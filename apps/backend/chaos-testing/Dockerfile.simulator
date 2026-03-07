@@ -1,0 +1,23 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY chaos-testing/package.json ./chaos-testing/
+
+# Install dependencies
+RUN cd chaos-testing && npm ci
+
+# Copy chaos testing source
+COPY chaos-testing ./chaos-testing
+
+# Build TypeScript
+RUN cd chaos-testing && npm run build
+
+# Create reports directory
+RUN mkdir -p /app/reports
+
+WORKDIR /app/chaos-testing
+
+CMD ["node", "dist/simulateLoad.js"]

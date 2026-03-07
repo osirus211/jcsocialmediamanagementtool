@@ -1,0 +1,202 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: chaos-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - chaos-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7.2-alpine
+    container_name: chaos-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ..
+      dockerfile: chaos-testing/Dockerfile.api
+    container_name: chaos-api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: chaos-test
+      PORT: 3000
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/chaos-test?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TWITTER_CLIENT_ID: ${TWITTER_CLIENT_ID:-test_client_id}
+      TWITTER_CLIENT_SECRET: ${TWITTER_CLIENT_SECRET:-test_client_secret}
+      TWITTER_REDIRECT_URI: ${TWITTER_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-test_encryption_key_32_characters}
+      JWT_SECRET: ${JWT_SECRET:-test_jwt_secret}
+      GRACEFUL_DEGRADATION_ENABLED: "true"
+      LOG_LEVEL: info
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chaos-network
+    restart: unless-stopped
+
+  # Publishing Worker (Scalable)
+  publishing-worker:
+    build:
+      context: ..
+      dockerfile: chaos-testing/Dockerfile.worker
+    environment:
+      NODE_ENV: chaos-test
+      WORKER_TYPE: publishing
+      WORKER_CONCURRENCY: ${PUBLISHING_WORKER_CONCURRENCY:-5}
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/chaos-test?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TWITTER_CLIENT_ID: ${TWITTER_CLIENT_ID:-test_client_id}
+      TWITTER_CLIENT_SECRET: ${TWITTER_CLIENT_SECRET:-test_client_secret}
+      TWITTER_REDIRECT_URI: ${TWITTER_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-test_encryption_key_32_characters}
+      GRACEFUL_DEGRADATION_ENABLED: "true"
+      LOG_LEVEL: info
+      # Chaos flags
+      CHAOS_ENABLED: ${CHAOS_ENABLED:-true}
+      CHAOS_WORKER_CRASH_RATE: ${CHAOS_WORKER_CRASH_RATE:-0.01}
+      CHAOS_PLATFORM_429_RATE: ${CHAOS_PLATFORM_429_RATE:-0.1}
+      CHAOS_PLATFORM_500_RATE: ${CHAOS_PLATFORM_500_RATE:-0.05}
+      CHAOS_NETWORK_TIMEOUT_RATE: ${CHAOS_NETWORK_TIMEOUT_RATE:-0.05}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chaos-network
+    restart: unless-stopped
+    deploy:
+      replicas: ${PUBLISHING_WORKER_REPLICAS:-3}
+
+  # Refresh Worker (Scalable)
+  refresh-worker:
+    build:
+      context: ..
+      dockerfile: chaos-testing/Dockerfile.worker
+    environment:
+      NODE_ENV: chaos-test
+      WORKER_TYPE: refresh
+      WORKER_CONCURRENCY: ${REFRESH_WORKER_CONCURRENCY:-3}
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/chaos-test?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TWITTER_CLIENT_ID: ${TWITTER_CLIENT_ID:-test_client_id}
+      TWITTER_CLIENT_SECRET: ${TWITTER_CLIENT_SECRET:-test_client_secret}
+      TWITTER_REDIRECT_URI: ${TWITTER_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-test_encryption_key_32_characters}
+      GRACEFUL_DEGRADATION_ENABLED: "true"
+      LOG_LEVEL: info
+      # Chaos flags
+      CHAOS_ENABLED: ${CHAOS_ENABLED:-true}
+      CHAOS_TOKEN_CORRUPTION_RATE: ${CHAOS_TOKEN_CORRUPTION_RATE:-0.02}
+      CHAOS_TOKEN_REVOCATION_RATE: ${CHAOS_TOKEN_REVOCATION_RATE:-0.01}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chaos-network
+    restart: unless-stopped
+    deploy:
+      replicas: ${REFRESH_WORKER_REPLICAS:-2}
+
+  # Metrics Exporter
+  metrics-exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.metrics
+    container_name: chaos-metrics-exporter
+    ports:
+      - "9090:9090"
+    environment:
+      NODE_ENV: chaos-test
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/chaos-test?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      METRICS_PORT: 9090
+      METRICS_INTERVAL: 5000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chaos-network
+    restart: unless-stopped
+
+  # Load Simulator
+  load-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: chaos-load-simulator
+    environment:
+      NODE_ENV: chaos-test
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/chaos-test?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      API_URL: http://api:3000
+      # Load configuration
+      ACCOUNTS: ${ACCOUNTS:-1000}
+      POSTS: ${POSTS:-5000}
+      PUBLISH_RATE: ${PUBLISH_RATE:-5}
+      REFRESH_EXPIRY_BURST: ${REFRESH_EXPIRY_BURST:-500}
+      FAILURE_RATE: ${FAILURE_RATE:-0.1}
+      DURATION_MINUTES: ${DURATION_MINUTES:-30}
+      # Chaos configuration
+      CHAOS_ENABLED: ${CHAOS_ENABLED:-true}
+      CHAOS_KILL_WORKER_INTERVAL: ${CHAOS_KILL_WORKER_INTERVAL:-300000}
+      CHAOS_REDIS_DELAY_RATE: ${CHAOS_REDIS_DELAY_RATE:-0.05}
+      CHAOS_RESTART_REDIS_INTERVAL: ${CHAOS_RESTART_REDIS_INTERVAL:-600000}
+    depends_on:
+      - api
+      - publishing-worker
+      - refresh-worker
+      - metrics-exporter
+    networks:
+      - chaos-network
+    volumes:
+      - ./reports:/app/reports
+
+networks:
+  chaos-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:

@@ -1,0 +1,88 @@
+# RUNTIME_TRACE Runtime Verification Checklist
+
+## Pre-Flight Checks
+- [ ] Backend server is running (npm run dev)
+- [ ] MongoDB is connected
+- [ ] Redis is connected
+- [ ] Environment variables are set
+
+## RUNTIME_TRACE Log Verification
+
+### 1. Registration Flow
+- [ ] RUNTIME_TRACE REGISTER_START appears in logs
+- [ ] RUNTIME_TRACE USER_CREATING appears
+- [ ] RUNTIME_TRACE USER_CREATED appears
+- [ ] RUNTIME_TRACE WORKSPACE_CREATE_CHECK appears
+- [ ] RUNTIME_TRACE REGISTER_FLOW_END appears
+- [ ] RUNTIME_TRACE REGISTER_COMPLETE appears in controller
+- [ ] Workspace is auto-created for new user (check MongoDB)
+
+### 2. Duplicate Registration Block
+- [ ] RUNTIME_TRACE DUPLICATE_REGISTRATION_BLOCKED appears
+- [ ] 409 Conflict error returned
+- [ ] No duplicate user in database
+
+### 3. Login Flow
+- [ ] RUNTIME_TRACE LOGIN_START appears
+- [ ] RUNTIME_TRACE LOGIN_SUCCESS appears
+- [ ] 200 OK response with tokens
+- [ ] Refresh token stored in user document
+
+### 4. Token Refresh Flow
+- [ ] RUNTIME_TRACE REFRESH_START appears
+- [ ] RUNTIME_TRACE TOKEN_ROTATED appears
+- [ ] RUNTIME_TRACE REFRESH_SUCCESS appears
+- [ ] New tokens returned
+- [ ] Old refresh token removed, new one added
+
+### 5. Token Refresh Failure
+- [ ] RUNTIME_TRACE REFRESH_FAILED appears on invalid token
+- [ ] 401 Unauthorized error returned
+
+### 6. Tenant Middleware
+- [ ] RUNTIME_TRACE TENANT_CHECK appears on workspace routes
+- [ ] RUNTIME_TRACE TENANT_SUCCESS for valid workspace access
+- [ ] RUNTIME_TRACE TENANT_FAILED for invalid workspace access
+- [ ] 403 Forbidden for unauthorized workspace
+
+### 7. Invalid Token Rejection
+- [ ] RUNTIME_TRACE INVALID_TOKEN_REJECTED appears
+- [ ] 401 Unauthorized error returned
+- [ ] Request blocked before reaching controller
+
+## Metrics Verification
+- [ ] auth_register_total increments on registration
+- [ ] auth_login_total increments on login
+- [ ] auth_token_refresh_total increments on refresh
+- [ ] Metrics endpoint accessible at /api/v1/metrics
+
+## Redis Verification
+- [ ] Refresh tokens stored in Redis
+- [ ] Blacklisted tokens in Redis
+- [ ] TTL set correctly on tokens
+- [ ] No KEYS * commands used (only SCAN)
+
+## MongoDB Verification
+- [ ] User document created with correct fields
+- [ ] Workspace auto-created for new user
+- [ ] refreshTokens array populated
+- [ ] No duplicate users with same email
+- [ ] Soft delete works (softDeletedAt field)
+
+## Security Checks
+- [ ] Passwords are hashed (not plain text)
+- [ ] Refresh tokens are httpOnly cookies
+- [ ] No sensitive data in logs
+- [ ] No tokens in error messages
+- [ ] Rate limiting works on auth endpoints
+
+## Cleanup
+- [ ] Test users can be removed
+- [ ] RUNTIME_TRACE logs can be filtered/searched
+- [ ] No production data affected
+
+## Notes
+- All RUNTIME_TRACE logs include timestamp
+- Logs are searchable via "RUNTIME_TRACE" keyword
+- No authentication logic was modified
+- Only diagnostic instrumentation added

@@ -1,0 +1,475 @@
+import { create } from 'zustand';
+import {
+  PublishMode,
+  SaveStatus,
+  MediaFile,
+  QueueSlot,
+  SocialPlatform,
+} from '@/types/composer.types';
+
+/**
+ * Composer Store State
+ * Manages draft creation, editing, and publishing workflow
+ */
+interface ComposerState {
+  // Draft metadata
+  draftId: string | null;
+  isNewDraft: boolean;
+  
+  // Content
+  mainContent: string;
+  platformContent: Record<SocialPlatform, string>;
+  
+  // Media
+  media: MediaFile[];
+  
+  // Accounts
+  selectedAccounts: string[];
+  
+  // Publish settings
+  publishMode: PublishMode;
+  scheduledDate?: Date;
+  selectedQueueSlot?: QueueSlot;
+  
+  // UI state
+  activePlatformTab: SocialPlatform | null;
+  activePreviewTab: SocialPlatform | null;
+  
+  // Auto-save state
+  saveStatus: SaveStatus;
+  lastSaved?: Date;
+  saveError?: string;
+  hasUnsavedChanges: boolean;
+}
+
+/**
+ * Composer Store Actions
+ */
+interface ComposerActions {
+  // Content setters
+  setContent: (platform: SocialPlatform | 'main', content: string) => void;
+  setSelectedAccounts: (accountIds: string[]) => void;
+  setPublishMode: (mode: PublishMode) => void;
+  setScheduledDate: (date: Date | undefined) => void;
+  setQueueSlot: (slot: QueueSlot | undefined) => void;
+  
+  // Media management
+  addMedia: (files: File[]) => Promise<void>;
+  removeMedia: (mediaId: string) => void;
+  updateMediaProgress: (mediaId: string, progress: number) => void;
+  updateMediaStatus: (mediaId: string, status: MediaFile['uploadStatus'], errorMessage?: string) => void;
+  
+  // UI state
+  setActivePlatformTab: (platform: SocialPlatform | null) => void;
+  setActivePreviewTab: (platform: SocialPlatform | null) => void;
+  
+  // Save state
+  setSaveStatus: (status: SaveStatus) => void;
+  setSaveError: (error: string | undefined) => void;
+  setLastSaved: (date: Date | undefined) => void;
+  setHasUnsavedChanges: (hasChanges: boolean) => void;
+  
+  // Draft management
+  setDraftId: (draftId: string | null) => void;
+  setIsNewDraft: (isNew: boolean) => void;
+  saveDraft: () => Promise<void>;
+  
+  // Reset
+  reset: () => void;
+}
+
+type ComposerStore = ComposerState & ComposerActions;
+
+/**
+ * Initial state
+ */
+const initialState: ComposerState = {
+  draftId: null,
+  isNewDraft: true,
+  mainContent: '',
+  platformContent: {} as Record<SocialPlatform, string>,
+  media: [],
+  selectedAccounts: [],
+  publishMode: PublishMode.NOW,
+  scheduledDate: undefined,
+  selectedQueueSlot: undefined,
+  activePlatformTab: null,
+  activePreviewTab: null,
+  saveStatus: 'idle',
+  lastSaved: undefined,
+  saveError: undefined,
+  hasUnsavedChanges: false,
+};
+
+/**
+ * Composer Store
+ * 
+ * Design principles:
+ * - Minimal re-renders: Use granular selectors
+ * - Session persistence: draftId persisted to sessionStorage
+ * - Safe state updates: Immutable updates
+ * - Error resilience: Graceful error handling
+ * 
+ * Auto-save is handled by a separate hook (useAutoSave)
+ * to keep store logic clean and testable
+ */
+export const useComposerStore = create<ComposerStore>((set, get) => ({
+  ...initialState,
+
+  // ============================================
+  // CONTENT SETTERS
+  // ============================================
+
+  setContent: (platform, content) => {
+    if (platform === 'main') {
+      set({ mainContent: content, hasUnsavedChanges: true });
+    } else {
+      set((state) => ({
+        platformContent: {
+          ...state.platformContent,
+          [platform]: content,
+        },
+        hasUnsavedChanges: true,
+      }));
+    }
+  },
+
+  setSelectedAccounts: (accountIds) => {
+    set({ selectedAccounts: accountIds, hasUnsavedChanges: true });
+  },
+
+  setPublishMode: (mode) => {
+    set({ publishMode: mode, hasUnsavedChanges: true });
+  },
+
+  setScheduledDate: (date) => {
+    set({ scheduledDate: date, hasUnsavedChanges: true });
+  },
+
+  setQueueSlot: (slot) => {
+    set({ selectedQueueSlot: slot, hasUnsavedChanges: true });
+  },
+
+  // ============================================
+  // MEDIA MANAGEMENT
+  // ============================================
+
+  addMedia: async (files) => {
+    const { FILE_VALIDATION } = await import('@/types/composer.types');
+    const { composerService } = await import('@/services/composer.service');
+
+    // Validate and upload each file
+    for (const file of files) {
+      const fileId = `temp-${Date.now()}-${Math.random()}`;
+      
+      // Validate file type
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+      
+      if (!isImage && !isVideo) {
+        console.error(`Invalid file type: ${file.type}`);
+        continue;
+      }
+
+      const validation = isImage ? FILE_VALIDATION.image : FILE_VALIDATION.video;
+      
+      // Validate file type against allowed types
+      if (!validation.types.includes(file.type)) {
+        set((state) => ({
+          media: [
+            ...state.media,
+            {
+              id: fileId,
+              url: '',
+              type: isImage ? 'image' : 'video',
+              size: file.size,
+              filename: file.name,
+              mimeType: file.type,
+              uploadStatus: 'error',
+              errorMessage: `File type ${file.type} is not supported`,
+            },
+          ],
+        }));
+        continue;
+      }
+
+      // Validate file size
+      if (file.size > validation.maxSize) {
+        const maxSizeMB = validation.maxSize / (1024 * 1024);
+        set((state) => ({
+          media: [
+            ...state.media,
+            {
+              id: fileId,
+              url: '',
+              type: isImage ? 'image' : 'video',
+              size: file.size,
+              filename: file.name,
+              mimeType: file.type,
+              uploadStatus: 'error',
+              errorMessage: `File size exceeds ${maxSizeMB}MB limit`,
+            },
+          ],
+        }));
+        continue;
+      }
+
+      // Create temporary media item
+      const tempMedia: MediaFile = {
+        id: fileId,
+        url: URL.createObjectURL(file),
+        type: isImage ? 'image' : 'video',
+        size: file.size,
+        filename: file.name,
+        mimeType: file.type,
+        uploadProgress: 0,
+        uploadStatus: 'uploading',
+      };
+
+      set((state) => ({
+        media: [...state.media, tempMedia],
+        hasUnsavedChanges: true,
+      }));
+
+      // Upload file
+      try {
+        const uploadedMedia = await composerService.uploadMedia(
+          file,
+          (progress) => {
+            get().updateMediaProgress(fileId, progress);
+          }
+        );
+
+        // Update media with uploaded data
+        set((state) => ({
+          media: state.media.map((m) =>
+            m.id === fileId
+              ? {
+                  ...m,
+                  id: uploadedMedia._id,
+                  url: uploadedMedia.url,
+                  thumbnailUrl: uploadedMedia.thumbnailUrl,
+                  uploadProgress: 100,
+                  uploadStatus: 'completed',
+                }
+              : m
+          ),
+        }));
+      } catch (error: any) {
+        console.error('Failed to upload media:', error);
+        
+        set((state) => ({
+          media: state.media.map((m) =>
+            m.id === fileId
+              ? {
+                  ...m,
+                  uploadStatus: 'error',
+                  errorMessage: error.message || 'Upload failed',
+                }
+              : m
+          ),
+        }));
+      }
+    }
+  },
+
+  removeMedia: (mediaId) => {
+    set((state) => ({
+      media: state.media.filter((m) => m.id !== mediaId),
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  updateMediaProgress: (mediaId, progress) => {
+    set((state) => ({
+      media: state.media.map((m) =>
+        m.id === mediaId ? { ...m, uploadProgress: progress } : m
+      ),
+    }));
+  },
+
+  updateMediaStatus: (mediaId, status, errorMessage) => {
+    set((state) => ({
+      media: state.media.map((m) =>
+        m.id === mediaId
+          ? { ...m, uploadStatus: status, errorMessage }
+          : m
+      ),
+    }));
+  },
+
+  // ============================================
+  // UI STATE
+  // ============================================
+
+  setActivePlatformTab: (platform) => {
+    set({ activePlatformTab: platform });
+  },
+
+  setActivePreviewTab: (platform) => {
+    set({ activePreviewTab: platform });
+  },
+
+  // ============================================
+  // SAVE STATE
+  // ============================================
+
+  setSaveStatus: (status) => {
+    set({ saveStatus: status });
+  },
+
+  setSaveError: (error) => {
+    set({ saveError: error });
+  },
+
+  setLastSaved: (date) => {
+    set({ lastSaved: date });
+  },
+
+  setHasUnsavedChanges: (hasChanges) => {
+    set({ hasUnsavedChanges: hasChanges });
+  },
+
+  // ============================================
+  // DRAFT MANAGEMENT
+  // ============================================
+
+  setDraftId: (draftId) => {
+    set({ draftId });
+    
+    // Persist to sessionStorage
+    if (draftId) {
+      sessionStorage.setItem('composer_draft_id', draftId);
+    } else {
+      sessionStorage.removeItem('composer_draft_id');
+    }
+  },
+
+  setIsNewDraft: (isNew) => {
+    set({ isNewDraft: isNew });
+  },
+
+  // ============================================
+  // AUTO-SAVE
+  // ============================================
+
+  saveDraft: async () => {
+    const state = get();
+    
+    // Don't save if already saving
+    if (state.saveStatus === 'saving') {
+      return;
+    }
+
+    // Track retry attempts
+    const retryAttempts = (state as any).retryAttempts || 0;
+    const maxRetries = 3;
+
+    try {
+      set({ saveStatus: 'saving', saveError: undefined });
+
+      // Import service dynamically to avoid circular dependencies
+      const { composerService } = await import('@/services/composer.service');
+
+      // Prepare draft data
+      const platformContent = Object.entries(state.platformContent)
+        .filter(([_, text]) => text.trim().length > 0)
+        .map(([platform, text]) => ({
+          platform: platform as SocialPlatform,
+          text,
+          enabled: true,
+        }));
+
+      const draftData = {
+        content: state.mainContent,
+        socialAccountIds: state.selectedAccounts,
+        mediaIds: state.media
+          .filter((m) => m.uploadStatus === 'completed')
+          .map((m) => m.id),
+        platformContent: platformContent.length > 0 ? platformContent : undefined,
+      };
+
+      let savedDraft;
+
+      if (state.draftId && !state.isNewDraft) {
+        // Update existing draft
+        savedDraft = await composerService.updateDraft(state.draftId, draftData);
+      } else {
+        // Create new draft
+        savedDraft = await composerService.createDraft(draftData);
+        set({ draftId: savedDraft._id, isNewDraft: false });
+        
+        // Persist to sessionStorage
+        sessionStorage.setItem('composer_draft_id', savedDraft._id);
+      }
+
+      // Mark as saved and reset retry counter
+      set({
+        saveStatus: 'saved',
+        lastSaved: new Date(),
+        hasUnsavedChanges: false,
+        saveError: undefined,
+        retryAttempts: 0,
+      } as any);
+
+      // Auto-transition to idle after 3 seconds
+      setTimeout(() => {
+        if (get().saveStatus === 'saved') {
+          set({ saveStatus: 'idle' });
+        }
+      }, 3000);
+
+    } catch (error: any) {
+      console.error('Failed to save draft:', error);
+      
+      const isNetworkError = !navigator.onLine || error.message?.includes('network') || error.message?.includes('fetch');
+      const errorMessage = isNetworkError 
+        ? 'Network error. Changes will be saved when connection is restored.'
+        : error.message || 'Failed to save draft';
+      
+      set({
+        saveStatus: 'error',
+        saveError: errorMessage,
+        retryAttempts: retryAttempts + 1,
+      } as any);
+
+      // Retry with exponential backoff if under max retries
+      if (retryAttempts < maxRetries) {
+        const retryDelay = Math.min(5000 * Math.pow(2, retryAttempts), 30000); // Max 30 seconds
+        
+        setTimeout(() => {
+          const currentState = get();
+          if (currentState.saveStatus === 'error' && currentState.hasUnsavedChanges) {
+            console.log(`Retrying auto-save (attempt ${retryAttempts + 1}/${maxRetries})...`);
+            currentState.saveDraft();
+          }
+        }, retryDelay);
+      } else {
+        // Max retries reached
+        console.error('Max auto-save retries reached. Manual save required.');
+      }
+    }
+  },
+
+  // ============================================
+  // RESET
+  // ============================================
+
+  reset: () => {
+    // Clear sessionStorage
+    sessionStorage.removeItem('composer_draft_id');
+    
+    // Reset to initial state
+    set(initialState);
+  },
+}));
+
+/**
+ * Restore draft ID from sessionStorage on app load
+ */
+export const restoreComposerSession = () => {
+  const draftId = sessionStorage.getItem('composer_draft_id');
+  if (draftId) {
+    useComposerStore.getState().setDraftId(draftId);
+  }
+};

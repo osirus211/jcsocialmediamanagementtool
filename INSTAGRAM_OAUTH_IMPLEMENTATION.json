@@ -1,0 +1,161 @@
+{
+  "oldFacebookInstagramFlowRemoved": true,
+  "instagramOAuthImplemented": true,
+  "longLivedTokenWorking": true,
+  "refreshWorkerActive": true,
+  "implementation": {
+    "architecture": "Standalone Instagram Business OAuth (ig_biz_login_oauth)",
+    "removed": [
+      "Instagram detection from Facebook Pages",
+      "saveInstagramAccount() method in FacebookOAuthService",
+      "getInstagramBusinessAccount() method in FacebookOAuthProvider",
+      "InstagramBusinessAccount interface"
+    ],
+    "created": [
+      {
+        "file": "apps/backend/src/services/oauth/InstagramOAuthProvider.ts",
+        "description": "Instagram Business OAuth provider",
+        "features": [
+          "Authorization URL: https://www.instagram.com/oauth/authorize",
+          "Token exchange: POST https://api.instagram.com/oauth/access_token",
+          "Long-lived token exchange: GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token",
+          "Profile fetch: GET https://graph.instagram.com/me?fields=id,username,account_type,media_count",
+          "Account type validation: Only BUSINESS and CREATOR accounts allowed",
+          "Token refresh: ig_refresh_token grant type"
+        ],
+        "scopes": [
+          "instagram_basic",
+          "instagram_content_publish",
+          "instagram_manage_insights",
+          "instagram_manage_comments",
+          "instagram_manage_messages"
+        ]
+      },
+      {
+        "file": "apps/backend/src/services/oauth/InstagramOAuthService.ts",
+        "description": "Instagram OAuth service with UPSERT logic",
+        "features": [
+          "Long-lived token exchange (60 days)",
+          "Account type validation",
+          "UPSERT behavior for reconnections",
+          "AES-256-GCM token encryption",
+          "Security audit logging",
+          "Capability flags: publish, analytics, messaging"
+        ]
+      },
+      {
+        "file": "apps/backend/src/workers/InstagramTokenRefreshWorker.ts",
+        "description": "Background token refresh worker",
+        "schedule": "Every 12 hours",
+        "logic": [
+          "Find accounts with tokenExpiresAt < 7 days",
+          "Refresh using ig_refresh_token",
+          "Update accessTokenEncrypted and tokenExpiresAt",
+          "Mark as REAUTH_REQUIRED if refresh fails"
+        ]
+      }
+    ],
+    "modified": [
+      {
+        "file": "apps/backend/src/controllers/OAuthController.ts",
+        "changes": [
+          "Added getInstagramConfig() method",
+          "Added Instagram to authorize() method",
+          "Added Instagram to callback() method",
+          "Added handleInstagramCallback() method",
+          "Added Instagram to getPlatforms() method",
+          "Platform validation updated to include 'instagram'"
+        ]
+      },
+      {
+        "file": "apps/backend/src/config/index.ts",
+        "changes": [
+          "Added INSTAGRAM_CALLBACK_URL to env schema",
+          "Added instagram.callbackUrl to oauth config"
+        ]
+      },
+      {
+        "file": "apps/backend/.env.example",
+        "changes": [
+          "Added INSTAGRAM_CALLBACK_URL example"
+        ]
+      }
+    ]
+  },
+  "oauth_flow": {
+    "endpoints": {
+      "authorize": "POST /api/v1/oauth/instagram/authorize",
+      "callback": "GET /api/v1/oauth/instagram/callback"
+    },
+    "state": {
+      "size": "256-bit",
+      "storage": "Redis",
+      "ttl": "600 seconds",
+      "consumption": "Atomic getdel",
+      "binding": "workspaceId + IP"
+    },
+    "token_exchange": {
+      "step1": "Exchange code for short-lived token",
+      "step2": "Exchange for long-lived token (60 days) via ig_exchange_token",
+      "step3": "Fetch profile with account_type validation",
+      "step4": "Save account with UPSERT"
+    }
+  },
+  "security": {
+    "encryption": "AES-256-GCM",
+    "stateAtomicity": "redis.getdel() with Lua fallback",
+    "ipBinding": true,
+    "tokenLogging": "None (tokens never logged)",
+    "accountTypeValidation": "Only BUSINESS and CREATOR allowed",
+    "uniqueIndex": "workspaceId + platform + platformAccountId",
+    "auditLogging": "All OAuth events logged"
+  },
+  "database": {
+    "platform": "instagram",
+    "platformAccountId": "Instagram user ID",
+    "accountName": "Instagram username",
+    "accessToken": "Encrypted long-lived token",
+    "tokenExpiresAt": "60 days from exchange",
+    "metadata": {
+      "accountType": "BUSINESS or CREATOR",
+      "mediaCount": "Number of media posts",
+      "capabilities": {
+        "publish": true,
+        "analytics": true,
+        "messaging": true
+      }
+    },
+    "upsert": true
+  },
+  "token_refresh_worker": {
+    "file": "apps/backend/src/workers/InstagramTokenRefreshWorker.ts",
+    "schedule": "Every 12 hours",
+    "threshold": "7 days before expiry",
+    "method": "ig_refresh_token",
+    "onFailure": "status = REAUTH_REQUIRED"
+  },
+  "frontend": {
+    "changes": "None required",
+    "behavior": "Instagram accounts appear in Connected Accounts list"
+  },
+  "testing": {
+    "steps": [
+      "Add Instagram OAuth credentials to .env",
+      "Start backend server",
+      "Click 'Connect Instagram' in frontend",
+      "Complete Instagram Business Login flow",
+      "Verify account appears in Connected Accounts",
+      "Verify token is encrypted in database",
+      "Verify tokenExpiresAt is set to 60 days",
+      "Verify account_type is BUSINESS or CREATOR"
+    ]
+  },
+  "next_phases": {
+    "phase_4": "Publishing Pipeline (not implemented)",
+    "phase_5": "Analytics Module (not implemented)",
+    "phase_6": "Messaging/Chat (not implemented)",
+    "phase_7": "Token Refresh Worker (IMPLEMENTED)",
+    "phase_8": "Agency Model/RBAC (not implemented)",
+    "phase_9": "Rate Limit Handler (not implemented)"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "content": "This is a production test draft post for validation testing",
+  "platforms": ["twitter", "linkedin"],
+  "scheduledFor": null,
+  "status": "draft"
+}

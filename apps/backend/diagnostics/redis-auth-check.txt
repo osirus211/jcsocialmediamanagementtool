@@ -1,0 +1,35 @@
+# RUNTIME_TRACE Redis Verification Commands
+# SAFE read-only Redis checks (never use KEYS *)
+
+# Connect to Redis
+redis-cli
+
+# Check keyspace info
+INFO keyspace
+
+# Get database size
+DBSIZE
+
+# Scan for auth-related keys (SAFE - uses cursor)
+SCAN 0 MATCH auth:* COUNT 100
+SCAN 0 MATCH session:* COUNT 100
+SCAN 0 MATCH refresh:* COUNT 100
+SCAN 0 MATCH token:* COUNT 100
+SCAN 0 MATCH blacklist:* COUNT 100
+
+# Check specific patterns (replace with actual keys from SCAN)
+# Example: GET auth:user:123
+# Example: TTL refresh:token:abc123
+# Example: EXISTS blacklist:token:xyz789
+
+# Check rate limiting keys
+SCAN 0 MATCH rate-limit:* COUNT 100
+
+# Memory usage
+INFO memory
+
+# Exit
+EXIT
+
+# IMPORTANT: Never use KEYS * in production!
+# Always use SCAN with MATCH pattern

@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY chaos-testing/package.json ./chaos-testing/
+
+# Install dependencies
+RUN cd chaos-testing && npm ci
+
+# Copy chaos testing source
+COPY chaos-testing ./chaos-testing
+
+# Build TypeScript
+RUN cd chaos-testing && npm run build
+
+WORKDIR /app/chaos-testing
+
+EXPOSE 9090
+
+CMD ["node", "dist/metricsCollector.js"]

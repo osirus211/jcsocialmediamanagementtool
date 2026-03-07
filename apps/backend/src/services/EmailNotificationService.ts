@@ -1,0 +1,220 @@
+/**
+ * Email Notification Service
+ * 
+ * Sends email notifications for critical events
+ */
+
+import mongoose from 'mongoose';
+import { SystemEvent } from './EventService';
+import { logger } from '../utils/logger';
+
+// Email service interface (can be implemented with SendGrid, AWS SES, etc.)
+interface EmailProvider {
+  sendEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void>;
+}
+
+// Mock email provider for development
+class MockEmailProvider implements EmailProvider {
+  async sendEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    logger.info('Mock email sent:', {
+      to: params.to,
+      subject: params.subject,
+    });
+  }
+}
+
+export class EmailNotificationService {
+  private emailProvider: EmailProvider;
+
+  constructor() {
+    // In production, initialize with real email provider (SendGrid, AWS SES, etc.)
+    this.emailProvider = new MockEmailProvider();
+  }
+
+  /**
+   * Send email notification
+   */
+  async sendNotification(params: {
+    eventType: SystemEvent;
+    workspaceId: string;
+    userId?: string;
+    payload: Record<string, any>;
+  }): Promise<void> {
+    const { eventType, workspaceId, userId, payload } = params;
+
+    try {
+      // Get email details
+      const emailDetails = this.getEmailDetails(eventType, payload);
+      if (!emailDetails) {
+        logger.debug(`No email template for event: ${eventType}`);
+        return;
+      }
+
+      // Get recipient email
+      const recipientEmail = await this.getRecipientEmail(workspaceId, userId);
+      if (!recipientEmail) {
+        logger.warn('No recipient email found');
+        return;
+      }
+
+      // Send email
+      await this.emailProvider.sendEmail({
+        to: recipientEmail,
+        subject: emailDetails.subject,
+        html: emailDetails.html,
+        text: emailDetails.text,
+      });
+
+      logger.info(`Email sent for event: ${eventType}`, {
+        to: recipientEmail,
+        subject: emailDetails.subject,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send email notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get email details based on event type
+   */
+  private getEmailDetails(
+    eventType: SystemEvent,
+    payload: Record<string, any>
+  ): {
+    subject: string;
+    html: string;
+    text: string;
+  } | null {
+    const templates: Partial<Record<SystemEvent, any>> = {
+      [SystemEvent.POST_FAILED]: {
+        subject: `Post Failed: ${payload.platform}`,
+        html: this.getPostFailedHtml(payload),
+        text: `Your post failed to publish to ${payload.platform}. Error: ${payload.error}. Please check your connection and try again.`,
+      },
+      [SystemEvent.APPROVAL_REQUIRED]: {
+        subject: 'Post Approval Required',
+        html: this.getApprovalRequiredHtml(payload),
+        text: `A new post is waiting for your approval. Content: ${payload.content}`,
+      },
+      [SystemEvent.CONNECTION_EXPIRED]: {
+        subject: `${payload.platform} Connection Expired`,
+        html: this.getConnectionExpiredHtml(payload),
+        text: `Your ${payload.platform} connection has expired. Please reconnect your account to continue publishing.`,
+      },
+      [SystemEvent.SUBSCRIPTION_FAILED]: {
+        subject: 'Subscription Payment Failed',
+        html: this.getSubscriptionFailedHtml(payload),
+        text: `Your subscription payment failed: ${payload.reason}. Please update your payment method to avoid service interruption.`,
+      },
+      [SystemEvent.PAYMENT_FAILED]: {
+        subject: 'Payment Failed',
+        html: this.getPaymentFailedHtml(payload),
+        text: `Payment of $${(payload.amount / 100).toFixed(2)} failed: ${payload.reason}. Please update your payment method.`,
+      },
+      [SystemEvent.TRIAL_ENDING]: {
+        subject: `Trial Ending in ${payload.daysRemaining} Days`,
+        html: this.getTrialEndingHtml(payload),
+        text: `Your trial ends in ${payload.daysRemaining} days. Upgrade now to continue using all features.`,
+      },
+      [SystemEvent.LIMIT_REACHED]: {
+        subject: `${payload.limitType} Limit Reached`,
+        html: this.getLimitReachedHtml(payload),
+        text: `You've reached your ${payload.limitType} limit (${payload.limit}). Upgrade your plan for more capacity.`,
+      },
+    };
+
+    return templates[eventType] || null;
+  }
+
+  /**
+   * Email templates
+   */
+  private getPostFailedHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Post Publishing Failed</h2>
+      <p>Your post failed to publish to <strong>${payload.platform}</strong>.</p>
+      <p><strong>Error:</strong> ${payload.error}</p>
+      <p>Please check your connection and try again.</p>
+      <a href="${process.env.APP_URL}/posts/${payload.postId}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Post</a>
+    `;
+  }
+
+  private getApprovalRequiredHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Post Approval Required</h2>
+      <p>A new post is waiting for your approval.</p>
+      <p><strong>Content:</strong> ${payload.content.substring(0, 200)}${payload.content.length > 200 ? '...' : ''}</p>
+      <a href="${process.env.APP_URL}/approvals/${payload.postId}" style="background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Review Post</a>
+    `;
+  }
+
+  private getConnectionExpiredHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Connection Expired</h2>
+      <p>Your <strong>${payload.platform}</strong> connection has expired.</p>
+      <p>Please reconnect your account to continue publishing posts.</p>
+      <a href="${process.env.APP_URL}/settings/connections" style="background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reconnect Account</a>
+    `;
+  }
+
+  private getSubscriptionFailedHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Subscription Payment Failed</h2>
+      <p>Your subscription payment failed: <strong>${payload.reason}</strong></p>
+      <p>Please update your payment method to avoid service interruption.</p>
+      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #F44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Payment Method</a>
+    `;
+  }
+
+  private getPaymentFailedHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Payment Failed</h2>
+      <p>Payment of <strong>$${(payload.amount / 100).toFixed(2)}</strong> failed: ${payload.reason}</p>
+      <p>Please update your payment method.</p>
+      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #F44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Payment Method</a>
+    `;
+  }
+
+  private getTrialEndingHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Trial Ending Soon</h2>
+      <p>Your trial ends in <strong>${payload.daysRemaining} days</strong>.</p>
+      <p>Upgrade now to continue using all features without interruption.</p>
+      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Upgrade Now</a>
+    `;
+  }
+
+  private getLimitReachedHtml(payload: Record<string, any>): string {
+    return `
+      <h2>Limit Reached</h2>
+      <p>You've reached your <strong>${payload.limitType}</strong> limit (${payload.limit}).</p>
+      <p>Upgrade your plan for more capacity.</p>
+      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #FF5722; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Upgrade Plan</a>
+    `;
+  }
+
+  /**
+   * Get recipient email
+   */
+  private async getRecipientEmail(
+    workspaceId: string,
+    userId?: string
+  ): Promise<string | null> {
+    // TODO: Query user email from database
+    // For now, return placeholder
+    return 'user@example.com';
+  }
+}
+
+export const emailNotificationService = new EmailNotificationService();

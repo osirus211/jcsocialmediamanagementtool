@@ -1,0 +1,115 @@
+# HELP process_uptime_seconds Process uptime in seconds
+# TYPE process_uptime_seconds gauge
+process_uptime_seconds 664
+
+# HELP process_memory_usage_bytes Process memory usage in bytes
+# TYPE process_memory_usage_bytes gauge
+process_memory_usage_bytes 140394496
+
+# HELP cpu_load_average CPU load average (1 minute)
+# TYPE cpu_load_average gauge
+cpu_load_average 0.00
+
+# HELP worker_alive Publishing worker alive status (1=alive, 0=dead)
+# TYPE worker_alive gauge
+worker_alive 1
+
+# HELP publish_success_total Total successful publishes
+# TYPE publish_success_total counter
+publish_success_total 0
+
+# HELP publish_failed_total Total failed publishes
+# TYPE publish_failed_total counter
+publish_failed_total 8
+
+# HELP publish_retry_total Total publish retries
+# TYPE publish_retry_total counter
+publish_retry_total 12
+
+# HELP publish_skipped_total Total skipped publishes
+# TYPE publish_skipped_total counter
+publish_skipped_total 0
+
+# HELP active_jobs Number of active publishing jobs
+# TYPE active_jobs gauge
+active_jobs 0
+
+# HELP scheduler_alive Scheduler alive status (1=alive, 0=dead)
+# TYPE scheduler_alive gauge
+scheduler_alive 1
+
+# HELP queue_waiting_jobs Number of jobs waiting in queue
+# TYPE queue_waiting_jobs gauge
+queue_waiting_jobs 0
+
+# HELP queue_active_jobs Number of active jobs in queue
+# TYPE queue_active_jobs gauge
+queue_active_jobs 0
+
+# HELP queue_completed_jobs Total completed jobs in queue
+# TYPE queue_completed_jobs counter
+queue_completed_jobs 0
+
+# HELP queue_failed_jobs Total failed jobs in queue
+# TYPE queue_failed_jobs counter
+queue_failed_jobs 8
+
+# HELP queue_delayed_jobs Number of delayed jobs in queue
+# TYPE queue_delayed_jobs gauge
+queue_delayed_jobs 0
+
+# HELP queue_failure_rate Queue failure rate percentage
+# TYPE queue_failure_rate gauge
+queue_failure_rate 100.00
+
+# HELP token_refresh_success_total Total successful token refreshes
+# TYPE token_refresh_success_total counter
+token_refresh_success_total 3
+
+# HELP token_refresh_failed_total Total failed token refreshes
+# TYPE token_refresh_failed_total counter
+token_refresh_failed_total 0
+
+# HELP token_refresh_retry_total Total token refresh retries
+# TYPE token_refresh_retry_total counter
+token_refresh_retry_total 0
+
+# HELP token_refresh_skipped_total Total skipped token refreshes
+# TYPE token_refresh_skipped_total counter
+token_refresh_skipped_total 0
+
+# HELP backup_verify_success_total Total successful backup verifications
+# TYPE backup_verify_success_total counter
+backup_verify_success_total 0
+
+# HELP backup_verify_failed_total Total failed backup verifications
+# TYPE backup_verify_failed_total counter
+backup_verify_failed_total 0
+
+# HELP backup_verify_last_duration_seconds Duration of last backup verification in seconds
+# TYPE backup_verify_last_duration_seconds gauge
+backup_verify_last_duration_seconds 0
+
+# HELP backpressure_detected Queue backpressure detected (1=yes, 0=no)
+# TYPE backpressure_detected gauge
+backpressure_detected 1
+
+# HELP backpressure_waiting_jobs Number of waiting jobs in queue
+# TYPE backpressure_waiting_jobs gauge
+backpressure_waiting_jobs 0
+
+# HELP backpressure_growth_rate Queue growth rate (jobs/second)
+# TYPE backpressure_growth_rate gauge
+backpressure_growth_rate 0.00
+
+# HELP backpressure_avg_job_time Average job processing time estimate (seconds)
+# TYPE backpressure_avg_job_time gauge
+backpressure_avg_job_time 0.00
+
+# HELP backpressure_backlog_age Age of oldest job in backlog (seconds)
+# TYPE backpressure_backlog_age gauge
+backpressure_backlog_age 0
+
+# HELP backpressure_alerts_sent Total backpressure alerts sent
+# TYPE backpressure_alerts_sent counter
+backpressure_alerts_sent 0

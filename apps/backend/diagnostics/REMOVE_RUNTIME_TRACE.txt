@@ -1,0 +1,108 @@
+# Instructions to Remove RUNTIME_TRACE Instrumentation
+
+## Overview
+All RUNTIME_TRACE diagnostic logs can be safely removed by searching for "RUNTIME_TRACE" and deleting those lines.
+
+## Files Modified
+The following files contain RUNTIME_TRACE instrumentation:
+
+1. apps/backend/src/controllers/AuthController.ts
+2. apps/backend/src/services/AuthService.ts
+3. apps/backend/src/middleware/auth.ts
+4. apps/backend/src/middleware/tenant.ts
+
+## Removal Steps
+
+### Option 1: Manual Removal
+1. Open each file listed above
+2. Search for "RUNTIME_TRACE"
+3. Delete lines containing logger.info('RUNTIME_TRACE ...')
+4. Delete lines containing logger.error('RUNTIME_TRACE ...')
+5. Save files
+6. Recompile TypeScript: npm run build
+7. Restart server
+
+### Option 2: Automated Removal (Linux/Mac)
+```bash
+cd apps/backend/src
+
+# Remove RUNTIME_TRACE from controllers
+sed -i '/RUNTIME_TRACE/d' controllers/AuthController.ts
+
+# Remove RUNTIME_TRACE from services
+sed -i '/RUNTIME_TRACE/d' services/AuthService.ts
+
+# Remove RUNTIME_TRACE from middleware
+sed -i '/RUNTIME_TRACE/d' middleware/auth.ts
+sed -i '/RUNTIME_TRACE/d' middleware/tenant.ts
+
+# Rebuild
+npm run build
+```
+
+### Option 3: Automated Removal (Windows PowerShell)
+```powershell
+cd apps\backend\src
+
+# Remove RUNTIME_TRACE from all files
+Get-ChildItem -Recurse -Include *.ts | ForEach-Object {
+    (Get-Content $_.FullName) | Where-Object { $_ -notmatch 'RUNTIME_TRACE' } | Set-Content $_.FullName
+}
+
+# Rebuild
+npm run build
+```
+
+## Verification
+After removal:
+1. Search entire codebase for "RUNTIME_TRACE" - should return 0 results
+2. Run TypeScript compiler: npm run build
+3. Check for compilation errors
+4. Start server and verify auth still works
+5. Run tests: npm test
+
+## What Gets Removed
+- All logger.info('RUNTIME_TRACE ...') statements
+- All logger.error('RUNTIME_TRACE ...') statements
+- Approximately 15-20 lines total across 4 files
+
+## What Stays Intact
+- All authentication logic
+- All error handling
+- All existing logger statements (non-RUNTIME_TRACE)
+- All middleware functionality
+- All controller logic
+- All service methods
+
+## Safety Notes
+- No authentication logic is modified
+- No database operations are affected
+- No API responses are changed
+- Only diagnostic logging is removed
+- System returns to pre-instrumentation state
+
+## Rollback
+If you need to restore RUNTIME_TRACE logs:
+1. Use git to revert changes: git checkout HEAD -- apps/backend/src/
+2. Or re-apply the instrumentation manually
+
+## Diagnostics Directory
+The diagnostics/ folder can be safely deleted:
+```bash
+rm -rf apps/backend/diagnostics/
+```
+
+This folder contains:
+- auth-runtime-test.sh
+- mongo-auth-check.js
+- redis-auth-check.txt
+- metrics-auth-check.sh
+- AUTH_RUNTIME_CHECKLIST.txt
+- REMOVE_RUNTIME_TRACE.txt (this file)
+
+## Support
+If you encounter issues after removal:
+1. Check TypeScript compilation errors
+2. Verify no syntax errors introduced
+3. Review git diff to see what was removed
+4. Restore from backup if needed

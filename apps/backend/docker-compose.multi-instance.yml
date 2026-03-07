@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # Redis - Shared state store
+  redis:
+    image: redis:7.0-alpine
+    container_name: oauth-redis
+    ports:
+      - "6380:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --maxclients 10000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - oauth-network
+
+  # Backend Instance 1
+  backend-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oauth-backend-1
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - INSTANCE_ID=backend-1
+      - TRUST_PROXY=true
+      - VALIDATION_MODE=true
+      - FACEBOOK_APP_ID=validation-test
+      - FACEBOOK_APP_SECRET=validation-test
+      - INSTAGRAM_CLIENT_ID=validation-test
+      - INSTAGRAM_CLIENT_SECRET=validation-test
+      - INSTAGRAM_BASIC_APP_ID=validation-test
+      - INSTAGRAM_BASIC_APP_SECRET=validation-test
+      - INSTAGRAM_BASIC_REDIRECT_URI=https://validation.test/callback
+      - MONGODB_URI=mongodb://localhost:27017/validation
+      - JWT_SECRET=validation-test-secret-key-32-chars-min
+      - JWT_REFRESH_SECRET=validation-test-refresh-secret-key-32-chars-min
+    ports:
+      - "6001:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - oauth-network
+
+  # Backend Instance 2
+  backend-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oauth-backend-2
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - INSTANCE_ID=backend-2
+      - TRUST_PROXY=true
+      - VALIDATION_MODE=true
+      - FACEBOOK_APP_ID=validation-test
+      - FACEBOOK_APP_SECRET=validation-test
+      - INSTAGRAM_CLIENT_ID=validation-test
+      - INSTAGRAM_CLIENT_SECRET=validation-test
+      - INSTAGRAM_BASIC_APP_ID=validation-test
+      - INSTAGRAM_BASIC_APP_SECRET=validation-test
+      - INSTAGRAM_BASIC_REDIRECT_URI=https://validation.test/callback
+      - MONGODB_URI=mongodb://localhost:27017/validation
+      - JWT_SECRET=validation-test-secret-key-32-chars-min
+      - JWT_REFRESH_SECRET=validation-test-refresh-secret-key-32-chars-min
+    ports:
+      - "6002:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - oauth-network
+
+  # Backend Instance 3
+  backend-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oauth-backend-3
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - INSTANCE_ID=backend-3
+      - TRUST_PROXY=true
+      - VALIDATION_MODE=true
+      - FACEBOOK_APP_ID=validation-test
+      - FACEBOOK_APP_SECRET=validation-test
+      - INSTAGRAM_CLIENT_ID=validation-test
+      - INSTAGRAM_CLIENT_SECRET=validation-test
+      - INSTAGRAM_BASIC_APP_ID=validation-test
+      - INSTAGRAM_BASIC_APP_SECRET=validation-test
+      - INSTAGRAM_BASIC_REDIRECT_URI=https://validation.test/callback
+      - MONGODB_URI=mongodb://localhost:27017/validation
+      - JWT_SECRET=validation-test-secret-key-32-chars-min
+      - JWT_REFRESH_SECRET=validation-test-refresh-secret-key-32-chars-min
+    ports:
+      - "6003:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - oauth-network
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: oauth-nginx
+    ports:
+      - "6000:80"
+    volumes:
+      - ./nginx-multi-instance.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend-1
+      - backend-2
+      - backend-3
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - oauth-network
+
+networks:
+  oauth-network:
+    driver: bridge
