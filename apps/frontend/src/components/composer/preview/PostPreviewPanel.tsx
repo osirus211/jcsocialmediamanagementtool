@@ -117,8 +117,8 @@ export function PostPreviewPanel() {
               content={getContent('twitter')}
               media={media}
               accountName={getAccountInfo('twitter')?.accountName}
-              accountHandle={getAccountInfo('twitter')?.accountHandle}
-              accountAvatar={getAccountInfo('twitter')?.profileData?.avatarUrl}
+              accountHandle={getAccountInfo('twitter')?.accountId}
+              accountAvatar={getAccountInfo('twitter')?.metadata?.avatarUrl}
             />
           )}
           {activeTab === 'linkedin' && (
@@ -126,15 +126,15 @@ export function PostPreviewPanel() {
               content={getContent('linkedin')}
               media={media}
               accountName={getAccountInfo('linkedin')?.accountName}
-              accountAvatar={getAccountInfo('linkedin')?.profileData?.avatarUrl}
+              accountAvatar={getAccountInfo('linkedin')?.metadata?.avatarUrl}
             />
           )}
           {activeTab === 'instagram' && (
             <InstagramPreview
               content={getContent('instagram')}
               media={media}
-              accountUsername={getAccountInfo('instagram')?.accountHandle}
-              accountAvatar={getAccountInfo('instagram')?.profileData?.avatarUrl}
+              accountUsername={getAccountInfo('instagram')?.accountId}
+              accountAvatar={getAccountInfo('instagram')?.metadata?.avatarUrl}
             />
           )}
           {activeTab === 'facebook' && (
@@ -142,7 +142,7 @@ export function PostPreviewPanel() {
               content={getContent('facebook')}
               media={media}
               accountName={getAccountInfo('facebook')?.accountName}
-              accountAvatar={getAccountInfo('facebook')?.profileData?.avatarUrl}
+              accountAvatar={getAccountInfo('facebook')?.metadata?.avatarUrl}
             />
           )}
         </div>
