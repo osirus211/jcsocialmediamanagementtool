@@ -91,10 +91,11 @@ export class MediaProcessingWorker {
     const startTime = Date.now();
 
     try {
-      // Update media status to processing
-      await Media.findByIdAndUpdate(mediaId, {
-        status: MediaStatus.PROCESSING,
-      });
+      // Import MediaService dynamically to avoid circular dependencies
+      const { mediaService } = await import('../services/MediaService');
+
+      // Mark processing as started
+      await mediaService.markProcessingStarted(mediaId);
 
       logger.info('Processing media', {
         mediaId,
@@ -127,9 +128,8 @@ export class MediaProcessingWorker {
         });
       }
 
-      // Update media status to ready
-      await Media.findByIdAndUpdate(mediaId, {
-        status: MediaStatus.READY,
+      // Mark processing as completed with processed data
+      await mediaService.markProcessingCompleted(mediaId, {
         width: processedData.width,
         height: processedData.height,
         duration: processedData.duration,
@@ -156,14 +156,11 @@ export class MediaProcessingWorker {
         error: error.message,
       });
 
-      // Update media status to failed
-      await Media.findByIdAndUpdate(mediaId, {
-        status: MediaStatus.FAILED,
-        metadata: {
-          error: error.message,
-          failedAt: new Date(),
-        },
-      });
+      // Import MediaService dynamically
+      const { mediaService } = await import('../services/MediaService');
+
+      // Mark processing as failed
+      await mediaService.markProcessingFailed(mediaId, error.message);
 
       throw error;
     }
@@ -171,7 +168,21 @@ export class MediaProcessingWorker {
 
   private async fetchMediaFile(fileUrl: string): Promise<Buffer> {
     try {
-      const response = await axios.get(fileUrl, {
+      // Check if this is a storage key (not a full URL)
+      // If it's a storage key, generate a presigned download URL
+      let downloadUrl = fileUrl;
+      
+      if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+        // This is a storage key, generate presigned URL
+        const { mediaStorageService } = await import('../services/MediaStorageService');
+        downloadUrl = await mediaStorageService.generatePresignedDownloadUrl(fileUrl);
+        
+        logger.debug('Generated presigned download URL for media processing', {
+          storageKey: fileUrl,
+        });
+      }
+
+      const response = await axios.get(downloadUrl, {
         responseType: 'arraybuffer',
         timeout: 30000,
       });

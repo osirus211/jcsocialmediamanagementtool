@@ -28,6 +28,37 @@ async function startWorkers() {
     await connectRedis();
     console.log('✅ Redis connected\n');
 
+    // Step 2.5: Register WorkerManager with Redis recovery service
+    console.log('🔧 Registering WorkerManager with Redis recovery service...');
+    try {
+      const { getRecoveryService } = await import('./config/redis');
+      const recoveryService = getRecoveryService();
+      
+      if (recoveryService) {
+        recoveryService.registerService({
+          name: 'worker-manager',
+          isRunning: () => workerManager.isRunning(),
+          start: async () => {
+            logger.info('WorkerManager restarting after Redis reconnect');
+            await workerManager.startAll();
+          },
+          stop: async () => {
+            logger.info('WorkerManager stopping due to Redis disconnect');
+            await workerManager.stopAll();
+          },
+          requiresRedis: true,
+        });
+        
+        console.log('✅ WorkerManager registered with Redis recovery service\n');
+        logger.info('✅ WorkerManager registered with Redis recovery service');
+      }
+    } catch (error: any) {
+      console.log('⚠️  Failed to register WorkerManager with recovery service:', error.message);
+      logger.warn('Failed to register WorkerManager with recovery service', {
+        error: error.message,
+      });
+    }
+
     // Step 3: Import and register workers
     console.log('👷 Registering workers...');
     
@@ -70,6 +101,45 @@ async function startWorkers() {
       });
     } catch (error) {
       logger.info('Media processing worker not available');
+    }
+    
+    // API Key Cleanup Worker
+    try {
+      const { apiKeyCleanupWorker } = await import('./workers/ApiKeyCleanupWorker');
+      workerManager.registerWorker('api-key-cleanup-worker', apiKeyCleanupWorker, {
+        enabled: true,
+        maxRestarts: 3,
+        restartDelay: 5000,
+      });
+      logger.info('API key cleanup worker registered');
+    } catch (error) {
+      logger.info('API key cleanup worker not available');
+    }
+    
+    // API Key Usage Aggregation Worker
+    try {
+      const { apiKeyUsageAggregationWorker } = await import('./workers/ApiKeyUsageAggregationWorker');
+      workerManager.registerWorker('api-key-usage-aggregation-worker', apiKeyUsageAggregationWorker, {
+        enabled: true,
+        maxRestarts: 3,
+        restartDelay: 5000,
+      });
+      logger.info('API key usage aggregation worker registered');
+    } catch (error) {
+      logger.info('API key usage aggregation worker not available');
+    }
+    
+    // API Key Cache Maintenance Worker
+    try {
+      const { apiKeyCacheMaintenanceWorker } = await import('./workers/ApiKeyCacheMaintenanceWorker');
+      workerManager.registerWorker('api-key-cache-maintenance-worker', apiKeyCacheMaintenanceWorker, {
+        enabled: true,
+        maxRestarts: 3,
+        restartDelay: 5000,
+      });
+      logger.info('API key cache maintenance worker registered');
+    } catch (error) {
+      logger.info('API key cache maintenance worker not available');
     }
     
     console.log('✅ Workers registered\n');

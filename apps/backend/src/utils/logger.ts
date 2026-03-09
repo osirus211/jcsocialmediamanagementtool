@@ -1,6 +1,7 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
+import { config } from '../config';
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
@@ -180,12 +181,12 @@ const maskSensitiveData = winston.format((info) => {
 const transports: winston.transport[] = [];
 
 // Determine logs directory (absolute path for production)
-const logsDir = process.env.NODE_ENV === 'production' 
+const logsDir = config.env === 'production' 
   ? '/app/logs' 
   : path.join(process.cwd(), 'logs');
 
 // Console transport (development)
-if (process.env.NODE_ENV !== 'production') {
+if (config.env !== 'production') {
   transports.push(
     new winston.transports.Console({
       format: combine(colorize(), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), logFormat),
@@ -218,7 +219,7 @@ transports.push(
 
 // Create logger instance
 export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: config.logging.level,
   format: combine(errors({ stack: true }), maskSensitiveData(), timestamp()),
   transports,
   exitOnError: false,

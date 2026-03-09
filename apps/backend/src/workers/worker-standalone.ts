@@ -85,7 +85,7 @@ const startWorker = async () => {
     console.log('✓ First logger.info succeeded');
     logger.info(`Environment: ${config.env}`);
     console.log('✓ Second logger.info succeeded');
-    logger.info(`Worker concurrency: ${process.env.WORKER_CONCURRENCY || 5}`);
+    logger.info(`Worker concurrency: ${config.worker.concurrency}`);
     console.log('✓ Third logger.info succeeded');
 
     // Connect to databases

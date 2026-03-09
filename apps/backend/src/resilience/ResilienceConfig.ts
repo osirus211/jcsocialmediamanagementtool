@@ -4,6 +4,7 @@ import {
   AdmissionControlConfig,
   DegradedModeConfig,
 } from './types';
+import { config } from '../config';
 
 /**
  * Resilience Configuration
@@ -24,81 +25,81 @@ export class ResilienceConfig {
    */
   static readonly LOAD_THRESHOLDS = {
     // Enter thresholds (when load is increasing)
-    LOW_TO_ELEVATED_ENTER: parseFloat(process.env.LOAD_THRESHOLD_LOW_TO_ELEVATED_ENTER || '45'),
-    ELEVATED_TO_HIGH_ENTER: parseFloat(process.env.LOAD_THRESHOLD_ELEVATED_TO_HIGH_ENTER || '65'),
-    HIGH_TO_CRITICAL_ENTER: parseFloat(process.env.LOAD_THRESHOLD_HIGH_TO_CRITICAL_ENTER || '85'),
+    LOW_TO_ELEVATED_ENTER: config.resilience.loadThresholds.lowToElevatedEnter,
+    ELEVATED_TO_HIGH_ENTER: config.resilience.loadThresholds.elevatedToHighEnter,
+    HIGH_TO_CRITICAL_ENTER: config.resilience.loadThresholds.highToCriticalEnter,
     
     // Exit thresholds (when load is decreasing)
-    ELEVATED_TO_LOW_EXIT: parseFloat(process.env.LOAD_THRESHOLD_ELEVATED_TO_LOW_EXIT || '35'),
-    HIGH_TO_ELEVATED_EXIT: parseFloat(process.env.LOAD_THRESHOLD_HIGH_TO_ELEVATED_EXIT || '55'),
-    CRITICAL_TO_HIGH_EXIT: parseFloat(process.env.LOAD_THRESHOLD_CRITICAL_TO_HIGH_EXIT || '75'),
+    ELEVATED_TO_LOW_EXIT: config.resilience.loadThresholds.elevatedToLowExit,
+    HIGH_TO_ELEVATED_EXIT: config.resilience.loadThresholds.highToElevatedExit,
+    CRITICAL_TO_HIGH_EXIT: config.resilience.loadThresholds.criticalToHighExit,
   };
 
   /**
    * Load score weights
    */
   static readonly LOAD_WEIGHTS = {
-    queueDepth: parseFloat(process.env.LOAD_WEIGHT_QUEUE_DEPTH || '0.3'),
-    retryRate: parseFloat(process.env.LOAD_WEIGHT_RETRY_RATE || '0.3'),
-    rateLimitHits: parseFloat(process.env.LOAD_WEIGHT_RATE_LIMIT || '0.2'),
-    refreshBacklog: parseFloat(process.env.LOAD_WEIGHT_REFRESH_BACKLOG || '0.2'),
+    queueDepth: config.resilience.loadWeights.queueDepth,
+    retryRate: config.resilience.loadWeights.retryRate,
+    rateLimitHits: config.resilience.loadWeights.rateLimitHits,
+    refreshBacklog: config.resilience.loadWeights.refreshBacklog,
   };
 
   /**
    * Publish pacing configuration
    */
   static readonly PUBLISH_PACING: PublishPacingConfig = {
-    normalConcurrency: parseInt(process.env.PUBLISH_CONCURRENCY_NORMAL || '5', 10),
-    elevatedConcurrency: parseInt(process.env.PUBLISH_CONCURRENCY_ELEVATED || '4', 10),
-    highConcurrency: parseInt(process.env.PUBLISH_CONCURRENCY_HIGH || '2', 10),
-    criticalConcurrency: parseInt(process.env.PUBLISH_CONCURRENCY_CRITICAL || '0', 10),
-    delayNonCriticalMs: parseInt(process.env.PUBLISH_DELAY_NON_CRITICAL_MS || '5000', 10),
+    normalConcurrency: config.resilience.publishPacing.normalConcurrency,
+    elevatedConcurrency: config.resilience.publishPacing.elevatedConcurrency,
+    highConcurrency: config.resilience.publishPacing.highConcurrency,
+    criticalConcurrency: config.resilience.publishPacing.criticalConcurrency,
+    delayNonCriticalMs: config.resilience.publishPacing.delayNonCriticalMs,
   };
 
   /**
    * Refresh throttle configuration
    */
   static readonly REFRESH_THROTTLE: RefreshThrottleConfig = {
-    maxRefreshPerSecondPerPlatform: parseInt(process.env.REFRESH_MAX_PER_SEC_PER_PLATFORM || '10', 10),
-    jitterMs: parseInt(process.env.REFRESH_JITTER_MS || '1000', 10),
-    priorityThresholdHours: parseInt(process.env.REFRESH_PRIORITY_THRESHOLD_HOURS || '1', 10),
-    highLoadThresholdMinutes: parseInt(process.env.REFRESH_HIGH_LOAD_THRESHOLD_MIN || '30', 10),
-    criticalLoadThresholdMinutes: parseInt(process.env.REFRESH_CRITICAL_LOAD_THRESHOLD_MIN || '10', 10),
+    maxRefreshPerSecondPerPlatform: config.resilience.refreshThrottle.maxRefreshPerSecondPerPlatform,
+    jitterMs: config.resilience.refreshThrottle.jitterMs,
+    priorityThresholdHours: config.resilience.refreshThrottle.priorityThresholdHours,
+    highLoadThresholdMinutes: config.resilience.refreshThrottle.highLoadThresholdMinutes,
+    criticalLoadThresholdMinutes: config.resilience.refreshThrottle.criticalLoadThresholdMinutes,
   };
 
   /**
    * Admission control configuration
    */
   static readonly ADMISSION_CONTROL: AdmissionControlConfig = {
-    enableRejection: process.env.ADMISSION_ENABLE_REJECTION !== 'false',
-    enableDelay: process.env.ADMISSION_ENABLE_DELAY !== 'false',
-    retryAfterSeconds: parseInt(process.env.ADMISSION_RETRY_AFTER_SEC || '60', 10),
-    delayMs: parseInt(process.env.ADMISSION_DELAY_MS || '2000', 10),
+    enableRejection: config.resilience.admissionControl.enableRejection,
+    enableDelay: config.resilience.admissionControl.enableDelay,
+    retryAfterSeconds: config.resilience.admissionControl.retryAfterSeconds,
+    delayMs: config.resilience.admissionControl.delayMs,
   };
 
   /**
    * Degraded mode configuration
    */
   static readonly DEGRADED_MODE: DegradedModeConfig = {
-    p99LatencyThresholdMs: parseInt(process.env.DEGRADED_P99_LATENCY_THRESHOLD_MS || '5000', 10),
-    p99LatencySustainedSeconds: parseInt(process.env.DEGRADED_P99_SUSTAINED_SEC || '120', 10),
-    queueLagThresholdSeconds: parseInt(process.env.DEGRADED_QUEUE_LAG_THRESHOLD_SEC || '60', 10),
-    queueLagSustainedSeconds: parseInt(process.env.DEGRADED_QUEUE_LAG_SUSTAINED_SEC || '120', 10),
-    retryStormThreshold: parseInt(process.env.DEGRADED_RETRY_STORM_THRESHOLD || '100', 10),
-    recoveryStableSeconds: parseInt(process.env.DEGRADED_RECOVERY_STABLE_SEC || '300', 10),
-    disableAnalytics: process.env.DEGRADED_DISABLE_ANALYTICS !== 'false',
-    pauseNonEssential: process.env.DEGRADED_PAUSE_NON_ESSENTIAL !== 'false',
-    slowPublishPacing: process.env.DEGRADED_SLOW_PUBLISH_PACING !== 'false',
-    aggressiveRateLimitBackoff: process.env.DEGRADED_AGGRESSIVE_BACKOFF !== 'false',
+    p99LatencyThresholdMs: config.resilience.degradedMode.p99LatencyThresholdMs,
+    p99LatencySustainedSeconds: config.resilience.degradedMode.p99LatencySustainedSeconds,
+    queueLagThresholdSeconds: config.resilience.degradedMode.queueLagThresholdSeconds,
+    queueLagSustainedSeconds: config.resilience.degradedMode.queueLagSustainedSeconds,
+    retryStormThreshold: config.resilience.degradedMode.retryStormThreshold,
+    recoveryStableSeconds: config.resilience.degradedMode.recoveryStableSeconds,
+    disableAnalytics: config.resilience.degradedMode.disableAnalytics,
+    pauseNonEssential: config.resilience.degradedMode.pauseNonEssential,
+    slowPublishPacing: config.resilience.degradedMode.slowPublishPacing,
+    aggressiveRateLimitBackoff: config.resilience.degradedMode.aggressiveRateLimitBackoff,
   };
 
   /**
    * Monitoring intervals
    */
   static readonly MONITORING = {
-    backpressureCheckIntervalMs: parseInt(process.env.BACKPRESSURE_CHECK_INTERVAL_MS || '10000', 10),
-    degradedModeCheckIntervalMs: parseInt(process.env.DEGRADED_MODE_CHECK_INTERVAL_MS || '30000', 10),
-    metricsExportIntervalMs: parseInt(process.env.METRICS_EXPORT_INTERVAL_MS || '60000', 10),
+    backpressureCheckIntervalMs: config.resilience.monitoring.backpressureCheckIntervalMs,
+    degradedModeCheckIntervalMs: config.resilience.monitoring.degradedModeCheckIntervalMs,
+    metricsExportIntervalMs: config.resilience.monitoring.metricsExportIntervalMs,
   };
 
   /**
@@ -106,25 +107,25 @@ export class ResilienceConfig {
    */
   static readonly CONTROL_LOOP = {
     // EMA smoothing alpha (0.0 = no smoothing, 1.0 = no memory)
-    emaAlpha: parseFloat(process.env.CONTROL_LOOP_EMA_ALPHA || '0.2'),
+    emaAlpha: config.resilience.controlLoop.emaAlpha,
     
     // Minimum dwell time per state (milliseconds)
-    dwellTimeLowMs: parseInt(process.env.CONTROL_LOOP_DWELL_TIME_LOW_MS || '10000', 10),
-    dwellTimeElevatedMs: parseInt(process.env.CONTROL_LOOP_DWELL_TIME_ELEVATED_MS || '15000', 10),
-    dwellTimeHighMs: parseInt(process.env.CONTROL_LOOP_DWELL_TIME_HIGH_MS || '20000', 10),
-    dwellTimeCriticalMs: parseInt(process.env.CONTROL_LOOP_DWELL_TIME_CRITICAL_MS || '30000', 10),
+    dwellTimeLowMs: config.resilience.controlLoop.dwellTimeLowMs,
+    dwellTimeElevatedMs: config.resilience.controlLoop.dwellTimeElevatedMs,
+    dwellTimeHighMs: config.resilience.controlLoop.dwellTimeHighMs,
+    dwellTimeCriticalMs: config.resilience.controlLoop.dwellTimeCriticalMs,
     
     // Global transition cooldown (milliseconds)
-    transitionCooldownMs: parseInt(process.env.CONTROL_LOOP_TRANSITION_COOLDOWN_MS || '10000', 10),
+    transitionCooldownMs: config.resilience.controlLoop.transitionCooldownMs,
     
     // Oscillation detection
-    oscillationWindowMs: parseInt(process.env.CONTROL_LOOP_OSCILLATION_WINDOW_MS || '60000', 10),
-    oscillationThreshold: parseInt(process.env.CONTROL_LOOP_OSCILLATION_THRESHOLD || '5', 10),
-    oscillationFreezeMs: parseInt(process.env.CONTROL_LOOP_OSCILLATION_FREEZE_MS || '30000', 10),
+    oscillationWindowMs: config.resilience.controlLoop.oscillationWindowMs,
+    oscillationThreshold: config.resilience.controlLoop.oscillationThreshold,
+    oscillationFreezeMs: config.resilience.controlLoop.oscillationFreezeMs,
     
     // Concurrency ramping
-    rampIntervalMs: parseInt(process.env.CONTROL_LOOP_RAMP_INTERVAL_MS || '5000', 10),
-    rampStepSize: parseInt(process.env.CONTROL_LOOP_RAMP_STEP_SIZE || '1', 10),
+    rampIntervalMs: config.resilience.controlLoop.rampIntervalMs,
+    rampStepSize: config.resilience.controlLoop.rampStepSize,
   };
 
   /**

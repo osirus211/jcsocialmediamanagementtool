@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
+import { config } from '../config';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 import { AppError } from '../utils/errors';
+import { config } from '../config';
 
 export const errorHandler = (
   err: Error,
@@ -8,7 +11,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = config.env === 'production';
   
   // Log error with full context
   logger.error('Error occurred:', {
@@ -93,3 +96,4 @@ export const errorHandler = (
     ...(!isProduction && { stack: err.stack }),
   });
 };
+

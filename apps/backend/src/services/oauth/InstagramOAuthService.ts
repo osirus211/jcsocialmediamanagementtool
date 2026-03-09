@@ -30,6 +30,7 @@ import { SecurityEventType } from '../../models/SecurityEvent';
 import { assertNoDuplicateAccount } from '../../utils/duplicateAccountPrevention';
 import { validateTokenExpiration } from '../../utils/expirationGuard';
 import { logger } from '../../utils/logger';
+import { config } from '../../config';
 import mongoose from 'mongoose';
 
 export interface InstagramConnectParams {
@@ -91,10 +92,10 @@ export class InstagramOAuthService {
 
     // Only include Instagram Basic Display if credentials are configured
     const hasBasicCredentials = 
-      process.env.INSTAGRAM_BASIC_APP_ID && 
-      process.env.INSTAGRAM_BASIC_APP_SECRET &&
-      process.env.INSTAGRAM_BASIC_APP_ID !== 'your_instagram_basic_app_id_here' &&
-      process.env.INSTAGRAM_BASIC_APP_SECRET !== 'your_instagram_basic_app_secret_here';
+      config.oauth.instagramBasic.appId && 
+      config.oauth.instagramBasic.appSecret &&
+      config.oauth.instagramBasic.appId !== 'your_instagram_basic_app_id_here' &&
+      config.oauth.instagramBasic.appSecret !== 'your_instagram_basic_app_secret_here';
 
     if (hasBasicCredentials) {
       options.push({
@@ -128,13 +129,13 @@ export class InstagramOAuthService {
   }> {
     try {
       // Feature flag: Use new InstagramProfessionalProvider when enabled
-      if (process.env.USE_INSTAGRAM_PROFESSIONAL === 'true') {
+      if (config.features.useInstagramProfessional) {
         // Use new unified provider (Instagram API with Instagram Login)
         // Use Instagram Basic Display app credentials (not Facebook app)
         const professionalProvider = new InstagramProfessionalProvider(
-          process.env.INSTAGRAM_BASIC_APP_ID!,
-          process.env.INSTAGRAM_BASIC_APP_SECRET!,
-          process.env.INSTAGRAM_BASIC_REDIRECT_URI!
+          config.oauth.instagramBasic.appId!,
+          config.oauth.instagramBasic.appSecret!,
+          config.oauth.instagramBasic.redirectUri!
         );
 
         const { url, state } = await professionalProvider.getAuthorizationUrl();
@@ -183,7 +184,7 @@ export class InstagramOAuthService {
       });
 
       // Feature flag: Use new InstagramProfessionalProvider when enabled
-      if (process.env.USE_INSTAGRAM_PROFESSIONAL === 'true') {
+      if (config.features.useInstagramProfessional) {
         return await this.handleProfessionalAccount(params);
       }
 
@@ -482,9 +483,9 @@ export class InstagramOAuthService {
       // Create professional provider instance
       // Use Instagram Basic Display app credentials (not Facebook app)
       const professionalProvider = new InstagramProfessionalProvider(
-        process.env.INSTAGRAM_BASIC_APP_ID!,
-        process.env.INSTAGRAM_BASIC_APP_SECRET!,
-        process.env.INSTAGRAM_BASIC_REDIRECT_URI!
+        config.oauth.instagramBasic.appId!,
+        config.oauth.instagramBasic.appSecret!,
+        config.oauth.instagramBasic.redirectUri!
       );
 
       // Step 1: Exchange code for token

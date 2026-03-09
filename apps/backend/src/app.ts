@@ -8,6 +8,7 @@ import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { httpMetricsMiddleware } from './middleware/httpMetrics';
+import { publicApiMetricsMiddleware } from './middleware/publicApiMetrics';
 import { sanitizeInput } from './middleware/validate';
 import {
   requestId,
@@ -24,6 +25,7 @@ import {
   sentryTracingHandler 
 } from './monitoring/sentry';
 import apiV1Routes from './routes/v1';
+import publicApiV1Routes from './routes/public/v1';
 
 const app: Application = express();
 
@@ -60,8 +62,8 @@ app.use(
     origin: config.cors.origin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Workspace-ID'],
-    exposedHeaders: ['X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Workspace-ID', 'X-API-Key'],
+    exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-API-Version'],
     maxAge: 86400, // 24 hours
   })
 );
@@ -101,6 +103,9 @@ app.use(requestLogger);
 
 // HTTP metrics tracking
 app.use(httpMetricsMiddleware);
+
+// Public API metrics tracking
+app.use(publicApiMetricsMiddleware);
 
 // Health check endpoints (before API routes for fast response)
 app.get('/health', async (_req: Request, res: Response) => {
@@ -202,6 +207,123 @@ app.get('/health/ready', async (_req: Request, res: Response) => {
   }
 });
 
+// PHASE 3: Redis health endpoint
+app.get('/health/redis', async (_req: Request, res: Response) => {
+  try {
+    const { isRedisHealthy, getCircuitBreakerStatus, getRecoveryService } = await import('./config/redis');
+    
+    const isHealthy = isRedisHealthy();
+    const circuitBreaker = getCircuitBreakerStatus();
+    const recoveryService = getRecoveryService();
+    
+    const health = {
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      redis: {
+        connected: isHealthy,
+        circuitBreaker: {
+          state: circuitBreaker.state,
+          errorRate: circuitBreaker.errorRate,
+          errors: circuitBreaker.errors,
+          successes: circuitBreaker.successes,
+          lastError: circuitBreaker.lastError,
+          openedAt: circuitBreaker.openedAt,
+        },
+      },
+      recovery: recoveryService ? recoveryService.getStatus() : null,
+    };
+    
+    const statusCode = isHealthy ? 200 : 503;
+    res.status(statusCode).json(health);
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      message: 'Redis health check failed',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+    });
+  }
+});
+
+// PHASE 3: Worker health endpoint
+app.get('/health/workers', async (_req: Request, res: Response) => {
+  try {
+    const { WorkerManager } = await import('./services/WorkerManager');
+    const workerManager = WorkerManager.getInstance();
+    
+    const workerStatuses = workerManager.getStatus();
+    const isHealthy = workerManager.isHealthy();
+    const redisHealth = workerManager.getRedisHealth();
+    
+    const health = {
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      timestamp: new Date().toISOString(),
+      workers: workerStatuses,
+      redis: redisHealth,
+      summary: {
+        total: workerStatuses.length,
+        enabled: workerStatuses.filter(w => w.isEnabled).length,
+        running: workerStatuses.filter(w => w.isRunning).length,
+        healthy: isHealthy,
+      },
+    };
+    
+    const statusCode = isHealthy ? 200 : 503;
+    res.status(statusCode).json(health);
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      message: 'Worker health check failed',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+    });
+  }
+});
+
+// PHASE 3: Queue health endpoint
+app.get('/health/queues', async (_req: Request, res: Response) => {
+  try {
+    const { queueMonitoringService } = await import('./services/QueueMonitoringService');
+    
+    const queueStats = await queueMonitoringService.getAllQueueStats();
+    const monitoringStatus = queueMonitoringService.getStatus();
+    
+    // Determine overall health
+    const unhealthyQueues = queueStats.filter(q => q.health === 'unhealthy');
+    const degradedQueues = queueStats.filter(q => q.health === 'degraded');
+    
+    let overallStatus = 'healthy';
+    if (unhealthyQueues.length > 0) {
+      overallStatus = 'unhealthy';
+    } else if (degradedQueues.length > 0) {
+      overallStatus = 'degraded';
+    }
+    
+    const health = {
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      monitoring: monitoringStatus,
+      queues: queueStats,
+      summary: {
+        total: queueStats.length,
+        healthy: queueStats.filter(q => q.health === 'healthy').length,
+        degraded: degradedQueues.length,
+        unhealthy: unhealthyQueues.length,
+      },
+    };
+    
+    const statusCode = overallStatus === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      message: 'Queue health check failed',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (_req: Request, res: Response) => {
   res.json({
@@ -242,6 +364,9 @@ app.get('/internal/publishing-health', async (_req: Request, res: Response) => {
 
 // API v1 routes
 app.use('/api/v1', apiV1Routes);
+
+// Public API v1 routes (external integrations)
+app.use('/api/public/v1', publicApiV1Routes);
 
 // Metrics endpoint placeholder (must be BEFORE 404 handler)
 // Will be set by server.ts during startup

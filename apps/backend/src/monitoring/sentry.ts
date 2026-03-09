@@ -14,6 +14,7 @@
  */
 
 import * as Sentry from '@sentry/node';
+import { config } from '../config';
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
@@ -23,9 +24,9 @@ import { logger } from '../utils/logger';
  * Only enabled in production and staging environments
  */
 export function initializeSentry(): void {
-  const dsn = process.env.SENTRY_DSN;
-  const environment = process.env.NODE_ENV || 'development';
-  const appVersion = process.env.APP_VERSION || 'unknown';
+  const dsn = config.sentry.dsn;
+  const environment = config.env || 'development';
+  const appVersion = config.sentry.appVersion;
 
   // Only enable Sentry in production and staging
   if (environment === 'development' || environment === 'test') {
@@ -112,7 +113,7 @@ export function initializeSentry(): void {
  * Captures request context for error tracking
  */
 export function sentryRequestHandler() {
-  const environment = process.env.NODE_ENV || 'development';
+  const environment = config.env || 'development';
   
   // Return no-op middleware in development/test
   if (environment === 'development' || environment === 'test') {
@@ -133,7 +134,7 @@ export function sentryRequestHandler() {
  * Enables performance monitoring
  */
 export function sentryTracingHandler() {
-  const environment = process.env.NODE_ENV || 'development';
+  const environment = config.env || 'development';
   
   // Return no-op middleware in development/test
   if (environment === 'development' || environment === 'test') {
@@ -150,7 +151,7 @@ export function sentryTracingHandler() {
  * Captures errors and sends to Sentry
  */
 export function sentryErrorHandler() {
-  const environment = process.env.NODE_ENV || 'development';
+  const environment = config.env || 'development';
   
   // Return no-op middleware in development/test
   if (environment === 'development' || environment === 'test') {

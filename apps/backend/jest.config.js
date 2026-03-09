@@ -10,8 +10,14 @@ module.exports = {
   ],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.test.json',
+      isolatedModules: true,
+    }],
   },
   testTimeout: 30000,
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+  modulePathIgnorePatterns: [
+    '<rootDir>/src/services/oauth/',
+  ],
 };

@@ -51,7 +51,7 @@ router.get('/health/detailed', async (req, res) => {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
-      version: process.env.npm_package_version || '1.0.0',
+      version: '1.0.0',
       error: 'Health check failed',
       details: {
         error: error.message,

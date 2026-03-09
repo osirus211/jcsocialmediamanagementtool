@@ -5,7 +5,7 @@ import { logger } from '../utils/logger';
 export const connectDatabase = async (): Promise<void> => {
   try {
     // Skip MongoDB validation in VALIDATION_MODE
-    if (process.env.VALIDATION_MODE === 'true') {
+    if (config.validationMode) {
       logger.warn('⚠️  MongoDB connection skipped (VALIDATION_MODE enabled)');
       console.log('⚠️  MongoDB connection skipped (VALIDATION_MODE enabled)');
       return;

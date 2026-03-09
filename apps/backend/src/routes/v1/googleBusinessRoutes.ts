@@ -22,6 +22,7 @@ import { oauthStateService } from '../../services/OAuthStateService';
 import { getClientIp, getHashedClientIp } from '../../utils/ipHash';
 import { logger } from '../../utils/logger';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
+import { config } from '../../config';
 import mongoose from 'mongoose';
 
 const router = Router();
@@ -55,9 +56,9 @@ const disconnectRateLimit = rateLimit({
 
 // Initialize Google Business OAuth Service
 const getGoogleBusinessService = (): GoogleBusinessOAuthService => {
-  const clientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
+  const clientId = config.oauth.googleBusiness.clientId;
+  const clientSecret = config.oauth.googleBusiness.clientSecret;
+  const redirectUri = config.oauth.googleBusiness.redirectUri;
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error('Google Business Profile OAuth credentials not configured');
@@ -163,7 +164,7 @@ router.get(
         });
 
         return res.redirect(
-          `${process.env.FRONTEND_URL}/integrations?error=${encodeURIComponent(
+          `${config.frontend.url}/integrations?error=${encodeURIComponent(
             error_description?.toString() || error.toString()
           )}`
         );
@@ -214,7 +215,7 @@ router.get(
 
       // Redirect to frontend with success
       res.redirect(
-        `${process.env.FRONTEND_URL}/integrations?success=true&platform=google-business&locations=${result.locations.length}`
+        `${config.frontend.url}/integrations?success=true&platform=google-business&locations=${result.locations.length}`
       );
     } catch (error: any) {
       logger.error('Google Business Profile OAuth callback failed', {
@@ -224,7 +225,7 @@ router.get(
 
       // Redirect to frontend with error
       res.redirect(
-        `${process.env.FRONTEND_URL}/integrations?error=${encodeURIComponent(
+        `${config.frontend.url}/integrations?error=${encodeURIComponent(
           error.message || 'Failed to connect Google Business Profile'
         )}`
       );

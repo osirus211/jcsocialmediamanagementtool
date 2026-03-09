@@ -10,6 +10,7 @@
  */
 
 import helmet from 'helmet';
+import { config } from '../config';
 import cors from 'cors';
 import { Request, Response, NextFunction, Express } from 'express';
 import { logger } from '../utils/logger';
@@ -60,7 +61,7 @@ export const configureHelmet = () => {
  * Configure CORS with strict origin checking
  */
 export const configureCors = () => {
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+  const allowedOrigins = config.frontend.allowedOrigins?.split(',') || [
     'http://localhost:5173',
     'http://localhost:3000',
   ];
@@ -144,7 +145,7 @@ export const sanitizeErrors = (
   const statusCode = err.statusCode || err.status || 500;
 
   // Production: hide stack traces and internal details
-  if (process.env.NODE_ENV === 'production') {
+  if (config.env === 'production') {
     res.status(statusCode).json({
       error: err.code || 'INTERNAL_ERROR',
       message: statusCode === 500 

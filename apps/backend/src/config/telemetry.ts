@@ -16,6 +16,7 @@ import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { trace, context, SpanStatusCode, Span } from '@opentelemetry/api';
 import { logger } from '../utils/logger';
+import { config } from './index';
 
 const SERVICE_NAME = 'social-media-scheduler';
 const SERVICE_VERSION = '1.0.0';
@@ -25,7 +26,7 @@ const SERVICE_VERSION = '1.0.0';
  */
 export function initTelemetry(): NodeSDK | null {
   // Only enable in production or when explicitly enabled
-  const telemetryEnabled = process.env.TELEMETRY_ENABLED === 'true';
+  const telemetryEnabled = config.telemetry.enabled;
   
   if (!telemetryEnabled) {
     logger.info('OpenTelemetry disabled');
@@ -34,14 +35,14 @@ export function initTelemetry(): NodeSDK | null {
 
   try {
     const jaegerExporter = new JaegerExporter({
-      endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+      endpoint: config.telemetry.jaegerEndpoint,
     });
 
     const sdk = new NodeSDK({
       resource: new Resource({
         [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
         [SemanticResourceAttributes.SERVICE_VERSION]: SERVICE_VERSION,
-        [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || 'development',
+        [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.env,
       }),
       spanProcessor: new BatchSpanProcessor(jaegerExporter),
       instrumentations: [
@@ -58,7 +59,7 @@ export function initTelemetry(): NodeSDK | null {
     logger.info('OpenTelemetry initialized', {
       serviceName: SERVICE_NAME,
       serviceVersion: SERVICE_VERSION,
-      jaegerEndpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+      jaegerEndpoint: config.telemetry.jaegerEndpoint,
     });
 
     // Graceful shutdown

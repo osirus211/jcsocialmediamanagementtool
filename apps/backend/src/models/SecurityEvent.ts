@@ -53,6 +53,17 @@ export enum SecurityEventType {
   OAUTH_TOKEN_EXPIRED = 'oauth_token_expired',
   OAUTH_TOKEN_REVOKED = 'oauth_token_revoked',
   ACCOUNT_DISCONNECTED = 'account_disconnected',
+  
+  // API Key Management
+  API_KEY_CREATED = 'api_key_created',
+  API_KEY_REVOKED = 'api_key_revoked',
+  API_KEY_DELETED = 'api_key_deleted',
+  API_KEY_ROTATED = 'api_key_rotated',
+  API_KEY_UPDATED = 'api_key_updated',
+  API_KEY_AUTH_FAILURE = 'api_key_auth_failure',
+  API_KEY_SCOPE_DENIED = 'api_key_scope_denied',
+  API_KEY_NEW_IP_DETECTED = 'api_key_new_ip_detected',
+  API_KEY_SUSPICIOUS_ACTIVITY = 'api_key_suspicious_activity',
 }
 
 export enum SecurityEventSeverity {

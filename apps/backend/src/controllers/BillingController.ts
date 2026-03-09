@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { config } from '../config';
 import { stripeService } from '../services/StripeService';
 import { Billing } from '../models/Billing';
 import { logger } from '../utils/logger';
@@ -56,8 +57,8 @@ export class BillingController {
       }
 
       // Create checkout session
-      const successUrl = `${process.env.FRONTEND_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${process.env.FRONTEND_URL}/billing`;
+      const successUrl = `${config.frontend.url}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${config.frontend.url}/billing`;
 
       const checkoutUrl = await stripeService.createCheckoutSession(
         billing.stripeCustomerId,
@@ -117,7 +118,7 @@ export class BillingController {
       }
 
       // Create portal session
-      const returnUrl = `${process.env.FRONTEND_URL}/billing`;
+      const returnUrl = `${config.frontend.url}/billing`;
       const portalUrl = await stripeService.createPortalSession(
         billing.stripeCustomerId,
         returnUrl

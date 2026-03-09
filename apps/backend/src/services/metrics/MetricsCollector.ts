@@ -23,6 +23,7 @@ export interface MetricsCollectorConfig {
   backpressureMonitor?: any;
   authService?: any;
   httpMetrics?: any;
+  publicApiMetrics?: any;
 }
 
 export interface CollectedMetrics {
@@ -71,6 +72,14 @@ export interface CollectedMetrics {
   // HTTP metrics
   http_requests_total: number;
   
+  // Public API metrics
+  public_api_requests_total: number;
+  public_api_errors_total: number;
+  public_api_rate_limit_hits: number;
+  public_api_auth_failures: number;
+  public_api_scope_denials: number;
+  public_api_latency_avg_ms: number;
+  
   // Alerting metrics (if available)
   alerts_total?: number;
   alerts_critical_total?: number;
@@ -87,9 +96,64 @@ export interface CollectedMetrics {
 
 export class MetricsCollector {
   private config: MetricsCollectorConfig;
+  private static aiMetrics = {
+    requests_total: 0,
+    success_total: 0,
+    failures_total: 0,
+    latency_sum_ms: 0,
+    latency_count: 0,
+  };
 
   constructor(config: MetricsCollectorConfig) {
     this.config = config;
+  }
+
+  /**
+   * Record AI request metrics (static method for easy access)
+   */
+  static recordAIRequest(
+    operation: string,
+    status: 'success' | 'failure',
+    latencyMs: number
+  ): void {
+    try {
+      MetricsCollector.aiMetrics.requests_total++;
+      
+      if (status === 'success') {
+        MetricsCollector.aiMetrics.success_total++;
+      } else {
+        MetricsCollector.aiMetrics.failures_total++;
+      }
+      
+      MetricsCollector.aiMetrics.latency_sum_ms += latencyMs;
+      MetricsCollector.aiMetrics.latency_count++;
+      
+      logger.debug('AI request recorded', {
+        operation,
+        status,
+        latencyMs,
+      });
+    } catch (error: any) {
+      logger.debug('Failed to record AI metrics', {
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Get AI metrics
+   */
+  static getAIMetrics(): any {
+    const avgLatency = MetricsCollector.aiMetrics.latency_count > 0
+      ? MetricsCollector.aiMetrics.latency_sum_ms / MetricsCollector.aiMetrics.latency_count
+      : 0;
+
+    return {
+      ai_requests_total: MetricsCollector.aiMetrics.requests_total,
+      ai_success_total: MetricsCollector.aiMetrics.success_total,
+      ai_failures_total: MetricsCollector.aiMetrics.failures_total,
+      ai_latency_avg_ms: Math.round(avgLatency),
+    };
   }
 
   /**
@@ -142,6 +206,14 @@ export class MetricsCollector {
       
       // HTTP metrics (defaults)
       http_requests_total: 0,
+      
+      // Public API metrics (defaults)
+      public_api_requests_total: 0,
+      public_api_errors_total: 0,
+      public_api_rate_limit_hits: 0,
+      public_api_auth_failures: 0,
+      public_api_scope_denials: 0,
+      public_api_latency_avg_ms: 0,
     };
 
     // Collect publishing worker metrics
@@ -306,6 +378,25 @@ export class MetricsCollector {
       }
     } catch (error: any) {
       logger.debug('Failed to collect HTTP metrics', {
+        error: error.message,
+      });
+    }
+
+    // Collect Public API metrics
+    try {
+      if (this.config.publicApiMetrics) {
+        const publicApiMetrics = this.config.publicApiMetrics.getMetrics();
+        if (publicApiMetrics) {
+          metrics.public_api_requests_total = publicApiMetrics.public_api_requests_total || 0;
+          metrics.public_api_errors_total = publicApiMetrics.public_api_errors_total || 0;
+          metrics.public_api_rate_limit_hits = publicApiMetrics.public_api_rate_limit_hits || 0;
+          metrics.public_api_auth_failures = publicApiMetrics.public_api_auth_failures || 0;
+          metrics.public_api_scope_denials = publicApiMetrics.public_api_scope_denials || 0;
+          metrics.public_api_latency_avg_ms = this.config.publicApiMetrics.getAverageLatency() || 0;
+        }
+      }
+    } catch (error: any) {
+      logger.debug('Failed to collect Public API metrics', {
         error: error.message,
       });
     }

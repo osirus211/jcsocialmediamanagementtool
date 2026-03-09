@@ -221,9 +221,9 @@ export class OAuthController {
    * Get Google Business Profile OAuth configuration
    */
   private getGoogleBusinessConfig(): { clientId: string; clientSecret: string; redirectUri: string; scopes: string[] } {
-    const clientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
+    const clientId = config.oauth.googleBusiness.clientId;
+    const clientSecret = config.oauth.googleBusiness.clientSecret;
+    const redirectUri = config.oauth.googleBusiness.redirectUri;
 
     if (!clientId || !clientSecret || !redirectUri) {
       throw new BadRequestError('Google Business Profile OAuth not configured');
@@ -2562,3 +2562,4 @@ export class OAuthController {
 }
 
 export const oauthController = new OAuthController();
+

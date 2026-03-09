@@ -29,7 +29,6 @@ import { ErrorClassification } from '../adapters/platforms/FacebookErrorHandler'
 import { PlatformHealthService } from '../services/PlatformHealthService';
 import { circuitBreakerManager } from '../services/CircuitBreakerManager';
 import { CircuitBreakerOpenError } from '../services/CircuitBreaker';
-import crypto from 'crypto';
 
 interface RefreshResult {
   success: boolean;
@@ -198,35 +197,40 @@ export class TokenRefreshWorker {
     }
 
     // Acquire distributed lock to prevent concurrent refreshes
-    const lockKey = `refresh_lock:${accountId}`;
-    const lockValue = crypto.randomBytes(16).toString('hex');
+    const { distributedLockService } = await import('../services/DistributedLockService');
+    const lockKey = `lock:token-refresh:${accountId}`;
     
-    const lockAcquired = await this.acquireLock(lockKey, lockValue);
-    if (!lockAcquired) {
-      logger.info('Token refresh already in progress by another worker', { 
-        accountId,
-        provider: account.provider 
-      });
-      this.metrics.refresh_skipped_total++;
-      return;
-    }
-
-    logger.debug('Distributed lock acquired', { accountId, lockKey });
-
     try {
-      const success = await this.attemptRefreshWithRetry(account);
-      if (!success) {
-        await this.markAccountExpired(accountId, 'Refresh failed after max retries');
-      } else {
-        logger.info('Token refreshed successfully', {
+      await distributedLockService.withLock(
+        lockKey,
+        async () => {
+          const success = await this.attemptRefreshWithRetry(account);
+          if (!success) {
+            await this.markAccountExpired(accountId, 'Refresh failed after max retries');
+          } else {
+            logger.info('Token refreshed successfully', {
+              accountId,
+              provider: account.provider,
+            });
+          }
+        },
+        {
+          ttl: this.LOCK_TTL * 1000, // Convert seconds to milliseconds
+          retryCount: 1, // Don't retry - if another worker has it, skip
+        }
+      );
+    } catch (error: any) {
+      // Lock acquisition failed - another worker is processing
+      if (error.name === 'LockAcquisitionError') {
+        logger.info('Token refresh already in progress by another worker', { 
           accountId,
-          provider: account.provider,
+          provider: account.provider 
         });
+        this.metrics.refresh_skipped_total++;
+        return;
       }
-    } finally {
-      // Always release lock using Lua script for safety
-      await this.releaseLock(lockKey, lockValue);
-      logger.debug('Distributed lock released', { accountId, lockKey });
+      // Other errors should be re-thrown
+      throw error;
     }
   }
 
@@ -556,52 +560,6 @@ export class TokenRefreshWorker {
       accountId,
       reason,
     });
-  }
-
-  /**
-   * Acquire distributed lock using Redis SET with NX and EX options
-   * @param lockKey - Redis key for the lock
-   * @param lockValue - Unique value to identify lock owner
-   * @returns true if lock acquired, false if already held
-   */
-  private async acquireLock(lockKey: string, lockValue: string): Promise<boolean> {
-    const redis = getRedisClient();
-    const result = await redis.set(
-      lockKey,
-      lockValue,
-      'EX',
-      this.LOCK_TTL,
-      'NX'
-    );
-    return result === 'OK';
-  }
-
-  /**
-   * Release distributed lock using Lua script to verify ownership
-   * Only deletes the lock if the value matches (prevents deleting another worker's lock)
-   * @param lockKey - Redis key for the lock
-   * @param lockValue - Unique value to verify lock ownership
-   */
-  private async releaseLock(lockKey: string, lockValue: string): Promise<void> {
-    const redis = getRedisClient();
-    
-    // Lua script to atomically check value and delete if it matches
-    const luaScript = `
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-      else
-        return 0
-      end
-    `;
-    
-    try {
-      await redis.eval(luaScript, 1, lockKey, lockValue);
-    } catch (error: any) {
-      logger.error('Failed to release lock', {
-        lockKey,
-        error: error.message,
-      });
-    }
   }
 
   /**

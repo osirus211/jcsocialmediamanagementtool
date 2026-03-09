@@ -23,7 +23,7 @@ export type StorageType = 'local' | 's3';
  * - 's3': S3StorageProvider (requires @aws-sdk/client-s3)
  */
 export async function createStorageProvider() {
-  const storageType = (process.env.STORAGE_TYPE || 'local') as StorageType;
+  const storageType = config.storage.type as StorageType;
 
   switch (storageType) {
     case 's3': {

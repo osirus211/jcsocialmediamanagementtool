@@ -1,4 +1,5 @@
 import { SocialPlatformProvider } from './SocialPlatformProvider';
+import { config } from '../config';
 import { TwitterProvider } from './TwitterProvider';
 import { SocialPlatform } from '../models/SocialAccount';
 import { logger } from '../utils/logger';
@@ -47,30 +48,30 @@ export class ProviderFactory {
   private loadConfiguration(): void {
     // Twitter/X configuration
     this.config.set(SocialPlatform.TWITTER, {
-      clientId: process.env.TWITTER_CLIENT_ID || '',
-      clientSecret: process.env.TWITTER_CLIENT_SECRET || '',
-      redirectUri: process.env.TWITTER_REDIRECT_URI || '',
+      clientId: config.oauth.twitter.clientId || '',
+      clientSecret: config.oauth.twitter.clientSecret || '',
+      redirectUri: config.oauth.twitter.redirectUri || '',
     });
 
     // LinkedIn configuration (placeholder)
     this.config.set(SocialPlatform.LINKEDIN, {
-      clientId: process.env.LINKEDIN_CLIENT_ID || '',
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
-      redirectUri: process.env.LINKEDIN_REDIRECT_URI || '',
+      clientId: config.oauth.linkedin.clientId || '',
+      clientSecret: config.oauth.linkedin.clientSecret || '',
+      redirectUri: config.oauth.linkedin.redirectUri || '',
     });
 
     // Facebook configuration (placeholder)
     this.config.set(SocialPlatform.FACEBOOK, {
-      clientId: process.env.FACEBOOK_CLIENT_ID || '',
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
-      redirectUri: process.env.FACEBOOK_REDIRECT_URI || '',
+      clientId: config.oauth.facebook.appId || '',
+      clientSecret: config.oauth.facebook.appSecret || '',
+      redirectUri: config.oauth.facebook.callbackUrl || '',
     });
 
     // Instagram configuration (placeholder)
     this.config.set(SocialPlatform.INSTAGRAM, {
-      clientId: process.env.INSTAGRAM_CLIENT_ID || '',
-      clientSecret: process.env.INSTAGRAM_CLIENT_SECRET || '',
-      redirectUri: process.env.INSTAGRAM_REDIRECT_URI || '',
+      clientId: config.oauth.instagram.clientId || '',
+      clientSecret: config.oauth.instagram.clientSecret || '',
+      redirectUri: config.oauth.instagram.redirectUri || '',
     });
 
     logger.info('Provider configuration loaded', {
@@ -182,3 +183,4 @@ export class ProviderFactory {
 
 // Export singleton instance
 export const providerFactory = ProviderFactory.getInstance();
+

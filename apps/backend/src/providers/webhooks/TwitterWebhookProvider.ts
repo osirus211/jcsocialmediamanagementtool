@@ -6,6 +6,7 @@
  */
 
 import { IncomingHttpHeaders } from 'http';
+import { config } from '../../config';
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { BaseWebhookProvider } from './BaseWebhookProvider';
@@ -38,7 +39,7 @@ export class TwitterWebhookProvider extends BaseWebhookProvider {
       if (isCached) return true;
     }
 
-    const consumerSecret = process.env.TWITTER_CONSUMER_SECRET || process.env.TWITTER_CLIENT_SECRET;
+    const consumerSecret = config.oauth.twitter.clientSecret;
     if (!consumerSecret) {
       throw new Error('TWITTER_CONSUMER_SECRET not configured');
     }
@@ -127,7 +128,7 @@ export class TwitterWebhookProvider extends BaseWebhookProvider {
       return false;
     }
 
-    const consumerSecret = process.env.TWITTER_CONSUMER_SECRET || process.env.TWITTER_CLIENT_SECRET;
+    const consumerSecret = config.oauth.twitter.clientSecret;
     if (!consumerSecret) {
       throw new Error('TWITTER_CONSUMER_SECRET not configured');
     }

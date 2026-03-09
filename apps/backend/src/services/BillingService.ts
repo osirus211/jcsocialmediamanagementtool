@@ -619,7 +619,7 @@ export class BillingService {
       await emailNotificationService.sendPaymentFailed({
         to: owner.email,
         amount,
-        updatePaymentUrl: `${process.env.FRONTEND_URL}/workspace/${workspaceId}/billing`,
+        updatePaymentUrl: `${config.frontend.url}/workspace/${workspaceId}/billing`,
         userId: owner._id.toString(),
         workspaceId,
       });

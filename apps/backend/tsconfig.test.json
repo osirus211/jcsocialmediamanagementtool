@@ -1,0 +1,52 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist-test",
+    "rootDir": "./src",
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "declaration": false,
+    "declarationMap": false,
+    "noEmitOnError": false,
+    "sourceMap": true,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node", "jest"],
+    "typeRoots": ["./node_modules/@types", "./src/types"]
+  },
+  "include": [
+    "src/**/__tests__/**/*",
+    "src/tests/**/*",
+    "src/config/**/*",
+    "src/services/WorkerManager.ts",
+    "src/services/QueueMonitoringService.ts",
+    "src/services/recovery/**/*",
+    "src/queue/**/*",
+    "src/utils/**/*",
+    "src/middleware/**/*",
+    "src/types/**/*",
+    "src/models/**/*",
+    "src/workers/**/*",
+    "src/app.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-test",
+    "src/services/oauth/**/*",
+    "src/monitoring/sentry.ts",
+    "src/services/AuthService.ts",
+    "src/services/EmailNotificationService.ts"
+  ]
+}

@@ -1,146 +1,128 @@
 /**
  * Media Storage Service
  * 
- * Handles media file storage to S3/R2
- * Generates storage URLs and manages media lifecycle
+ * Handles media file storage operations using AWS S3
+ * 
+ * Features:
+ * - Generate presigned upload URLs
+ * - Delete media from storage
+ * - Build CDN URLs
+ * - Support for multiple storage providers (S3, GCS)
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 
-export interface UploadToS3Input {
-  buffer: Buffer;
-  filename: string;
-  mimeType: string;
-  workspaceId: string;
+export enum StorageProvider {
+  S3 = 's3',
+  GCS = 'gcs',
+  LOCAL = 'local',
 }
 
-export interface UploadToS3Result {
-  mediaId: string;
+export interface PresignedUploadUrl {
+  uploadUrl: string;
   storageKey: string;
-  storageUrl: string;
-  publicUrl: string;
+  storageProvider: StorageProvider;
+  expiresIn: number;
+}
+
+export interface MediaStorageConfig {
+  provider: StorageProvider;
+  bucket: string;
+  region: string;
+  cdnBaseUrl?: string;
 }
 
 export class MediaStorageService {
-  private s3Client: S3Client;
-  private bucket: string;
-  private region: string;
-  private publicBaseUrl: string;
+  private static instance: MediaStorageService;
+  private s3Client: S3Client | null = null;
+  private storageConfig: MediaStorageConfig;
 
-  constructor() {
-    this.region = config.aws.region || 'us-east-1';
-    this.bucket = config.aws.s3Bucket || 'social-media-scheduler-media';
-    this.publicBaseUrl = config.aws.s3PublicUrl || `https://${this.bucket}.s3.${this.region}.amazonaws.com`;
+  private constructor() {
+    // Initialize storage configuration
+    this.storageConfig = {
+      provider: StorageProvider.S3,
+      bucket: config.aws.s3Bucket || '',
+      region: config.aws.region,
+      cdnBaseUrl: process.env.CDN_BASE_URL,
+    };
 
-    this.s3Client = new S3Client({
-      region: this.region,
-      credentials: {
-        accessKeyId: config.aws.accessKeyId || '',
-        secretAccessKey: config.aws.secretAccessKey || '',
-      },
-    });
-
-    logger.info('Media storage service initialized', {
-      bucket: this.bucket,
-      region: this.region,
-    });
-  }
-
-  /**
-   * Generate storage key for file
-   * Format: workspaceId/yyyy/mm/uuid.ext
-   */
-  private generateStorageKey(workspaceId: string, filename: string): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const ext = path.extname(filename);
-    const uuid = uuidv4();
-    
-    return `${workspaceId}/${year}/${month}/${uuid}${ext}`;
-  }
-
-  /**
-   * Upload media to S3
-   */
-  async uploadToS3(input: UploadToS3Input): Promise<UploadToS3Result> {
-    const storageKey = this.generateStorageKey(input.workspaceId, input.filename);
-    const mediaId = uuidv4();
-
-    try {
-      const command = new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: storageKey,
-        Body: input.buffer,
-        ContentType: input.mimeType,
-        Metadata: {
-          workspaceId: input.workspaceId,
-          mediaId,
-          originalFilename: input.filename,
+    // Initialize S3 client if AWS credentials are available
+    if (config.aws.accessKeyId && config.aws.secretAccessKey && config.aws.s3Bucket) {
+      this.s3Client = new S3Client({
+        region: config.aws.region,
+        credentials: {
+          accessKeyId: config.aws.accessKeyId,
+          secretAccessKey: config.aws.secretAccessKey,
         },
       });
 
-      await this.s3Client.send(command);
-
-      const publicUrl = `${this.publicBaseUrl}/${storageKey}`;
-      const storageUrl = `s3://${this.bucket}/${storageKey}`;
-
-      logger.info('Media uploaded to S3', {
-        mediaId,
-        storageKey,
-        size: input.buffer.length,
-        workspaceId: input.workspaceId,
+      logger.info('MediaStorageService initialized with S3', {
+        region: config.aws.region,
+        bucket: config.aws.s3Bucket,
       });
-
-      return {
-        mediaId,
-        storageKey,
-        storageUrl,
-        publicUrl,
-      };
-    } catch (error: any) {
-      logger.error('S3 upload failed', {
-        error: error.message,
-        storageKey,
-        workspaceId: input.workspaceId,
+    } else {
+      logger.warn('MediaStorageService initialized without S3 credentials', {
+        message: 'Media upload will not work without AWS credentials',
       });
-      throw new Error(`Failed to upload to S3: ${error.message}`);
     }
   }
 
+  static getInstance(): MediaStorageService {
+    if (!MediaStorageService.instance) {
+      MediaStorageService.instance = new MediaStorageService();
+    }
+    return MediaStorageService.instance;
+  }
+
   /**
-   * Generate signed URL for direct upload (client-side)
+   * Generate a presigned upload URL for direct client upload
+   * 
+   * @param workspaceId - Workspace ID
+   * @param filename - Original filename
+   * @param mimeType - MIME type of the file
+   * @param expiresIn - URL expiration time in seconds (default: 15 minutes)
+   * @returns Presigned upload URL and storage key
    */
-  async generateSignedUploadUrl(
+  async generatePresignedUploadUrl(
     workspaceId: string,
     filename: string,
     mimeType: string,
-    expiresIn: number = 3600
-  ): Promise<{ uploadUrl: string; storageKey: string; mediaId: string }> {
-    const storageKey = this.generateStorageKey(workspaceId, filename);
-    const mediaId = uuidv4();
+    expiresIn: number = 900 // 15 minutes
+  ): Promise<PresignedUploadUrl> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized. AWS credentials are required.');
+    }
 
     try {
+      // Generate unique storage key
+      const storageKey = this.generateStorageKey(workspaceId, filename);
+
+      // Create PutObject command
       const command = new PutObjectCommand({
-        Bucket: this.bucket,
+        Bucket: this.storageConfig.bucket,
         Key: storageKey,
         ContentType: mimeType,
+        // Add metadata
         Metadata: {
           workspaceId,
-          mediaId,
           originalFilename: filename,
+          uploadedAt: new Date().toISOString(),
         },
       });
 
-      const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+      // Generate presigned URL
+      const uploadUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn,
+      });
 
-      logger.info('Signed upload URL generated', {
-        mediaId,
+      logger.info('Generated presigned upload URL', {
+        workspaceId,
+        filename,
         storageKey,
         expiresIn,
       });
@@ -148,67 +130,149 @@ export class MediaStorageService {
       return {
         uploadUrl,
         storageKey,
-        mediaId,
+        storageProvider: this.storageConfig.provider,
+        expiresIn,
       };
     } catch (error: any) {
-      logger.error('Failed to generate signed URL', {
-        error: error.message,
+      logger.error('Failed to generate presigned upload URL', {
         workspaceId,
-      });
-      throw new Error(`Failed to generate signed URL: ${error.message}`);
-    }
-  }
-
-  /**
-   * Get public URL for storage key
-   */
-  getPublicUrl(storageKey: string): string {
-    return `${this.publicBaseUrl}/${storageKey}`;
-  }
-
-  /**
-   * Delete media from S3
-   */
-  async deleteFromS3(storageKey: string): Promise<void> {
-    try {
-      const command = new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: storageKey,
-      });
-
-      await this.s3Client.send(command);
-
-      logger.info('Media deleted from S3', {
-        storageKey,
-      });
-    } catch (error: any) {
-      logger.error('S3 deletion failed', {
+        filename,
         error: error.message,
-        storageKey,
       });
-      throw new Error(`Failed to delete from S3: ${error.message}`);
+      throw new Error(`Failed to generate presigned upload URL: ${error.message}`);
     }
   }
 
   /**
-   * Check if file exists in S3
+   * Generate a presigned download URL for accessing media
+   * 
+   * @param storageKey - Storage key of the media
+   * @param expiresIn - URL expiration time in seconds (default: 1 hour)
+   * @returns Presigned download URL
    */
-  async fileExists(storageKey: string): Promise<boolean> {
+  async generatePresignedDownloadUrl(
+    storageKey: string,
+    expiresIn: number = 3600 // 1 hour
+  ): Promise<string> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized. AWS credentials are required.');
+    }
+
     try {
       const command = new GetObjectCommand({
-        Bucket: this.bucket,
+        Bucket: this.storageConfig.bucket,
+        Key: storageKey,
+      });
+
+      const downloadUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn,
+      });
+
+      logger.debug('Generated presigned download URL', {
+        storageKey,
+        expiresIn,
+      });
+
+      return downloadUrl;
+    } catch (error: any) {
+      logger.error('Failed to generate presigned download URL', {
+        storageKey,
+        error: error.message,
+      });
+      throw new Error(`Failed to generate presigned download URL: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete media from storage
+   * 
+   * @param storageKey - Storage key of the media to delete
+   */
+  async deleteMedia(storageKey: string): Promise<void> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized. AWS credentials are required.');
+    }
+
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.storageConfig.bucket,
         Key: storageKey,
       });
 
       await this.s3Client.send(command);
-      return true;
+
+      logger.info('Media deleted from storage', {
+        storageKey,
+      });
     } catch (error: any) {
-      if (error.name === 'NoSuchKey') {
-        return false;
-      }
-      throw error;
+      logger.error('Failed to delete media from storage', {
+        storageKey,
+        error: error.message,
+      });
+      throw new Error(`Failed to delete media: ${error.message}`);
     }
+  }
+
+  /**
+   * Build CDN URL for media
+   * 
+   * @param storageKey - Storage key of the media
+   * @returns CDN URL or S3 URL if CDN is not configured
+   */
+  buildCdnUrl(storageKey: string): string {
+    if (this.storageConfig.cdnBaseUrl) {
+      // Use CDN URL if configured
+      return `${this.storageConfig.cdnBaseUrl}/${storageKey}`;
+    }
+
+    // Fallback to S3 URL
+    return `https://${this.storageConfig.bucket}.s3.${this.storageConfig.region}.amazonaws.com/${storageKey}`;
+  }
+
+  /**
+   * Build storage URL (direct S3 URL)
+   * 
+   * @param storageKey - Storage key of the media
+   * @returns S3 URL
+   */
+  buildStorageUrl(storageKey: string): string {
+    return `https://${this.storageConfig.bucket}.s3.${this.storageConfig.region}.amazonaws.com/${storageKey}`;
+  }
+
+  /**
+   * Generate unique storage key for media
+   * 
+   * Format: media/{workspaceId}/{year}/{month}/{uuid}.{ext}
+   * 
+   * @param workspaceId - Workspace ID
+   * @param filename - Original filename
+   * @returns Storage key
+   */
+  private generateStorageKey(workspaceId: string, filename: string): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const uuid = uuidv4();
+    const ext = path.extname(filename).toLowerCase();
+
+    return `media/${workspaceId}/${year}/${month}/${uuid}${ext}`;
+  }
+
+  /**
+   * Get storage configuration
+   */
+  getStorageConfig(): MediaStorageConfig {
+    return { ...this.storageConfig };
+  }
+
+  /**
+   * Check if storage is configured
+   */
+  isConfigured(): boolean {
+    return this.s3Client !== null;
   }
 }
 
-export const mediaStorageService = new MediaStorageService();
+// Export singleton instance
+export const mediaStorageService = MediaStorageService.getInstance();
+

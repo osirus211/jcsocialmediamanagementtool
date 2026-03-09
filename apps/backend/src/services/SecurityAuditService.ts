@@ -72,6 +72,7 @@ export class SecurityAuditService {
       SecurityEventType.IP_BLOCKED,
       SecurityEventType.USER_SUSPENDED,
       SecurityEventType.WORKSPACE_DELETED,
+      SecurityEventType.API_KEY_SUSPICIOUS_ACTIVITY,
     ].includes(type)) {
       return SecurityEventSeverity.CRITICAL;
     }
@@ -82,6 +83,8 @@ export class SecurityAuditService {
       SecurityEventType.TOKEN_REFRESH_FAILURE,
       SecurityEventType.OAUTH_CONNECT_FAILURE,
       SecurityEventType.PERMISSION_DENIED,
+      SecurityEventType.API_KEY_AUTH_FAILURE,
+      SecurityEventType.API_KEY_SCOPE_DENIED,
     ].includes(type)) {
       return SecurityEventSeverity.ERROR;
     }
@@ -93,6 +96,7 @@ export class SecurityAuditService {
       SecurityEventType.IP_THROTTLED,
       SecurityEventType.CONCURRENT_REFRESH_BLOCKED,
       SecurityEventType.OAUTH_TOKEN_EXPIRED,
+      SecurityEventType.API_KEY_NEW_IP_DETECTED,
     ].includes(type)) {
       return SecurityEventSeverity.WARNING;
     }

@@ -450,7 +450,7 @@ export class AuthService {
       const { emailNotificationService } = await import('./EmailNotificationService');
 
       // TODO: Generate actual reset token and URL
-      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=placeholder`;
+      const resetUrl = `${config.frontend.url}/reset-password?token=placeholder`;
 
       await emailNotificationService.sendPasswordReset({
         to: user.email,

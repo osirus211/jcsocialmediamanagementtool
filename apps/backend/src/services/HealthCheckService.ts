@@ -1,4 +1,5 @@
 import { getRedisClientSafe, isRedisHealthy, getCircuitBreakerStatus } from '../config/redis';
+import { config } from '../config';
 import { logger } from '../utils/logger';
 import mongoose from 'mongoose';
 
@@ -62,7 +63,7 @@ export class HealthCheckService {
         status: overallStatus,
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
-        version: process.env.npm_package_version || '1.0.0',
+        version: config.sentry.appVersion || '1.0.0',
         components,
         details: {
           responseTime: Date.now() - startTime,
@@ -78,7 +79,7 @@ export class HealthCheckService {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
-        version: process.env.npm_package_version || '1.0.0',
+        version: config.sentry.appVersion || '1.0.0',
         components: {
           redis: { status: 'unhealthy', message: 'Health check failed' },
           mongodb: { status: 'unhealthy', message: 'Health check failed' },
@@ -153,7 +154,7 @@ export class HealthCheckService {
     
     try {
       // In VALIDATION_MODE, MongoDB is intentionally skipped
-      if (process.env.VALIDATION_MODE === 'true') {
+      if (config.validationMode) {
         return {
           status: 'healthy',
           message: 'Skipped (VALIDATION_MODE)',

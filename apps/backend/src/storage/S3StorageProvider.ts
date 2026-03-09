@@ -17,6 +17,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { StorageProvider, UploadOptions, UploadResult } from './StorageProvider';
 import { logger } from '../utils/logger';
+import { config as storageConfig } from '../config';
 
 export interface S3StorageConfig {
   bucket: string;
@@ -159,11 +160,11 @@ export class S3StorageProvider implements StorageProvider {
  */
 export function createS3StorageFromEnv(): S3StorageProvider {
   const config: S3StorageConfig = {
-    bucket: process.env.S3_BUCKET || '',
-    region: process.env.S3_REGION || 'auto',
-    endpoint: process.env.S3_ENDPOINT, // For R2: https://[account-id].r2.cloudflarestorage.com
-    accessKeyId: process.env.S3_ACCESS_KEY || '',
-    secretAccessKey: process.env.S3_SECRET_KEY || '',
+    bucket: storageConfig.storage.s3.bucket || '',
+    region: storageConfig.storage.s3.region || 'auto',
+    endpoint: storageConfig.storage.s3.endpoint, // For R2: https://[account-id].r2.cloudflarestorage.com
+    accessKeyId: storageConfig.storage.s3.accessKey || '',
+    secretAccessKey: storageConfig.storage.s3.secretKey || '',
     publicUrl: process.env.S3_PUBLIC_URL, // CDN URL: https://cdn.example.com
   };
 

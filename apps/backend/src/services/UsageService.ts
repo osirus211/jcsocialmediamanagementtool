@@ -114,6 +114,18 @@ export class UsageService {
   }
 
   /**
+   * Increment AI requests counter
+   */
+  async incrementAI(workspaceId: string | mongoose.Types.ObjectId): Promise<void> {
+    const objectId = typeof workspaceId === 'string' 
+      ? new mongoose.Types.ObjectId(workspaceId) 
+      : workspaceId;
+    const usage = await this.getCurrentUsage(objectId);
+    usage.aiRequests = (usage.aiRequests || 0) + 1;
+    await usage.save();
+  }
+
+  /**
    * Check if workspace has exceeded limits
    */
   async checkLimits(workspaceId: mongoose.Types.ObjectId): Promise<{

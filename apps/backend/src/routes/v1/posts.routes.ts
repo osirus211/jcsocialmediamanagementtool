@@ -6,9 +6,11 @@
 
 import { Router } from 'express';
 import { postController } from '../../controllers/PostController';
+import { bulkUploadController } from '../../controllers/BulkUploadController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
 import { rateLimit } from 'express-rate-limit';
+import multer from 'multer';
 import {
   validateCreatePost,
   validateUpdatePost,
@@ -26,6 +28,21 @@ import {
 } from '../../validators/uiValidators';
 
 const router = Router();
+
+// Configure multer for CSV upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'));
+    }
+  },
+});
 
 // All routes require authentication and workspace context
 router.use(requireAuth);
@@ -890,6 +907,90 @@ router.post('/bulk/reschedule', validateBulkReschedule, (req, res, next) => {
  */
 router.post('/bulk/update', validateBulkUpdate, (req, res, next) => {
   postController.bulkUpdate(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/v1/posts/bulk-upload:
+ *   post:
+ *     summary: Bulk upload posts from CSV
+ *     description: Upload a CSV file to create multiple scheduled posts
+ *     tags:
+ *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV file (max 5MB, max 500 rows)
+ *     responses:
+ *       201:
+ *         description: Bulk upload job created
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/bulk-upload', upload.single('file'), (req, res, next) => {
+  bulkUploadController.uploadCSV(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/v1/posts/bulk-upload/{id}:
+ *   get:
+ *     summary: Get bulk upload job status
+ *     description: Get the status of a bulk upload job
+ *     tags:
+ *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Upload job ID
+ *     responses:
+ *       200:
+ *         description: Upload job status
+ *       404:
+ *         description: Job not found
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/bulk-upload/:id', (req, res, next) => {
+  bulkUploadController.getUploadStatus(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/v1/posts/bulk-upload:
+ *   get:
+ *     summary: List bulk upload jobs
+ *     description: List recent bulk upload jobs for the workspace
+ *     tags:
+ *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of upload jobs
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/bulk-upload', (req, res, next) => {
+  bulkUploadController.listUploadJobs(req, res, next);
 });
 
 export default router;

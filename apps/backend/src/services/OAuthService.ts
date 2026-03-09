@@ -1,7 +1,11 @@
 import { SocialAccount, SocialPlatform, AccountStatus } from '../models/SocialAccount';
+import { config } from '../config';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 import { encrypt } from '../utils/encryption';
+import { config } from '../config';
 import crypto from 'crypto';
+import { config } from '../config';
 
 /**
  * OAuth Service
@@ -46,16 +50,16 @@ interface UserProfileResult {
 export class OAuthService {
   private readonly configs: Record<SocialPlatform, OAuthConfig> = {
     [SocialPlatform.TWITTER]: {
-      clientId: process.env.TWITTER_CLIENT_ID || 'mock_twitter_client_id',
-      clientSecret: process.env.TWITTER_CLIENT_SECRET || 'mock_twitter_secret',
+      clientId: config.oauth.twitter.clientId || 'mock_twitter_client_id',
+      clientSecret: config.oauth.twitter.clientSecret || 'mock_twitter_secret',
       redirectUri: process.env.TWITTER_REDIRECT_URI || 'http://localhost:3000/auth/twitter/callback',
       scopes: ['tweet.read', 'tweet.write', 'users.read'],
       authUrl: 'https://twitter.com/i/oauth2/authorize',
       tokenUrl: 'https://api.twitter.com/2/oauth2/token',
     },
     [SocialPlatform.LINKEDIN]: {
-      clientId: process.env.LINKEDIN_CLIENT_ID || 'mock_linkedin_client_id',
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET || 'mock_linkedin_secret',
+      clientId: config.oauth.linkedin.clientId || 'mock_linkedin_client_id',
+      clientSecret: config.oauth.linkedin.clientSecret || 'mock_linkedin_secret',
       redirectUri: process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:3000/auth/linkedin/callback',
       scopes: ['w_member_social', 'r_liteprofile'],
       authUrl: 'https://www.linkedin.com/oauth/v2/authorization',

@@ -5,19 +5,26 @@
  */
 
 import Stripe from 'stripe';
+import { config } from '../config';
 import mongoose from 'mongoose';
+import { config } from '../config';
 import { Subscription as SubscriptionModel, SubscriptionStatus, BillingCycle, ISubscription } from '../models/Subscription';
+import { config } from '../config';
 import { Plan } from '../models/Plan';
+import { config } from '../config';
 import { Workspace } from '../models/Workspace';
+import { config } from '../config';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 import {
+import { config } from '../config';
   recordSubscriptionCreated,
   recordSubscriptionCanceled,
   recordPaymentSucceeded,
   recordPaymentFailed,
 } from '../config/billingMetrics';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+const stripe = new Stripe(config.stripe.secretKey || '', {
   apiVersion: '2024-11-20.acacia' as any,
 });
 
@@ -479,3 +486,4 @@ export class StripeService {
 }
 
 export const stripeService = new StripeService();
+

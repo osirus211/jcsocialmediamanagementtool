@@ -26,6 +26,9 @@ export interface IUsage extends Document {
   // API usage (for future API access feature)
   apiRequests: number;
   
+  // AI usage
+  aiRequests: number;
+  
   // Timestamps
   periodStart: Date;
   periodEnd: Date;
@@ -96,6 +99,13 @@ const UsageSchema = new Schema<IUsage>(
     
     // API usage
     apiRequests: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    
+    // AI usage
+    aiRequests: {
       type: Number,
       default: 0,
       min: 0,

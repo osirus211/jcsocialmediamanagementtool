@@ -1,0 +1,1017 @@
+openapi: 3.0.3
+info:
+  title: Social Media Scheduler Public API
+  version: 1.0.0
+  description: |
+    External-facing REST API for third-party integrations with the Social Media Scheduler platform.
+    
+    ## Authentication
+    
+    All requests require an API key passed in the `X-API-Key` header:
+    
+    ```
+    X-API-Key: sk_live_your_api_key_here
+    ```
+    
+    API keys can be created and managed through the dashboard at `/settings/api-keys`.
+    
+    ## Rate Limiting
+    
+    API requests are rate-limited per API key. Default limits:
+    - 1000 requests per hour per API key
+    - 5000 requests per hour per workspace (across all keys)
+    
+    Rate limit information is included in response headers:
+    - `X-RateLimit-Limit`: Maximum requests allowed in the window
+    - `X-RateLimit-Remaining`: Requests remaining in current window
+    - `X-RateLimit-Reset`: Unix timestamp when the rate limit resets
+    
+    When rate limited, you'll receive a `429 Too Many Requests` response with a `Retry-After` header.
+    
+    ## Scopes & Permissions
+    
+    API keys have granular permission scopes that control access to endpoints:
+    
+    - `posts:read` - Read posts and drafts
+    - `posts:write` - Create, update, and delete posts
+    - `analytics:read` - Read analytics data
+    - `media:read` - Read media library
+    - `media:write` - Upload and delete media
+    - `accounts:read` - Read connected social accounts
+    - `accounts:write` - Connect and disconnect accounts
+    - `workspaces:read` - Read workspace information
+    - `integrations:read` - Read OAuth integrations
+    - `integrations:write` - Manage OAuth integrations
+    
+    Write scopes automatically include read access (e.g., `posts:write` includes `posts:read`).
+    
+    ## Error Responses
+    
+    All errors follow a consistent format:
+    
+    ```json
+    {
+      "error": "Error Type",
+      "message": "Human-readable error message",
+      "code": "ERROR_CODE",
+      "requestId": "req_abc123",
+      "timestamp": "2026-03-07T10:30:00Z",
+      "docsUrl": "https://docs.example.com/errors/ERROR_CODE"
+    }
+    ```
+    
+    Common error codes:
+    - `MISSING_API_KEY` - No API key provided
+    - `INVALID_API_KEY` - API key is invalid or malformed
+    - `REVOKED_API_KEY` - API key has been revoked
+    - `EXPIRED_API_KEY` - API key has expired
+    - `INSUFFICIENT_SCOPE` - API key lacks required permission scope
+    - `IP_NOT_ALLOWED` - Request from non-allowlisted IP
+    - `RATE_LIMIT_EXCEEDED` - Rate limit exceeded
+    - `VALIDATION_ERROR` - Request validation failed
+    - `NOT_FOUND` - Resource not found
+    
+  contact:
+    name: API Support
+    email: api-support@example.com
+  license:
+    name: Proprietary
+    
+servers:
+  - url: https://api.example.com
+    description: Production server
+  - url: https://api-staging.example.com
+    description: Staging server
+  - url: http://localhost:3000
+    description: Local development
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Posts
+    description: Manage social media posts and drafts
+  - name: Accounts
+    description: View connected social media accounts
+  - name: Analytics
+    description: Access analytics data and metrics
+  - name: Media
+    description: Manage media library and assets
+
+paths:
+  /api/public/v1/posts:
+    get:
+      tags:
+        - Posts
+      summary: List posts
+      description: Retrieve a paginated list of posts for your workspace
+      operationId: listPosts
+      security:
+        - ApiKeyAuth: [posts:read]
+      parameters:
+        - name: status
+          in: query
+          description: Filter by post status
+          required: false
+          schema:
+            type: string
+            enum: [draft, scheduled, published, failed]
+        - name: limit
+          in: query
+          description: Number of posts to return (max 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+    
+    post:
+      tags:
+        - Posts
+      summary: Create a post
+      description: Create a new scheduled post
+      operationId: createPost
+      security:
+        - ApiKeyAuth: [posts:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+      responses:
+        '201':
+          description: Post created successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  post:
+                    $ref: '#/components/schemas/Post'
+                  message:
+                    type: string
+                    example: Post created successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  
+  /api/public/v1/posts/{id}:
+    get:
+      tags:
+        - Posts
+      summary: Get a post
+      description: Retrieve a single post by ID
+      operationId: getPost
+      security:
+        - ApiKeyAuth: [posts:read]
+      parameters:
+        - name: id
+          in: path
+          description: Post ID
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{24}$'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  post:
+                    $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+    
+    delete:
+      tags:
+        - Posts
+      summary: Delete a post
+      description: Delete a post by ID
+      operationId: deletePost
+      security:
+        - ApiKeyAuth: [posts:write]
+      parameters:
+        - name: id
+          in: path
+          description: Post ID
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{24}$'
+      responses:
+        '200':
+          description: Post deleted successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Post deleted successfully
+                  postId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  
+  /api/public/v1/accounts:
+    get:
+      tags:
+        - Accounts
+      summary: List connected accounts
+      description: Retrieve all connected social media accounts for your workspace
+      operationId: listAccounts
+      security:
+        - ApiKeyAuth: [accounts:read]
+      parameters:
+        - name: platform
+          in: query
+          description: Filter by social media platform
+          required: false
+          schema:
+            type: string
+            enum: [twitter, facebook, instagram, linkedin, tiktok, google_business]
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SocialAccount'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  
+  /api/public/v1/analytics:
+    get:
+      tags:
+        - Analytics
+      summary: Get aggregated analytics
+      description: Retrieve aggregated analytics data for your workspace
+      operationId: getAnalytics
+      security:
+        - ApiKeyAuth: [analytics:read]
+      parameters:
+        - name: startDate
+          in: query
+          description: Start date for analytics period (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: End date for analytics period (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: platform
+          in: query
+          description: Filter by social media platform
+          required: false
+          schema:
+            type: string
+            enum: [twitter, facebook, instagram, linkedin, tiktok, google_business]
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregatedAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  
+  /api/public/v1/analytics/posts/{id}:
+    get:
+      tags:
+        - Analytics
+      summary: Get post analytics
+      description: Retrieve analytics data for a specific post
+      operationId: getPostAnalytics
+      security:
+        - ApiKeyAuth: [analytics:read]
+      parameters:
+        - name: id
+          in: path
+          description: Post ID
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{24}$'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostAnalytics'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  
+  /api/public/v1/media:
+    get:
+      tags:
+        - Media
+      summary: List media files
+      description: Retrieve a paginated list of media files for your workspace
+      operationId: listMedia
+      security:
+        - ApiKeyAuth: [media:read]
+      parameters:
+        - name: type
+          in: query
+          description: Filter by media type
+          required: false
+          schema:
+            type: string
+            enum: [image, video]
+        - name: limit
+          in: query
+          description: Number of items to return (max 100)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  media:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Media'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+    
+    post:
+      tags:
+        - Media
+      summary: Upload media file
+      description: Upload a new media file (Not yet implemented)
+      operationId: uploadMedia
+      security:
+        - ApiKeyAuth: [media:write]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '501':
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /api/public/v1/media/{id}:
+    get:
+      tags:
+        - Media
+      summary: Get a media file
+      description: Retrieve a single media file by ID
+      operationId: getMedia
+      security:
+        - ApiKeyAuth: [media:read]
+      parameters:
+        - name: id
+          in: path
+          description: Media ID
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{24}$'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  media:
+                    $ref: '#/components/schemas/Media'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+    
+    delete:
+      tags:
+        - Media
+      summary: Delete a media file
+      description: Delete a media file by ID
+      operationId: deleteMedia
+      security:
+        - ApiKeyAuth: [media:write]
+      parameters:
+        - name: id
+          in: path
+          description: Media ID
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{24}$'
+      responses:
+        '200':
+          description: Media deleted successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Media deleted successfully
+                  mediaId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. Format: `sk_live_<random_string>`
+        
+        Create API keys in your dashboard at `/settings/api-keys`.
+  
+  headers:
+    X-RateLimit-Limit:
+      description: Maximum number of requests allowed in the current window
+      schema:
+        type: integer
+        example: 1000
+    X-RateLimit-Remaining:
+      description: Number of requests remaining in the current window
+      schema:
+        type: integer
+        example: 999
+    X-RateLimit-Reset:
+      description: Unix timestamp when the rate limit resets
+      schema:
+        type: integer
+        example: 1709812800
+  
+  schemas:
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique post identifier
+          example: 507f1f77bcf86cd799439011
+        content:
+          type: string
+          description: Post content text
+          example: Check out our new product launch!
+        platformContent:
+          type: array
+          description: Platform-specific content overrides
+          items:
+            type: object
+            properties:
+              platform:
+                type: string
+                enum: [twitter, facebook, instagram, linkedin, tiktok]
+              content:
+                type: string
+        socialAccountIds:
+          type: array
+          description: IDs of social accounts to post to
+          items:
+            type: string
+        status:
+          type: string
+          enum: [draft, scheduled, published, failed]
+          description: Current post status
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When the post is scheduled to be published
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the post was actually published
+        errorMessage:
+          type: string
+          nullable: true
+          description: Error message if post failed
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    
+    CreatePostRequest:
+      type: object
+      required:
+        - content
+        - socialAccountIds
+        - scheduledAt
+      properties:
+        content:
+          type: string
+          description: Post content text
+          example: Check out our new product launch!
+        socialAccountIds:
+          type: array
+          description: IDs of social accounts to post to
+          items:
+            type: string
+          minItems: 1
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When to publish the post (must be in the future)
+        platformContent:
+          type: array
+          description: Platform-specific content overrides
+          items:
+            type: object
+            properties:
+              platform:
+                type: string
+                enum: [twitter, facebook, instagram, linkedin, tiktok]
+              content:
+                type: string
+        mediaIds:
+          type: array
+          description: IDs of media files to attach
+          items:
+            type: string
+    
+    SocialAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique account identifier
+        platform:
+          type: string
+          enum: [twitter, facebook, instagram, linkedin, tiktok, google_business]
+          description: Social media platform
+        username:
+          type: string
+          description: Account username or handle
+        profileUrl:
+          type: string
+          description: URL to the social media profile
+        profilePicture:
+          type: string
+          nullable: true
+          description: URL to profile picture
+        isActive:
+          type: boolean
+          description: Whether the account is currently active
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last time account data was synced
+        createdAt:
+          type: string
+          format: date-time
+    
+    AggregatedAnalytics:
+      type: object
+      properties:
+        analytics:
+          type: object
+          properties:
+            totals:
+              type: object
+              properties:
+                impressions:
+                  type: integer
+                  description: Total impressions across all posts
+                engagements:
+                  type: integer
+                  description: Total engagements (likes + comments + shares + clicks)
+                likes:
+                  type: integer
+                  description: Total likes
+                comments:
+                  type: integer
+                  description: Total comments
+                shares:
+                  type: integer
+                  description: Total shares
+                clicks:
+                  type: integer
+                  description: Total clicks
+            period:
+              type: object
+              properties:
+                startDate:
+                  type: string
+                  format: date-time
+                endDate:
+                  type: string
+                  format: date-time
+            postsAnalyzed:
+              type: integer
+              description: Number of posts included in analytics
+    
+    PostAnalytics:
+      type: object
+      properties:
+        postId:
+          type: string
+          description: Post ID
+        analytics:
+          type: array
+          items:
+            type: object
+            properties:
+              platform:
+                type: string
+                enum: [twitter, facebook, instagram, linkedin, tiktok]
+              impressions:
+                type: integer
+              engagements:
+                type: integer
+              likes:
+                type: integer
+              comments:
+                type: integer
+              shares:
+                type: integer
+              clicks:
+                type: integer
+              fetchedAt:
+                type: string
+                format: date-time
+        total:
+          type: integer
+          description: Number of analytics records
+    
+    Media:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique media identifier
+        filename:
+          type: string
+          description: Original filename
+        mediaType:
+          type: string
+          enum: [image, video]
+          description: Type of media file
+        storageUrl:
+          type: string
+          description: Storage URL (internal)
+        cdnUrl:
+          type: string
+          description: CDN URL for public access
+        thumbnailUrl:
+          type: string
+          nullable: true
+          description: Thumbnail URL (for videos)
+        size:
+          type: integer
+          description: File size in bytes
+        mimeType:
+          type: string
+          description: MIME type
+          example: image/jpeg
+        width:
+          type: integer
+          nullable: true
+          description: Image/video width in pixels
+        height:
+          type: integer
+          nullable: true
+          description: Image/video height in pixels
+        duration:
+          type: number
+          nullable: true
+          description: Video duration in seconds
+        status:
+          type: string
+          enum: [uploading, processing, ready, failed]
+          description: Processing status
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+        limit:
+          type: integer
+          description: Items per page
+        total:
+          type: integer
+          description: Total number of items
+        pages:
+          type: integer
+          description: Total number of pages
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: Unauthorized
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid API key
+        code:
+          type: string
+          description: Machine-readable error code
+          example: INVALID_API_KEY
+        requestId:
+          type: string
+          description: Unique request identifier for debugging
+          example: req_abc123xyz
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+        docsUrl:
+          type: string
+          description: Link to error documentation
+          example: https://docs.example.com/errors/INVALID_API_KEY
+  
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Bad Request
+            message: Content, socialAccountIds, and scheduledAt are required
+            code: VALIDATION_ERROR
+            requestId: req_abc123xyz
+            timestamp: '2026-03-07T10:30:00Z'
+    
+    Unauthorized:
+      description: Unauthorized - missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+            message: Invalid API key
+            code: INVALID_API_KEY
+            requestId: req_abc123xyz
+            timestamp: '2026-03-07T10:30:00Z'
+            docsUrl: https://docs.example.com/errors/INVALID_API_KEY
+    
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Forbidden
+            message: 'Missing required scopes: posts:write'
+            code: INSUFFICIENT_SCOPE
+            requestId: req_abc123xyz
+            timestamp: '2026-03-07T10:30:00Z'
+            docsUrl: https://docs.example.com/errors/INSUFFICIENT_SCOPE
+    
+    NotFound:
+      description: Not found - resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not Found
+            message: Post not found
+            code: NOT_FOUND
+            requestId: req_abc123xyz
+            timestamp: '2026-03-07T10:30:00Z'
+    
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          description: Seconds until rate limit resets
+          schema:
+            type: integer
+            example: 3600
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Too Many Requests
+            message: Rate limit exceeded. Please retry after 3600 seconds.
+            code: RATE_LIMIT_EXCEEDED
+            requestId: req_abc123xyz
+            timestamp: '2026-03-07T10:30:00Z'
+            docsUrl: https://docs.example.com/errors/RATE_LIMIT_EXCEEDED

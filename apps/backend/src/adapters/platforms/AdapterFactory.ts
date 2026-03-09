@@ -11,6 +11,7 @@ import { InstagramBusinessProvider } from '../../services/oauth/InstagramBusines
 import { TwitterOAuthProvider } from '../../services/oauth/TwitterOAuthProvider';
 import { LinkedInOAuthProvider } from '../../services/oauth/LinkedInOAuthProvider';
 import { TikTokProvider } from '../../services/oauth/TikTokProvider';
+import { config } from '../../config';
 
 export class AdapterFactory {
   /**
@@ -49,19 +50,18 @@ export class AdapterFactory {
    * Get client ID for platform from environment variables
    */
   private static getClientId(platform: SocialPlatform): string {
-    const envVarMap: Record<SocialPlatform, string> = {
-      facebook: 'FACEBOOK_APP_ID',
-      instagram: 'FACEBOOK_APP_ID', // Instagram uses Facebook OAuth
-      twitter: 'TWITTER_CLIENT_ID',
-      linkedin: 'LINKEDIN_CLIENT_ID',
-      tiktok: 'TIKTOK_CLIENT_KEY',
+    const configMap: Record<SocialPlatform, string | undefined> = {
+      facebook: config.oauth.facebook.appId,
+      instagram: config.oauth.facebook.appId, // Instagram uses Facebook OAuth
+      twitter: config.oauth.twitter.clientId,
+      linkedin: config.oauth.linkedin.clientId,
+      tiktok: config.oauth.tiktok.clientKey,
     };
 
-    const envVar = envVarMap[platform];
-    const value = process.env[envVar];
+    const value = configMap[platform];
 
     if (!value) {
-      throw new Error(`Missing environment variable: ${envVar}`);
+      throw new Error(`Missing configuration for platform: ${platform}`);
     }
 
     return value;
@@ -71,19 +71,18 @@ export class AdapterFactory {
    * Get client secret for platform from environment variables
    */
   private static getClientSecret(platform: SocialPlatform): string {
-    const envVarMap: Record<SocialPlatform, string> = {
-      facebook: 'FACEBOOK_APP_SECRET',
-      instagram: 'FACEBOOK_APP_SECRET', // Instagram uses Facebook OAuth
-      twitter: 'TWITTER_CLIENT_SECRET',
-      linkedin: 'LINKEDIN_CLIENT_SECRET',
-      tiktok: 'TIKTOK_CLIENT_SECRET',
+    const configMap: Record<SocialPlatform, string | undefined> = {
+      facebook: config.oauth.facebook.appSecret,
+      instagram: config.oauth.facebook.appSecret, // Instagram uses Facebook OAuth
+      twitter: config.oauth.twitter.clientSecret,
+      linkedin: config.oauth.linkedin.clientSecret,
+      tiktok: config.oauth.tiktok.clientSecret,
     };
 
-    const envVar = envVarMap[platform];
-    const value = process.env[envVar];
+    const value = configMap[platform];
 
     if (!value) {
-      throw new Error(`Missing environment variable: ${envVar}`);
+      throw new Error(`Missing configuration for platform: ${platform}`);
     }
 
     return value;
@@ -93,7 +92,7 @@ export class AdapterFactory {
    * Get redirect URI for platform from environment variables
    */
   private static getRedirectUri(platform: SocialPlatform): string {
-    const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || 'http://localhost:3000';
+    const baseUrl = config.frontend.url;
     return `${baseUrl}/api/v1/channels/oauth/callback/${platform}`;
   }
 

@@ -146,7 +146,7 @@ export class EmailNotificationService {
       <p>Your post failed to publish to <strong>${payload.platform}</strong>.</p>
       <p><strong>Error:</strong> ${payload.error}</p>
       <p>Please check your connection and try again.</p>
-      <a href="${process.env.APP_URL}/posts/${payload.postId}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Post</a>
+      <a href="${config.app.url}/posts/${payload.postId}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Post</a>
     `;
   }
 
@@ -155,7 +155,7 @@ export class EmailNotificationService {
       <h2>Post Approval Required</h2>
       <p>A new post is waiting for your approval.</p>
       <p><strong>Content:</strong> ${payload.content.substring(0, 200)}${payload.content.length > 200 ? '...' : ''}</p>
-      <a href="${process.env.APP_URL}/approvals/${payload.postId}" style="background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Review Post</a>
+      <a href="${config.app.url}/approvals/${payload.postId}" style="background-color: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Review Post</a>
     `;
   }
 
@@ -164,7 +164,7 @@ export class EmailNotificationService {
       <h2>Connection Expired</h2>
       <p>Your <strong>${payload.platform}</strong> connection has expired.</p>
       <p>Please reconnect your account to continue publishing posts.</p>
-      <a href="${process.env.APP_URL}/settings/connections" style="background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reconnect Account</a>
+      <a href="${config.app.url}/settings/connections" style="background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reconnect Account</a>
     `;
   }
 
@@ -173,7 +173,7 @@ export class EmailNotificationService {
       <h2>Subscription Payment Failed</h2>
       <p>Your subscription payment failed: <strong>${payload.reason}</strong></p>
       <p>Please update your payment method to avoid service interruption.</p>
-      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #F44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Payment Method</a>
+      <a href="${config.app.url}/settings/billing" style="background-color: #F44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Payment Method</a>
     `;
   }
 
@@ -182,7 +182,7 @@ export class EmailNotificationService {
       <h2>Payment Failed</h2>
       <p>Payment of <strong>$${(payload.amount / 100).toFixed(2)}</strong> failed: ${payload.reason}</p>
       <p>Please update your payment method.</p>
-      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #F44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Payment Method</a>
+      <a href="${config.app.url}/settings/billing" style="background-color: #F44336; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Payment Method</a>
     `;
   }
 
@@ -191,7 +191,7 @@ export class EmailNotificationService {
       <h2>Trial Ending Soon</h2>
       <p>Your trial ends in <strong>${payload.daysRemaining} days</strong>.</p>
       <p>Upgrade now to continue using all features without interruption.</p>
-      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Upgrade Now</a>
+      <a href="${config.app.url}/settings/billing" style="background-color: #9C27B0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Upgrade Now</a>
     `;
   }
 
@@ -200,7 +200,7 @@ export class EmailNotificationService {
       <h2>Limit Reached</h2>
       <p>You've reached your <strong>${payload.limitType}</strong> limit (${payload.limit}).</p>
       <p>Upgrade your plan for more capacity.</p>
-      <a href="${process.env.APP_URL}/settings/billing" style="background-color: #FF5722; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Upgrade Plan</a>
+      <a href="${config.app.url}/settings/billing" style="background-color: #FF5722; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Upgrade Plan</a>
     `;
   }
 

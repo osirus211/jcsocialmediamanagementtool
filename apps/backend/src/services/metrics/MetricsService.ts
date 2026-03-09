@@ -198,6 +198,37 @@ export class MetricsService {
     lines.push(`http_requests_total ${metrics.http_requests_total}`);
     lines.push('');
 
+    // Public API metrics
+    lines.push('# HELP public_api_requests_total Total Public API requests');
+    lines.push('# TYPE public_api_requests_total counter');
+    lines.push(`public_api_requests_total ${metrics.public_api_requests_total}`);
+    lines.push('');
+
+    lines.push('# HELP public_api_errors_total Total Public API errors (4xx and 5xx)');
+    lines.push('# TYPE public_api_errors_total counter');
+    lines.push(`public_api_errors_total ${metrics.public_api_errors_total}`);
+    lines.push('');
+
+    lines.push('# HELP public_api_rate_limit_hits Total Public API rate limit hits');
+    lines.push('# TYPE public_api_rate_limit_hits counter');
+    lines.push(`public_api_rate_limit_hits ${metrics.public_api_rate_limit_hits}`);
+    lines.push('');
+
+    lines.push('# HELP public_api_auth_failures Total Public API authentication failures');
+    lines.push('# TYPE public_api_auth_failures counter');
+    lines.push(`public_api_auth_failures ${metrics.public_api_auth_failures}`);
+    lines.push('');
+
+    lines.push('# HELP public_api_scope_denials Total Public API scope permission denials');
+    lines.push('# TYPE public_api_scope_denials counter');
+    lines.push(`public_api_scope_denials ${metrics.public_api_scope_denials}`);
+    lines.push('');
+
+    lines.push('# HELP public_api_latency_avg_ms Average Public API request latency in milliseconds');
+    lines.push('# TYPE public_api_latency_avg_ms gauge');
+    lines.push(`public_api_latency_avg_ms ${metrics.public_api_latency_avg_ms.toFixed(2)}`);
+    lines.push('');
+
     // Alerting metrics (optional)
     if (metrics.alerts_total !== undefined) {
       lines.push('# HELP alerts_total Total alerts sent');

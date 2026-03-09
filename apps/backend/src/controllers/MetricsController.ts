@@ -44,6 +44,11 @@ export class MetricsController {
    */
   async getMetrics(req: Request, res: Response): Promise<void> {
     try {
+      // Update Redis and Worker metrics before exporting
+      const { updateRedisMetrics, updateWorkerMetrics } = await import('../config/metrics');
+      updateRedisMetrics();
+      updateWorkerMetrics();
+      
       const metrics = await this.metricsService.getPrometheusMetrics();
       
       // Set Prometheus content type

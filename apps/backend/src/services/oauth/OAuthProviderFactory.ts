@@ -16,10 +16,15 @@
  */
 
 import { OAuthProvider } from './OAuthProvider';
+import { config } from '../../config';
 import { InstagramBusinessProvider } from './InstagramBusinessProvider';
+import { config } from '../../config';
 import { InstagramBasicDisplayProvider } from './InstagramBasicDisplayProvider';
+import { config } from '../../config';
 import { GoogleBusinessProvider } from './GoogleBusinessProvider';
+import { config } from '../../config';
 import { logger } from '../../utils/logger';
+import { config } from '../../config';
 
 export enum ProviderType {
   INSTAGRAM_BUSINESS = 'INSTAGRAM_BUSINESS',
@@ -56,8 +61,8 @@ export class OAuthProviderFactory {
   private initializeProviders(): void {
     // Initialize Instagram Business Provider (via Facebook)
     try {
-      const businessClientId = process.env.INSTAGRAM_CLIENT_ID || process.env.FACEBOOK_APP_ID;
-      const businessClientSecret = process.env.INSTAGRAM_CLIENT_SECRET || process.env.FACEBOOK_APP_SECRET;
+      const businessClientId = process.env.INSTAGRAM_CLIENT_ID || config.oauth.facebook.appId;
+      const businessClientSecret = process.env.INSTAGRAM_CLIENT_SECRET || config.oauth.facebook.appSecret;
       const businessRedirectUri = process.env.INSTAGRAM_REDIRECT_URI || process.env.FACEBOOK_CALLBACK_URL;
 
       if (!businessClientId || !businessClientSecret || !businessRedirectUri) {
@@ -191,3 +196,4 @@ export class OAuthProviderFactory {
 
 // Export singleton instance
 export const oauthProviderFactory = OAuthProviderFactory.getInstance();
+

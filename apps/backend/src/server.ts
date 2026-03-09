@@ -28,7 +28,6 @@ let workerInstance: any = null;
 let tokenRefreshWorkerInstance: any = null;
 let systemMonitorInstance: any = null;
 let backupVerificationWorkerInstance: any = null;
-let backpressureMonitorInstance: any = null;
 let metricsControllerInstance: any = null;
 let isShuttingDown = false;
 
@@ -112,13 +111,6 @@ const gracefulShutdown = async (signal: string) => {
       logger.info('Stopping backup verification worker...');
       backupVerificationWorkerInstance.stop();
       logger.info('✅ Backup verification worker stopped');
-    }
-    
-    // 3e. Stop backpressure monitor
-    if (backpressureMonitorInstance) {
-      logger.info('Stopping backpressure monitor...');
-      backpressureMonitorInstance.stop();
-      logger.info('✅ Backpressure monitor stopped');
     }
     
     // 4. Close queue connections
@@ -352,9 +344,26 @@ const startServer = async () => {
         const { analyticsCollectorWorker } = await import('./workers/AnalyticsCollectorWorker');
         const { analyticsSchedulerService } = await import('./services/AnalyticsSchedulerService');
         
-        // Start analytics collector worker
-        analyticsCollectorWorker.start();
-        logger.info('📊 Analytics collector worker started');
+        // FIX 2: Register analytics worker with WorkerManager for crash recovery and health monitoring
+        try {
+          const { WorkerManager } = await import('./services/WorkerManager');
+          const workerManager = WorkerManager.getInstance();
+          
+          workerManager.registerWorker('analytics-collector', analyticsCollectorWorker, {
+            enabled: true,
+            maxRestarts: 5,
+            restartDelay: 5000,
+          });
+          
+          logger.info('📊 Analytics collector worker registered with WorkerManager');
+        } catch (wmError: any) {
+          logger.warn('Failed to register analytics worker with WorkerManager', {
+            error: wmError.message,
+          });
+          // Fallback to direct start if WorkerManager registration fails
+          analyticsCollectorWorker.start();
+          logger.info('📊 Analytics collector worker started (direct)');
+        }
         
         // Start analytics scheduler
         analyticsSchedulerService.start();
@@ -512,68 +521,6 @@ const startServer = async () => {
       logger.info('⏸️  Backup verification worker disabled');
     }
 
-    console.log('🔧 Checking queue backpressure monitor...');
-    console.log('🔧 redisConnected:', redisConnected, 'config.backpressure.enabled:', config.backpressure.enabled);
-    // Start queue backpressure monitor - ALWAYS when Redis is connected
-    if (redisConnected) {
-      console.log('🔧 INSIDE queue backpressure monitor initialization');
-      try {
-        const { QueueBackpressureMonitor } = await import('./services/monitoring/QueueBackpressureMonitor');
-        const { QueueManager } = await import('./queue/QueueManager');
-        
-        // Create alerting service for backpressure monitor (if alerting enabled)
-        let alertingService = null;
-        if (config.alerting.enabled) {
-          const { AlertingService } = await import('./services/alerting/AlertingService');
-          const { ConsoleAlertAdapter } = await import('./services/alerting/ConsoleAlertAdapter');
-          const { WebhookAlertAdapter } = await import('./services/alerting/WebhookAlertAdapter');
-          
-          const adapters: any[] = [new ConsoleAlertAdapter()];
-          
-          if (config.alerting.webhookUrl) {
-            adapters.push(new WebhookAlertAdapter({
-              url: config.alerting.webhookUrl,
-              format: config.alerting.webhookFormat,
-            }));
-          }
-          
-          alertingService = new AlertingService({
-            enabled: config.alerting.enabled,
-            cooldownMinutes: config.alerting.cooldownMinutes,
-            adapters,
-          });
-        }
-        
-        // Create and start backpressure monitor
-        backpressureMonitorInstance = new QueueBackpressureMonitor(
-          {
-            enabled: true, // Force enabled when Redis is connected
-            pollInterval: config.backpressure.pollInterval,
-            queueName: 'posting-queue',
-            waitingJobsThreshold: config.backpressure.waitingJobsThreshold,
-            growthRateThreshold: config.backpressure.growthRateThreshold,
-            jobTimeThreshold: config.backpressure.jobTimeThreshold,
-            failureRateThreshold: config.backpressure.failureRateThreshold,
-            backlogAgeThreshold: config.backpressure.backlogAgeThreshold,
-            stalledThreshold: config.backpressure.stalledThreshold,
-          },
-          QueueManager.getInstance(),
-          alertingService
-        );
-        
-        await backpressureMonitorInstance.start();
-        console.log('📊 Queue backpressure monitor started');
-        logger.info('📊 Queue backpressure monitor started');
-      } catch (error) {
-        console.log('❌ Queue backpressure monitor failed to start:', error);
-        logger.error('❌ Queue backpressure monitor failed to start:', error);
-        throw error; // Fail fast if monitor can't start
-      }
-    } else {
-      console.log('🔧 Queue backpressure monitor DISABLED (Redis not available)');
-      logger.warn('⏸️  Queue backpressure monitor DISABLED (Redis not available)');
-    }
-
     console.log('🔧 Setting up metrics endpoint...');
     // Setup metrics endpoint
     try {
@@ -588,6 +535,8 @@ const startServer = async () => {
       console.log('🔧 AuthMetricsTracker imported');
       const { httpMetricsTracker } = await import('./middleware/httpMetrics');
       console.log('🔧 HttpMetricsTracker imported');
+      const { publicApiMetricsTracker } = await import('./middleware/publicApiMetrics');
+      console.log('🔧 PublicApiMetricsTracker imported');
       
       let queueManager = null;
       if (redisConnected) {
@@ -607,9 +556,9 @@ const startServer = async () => {
         schedulerService: schedulerService,
         queueManager: queueManager,
         systemMonitor: systemMonitorInstance,
-        backpressureMonitor: backpressureMonitorInstance,
         authService: authMetricsTracker,
         httpMetrics: httpMetricsTracker,
+        publicApiMetrics: publicApiMetricsTracker,
       });
       
       console.log('🔧 Creating metrics service...');
@@ -695,14 +644,79 @@ const startServer = async () => {
             });
           }
 
-          // Register backpressure monitor (if exists)
-          if (backpressureMonitorInstance) {
+          // Register WorkerManager for automatic worker restart
+          try {
+            const { WorkerManager } = await import('./services/WorkerManager');
+            const workerManager = WorkerManager.getInstance();
+            
             recoveryService.registerService({
-              name: 'backpressure-monitor',
-              isRunning: () => backpressureMonitorInstance.getStatus().isRunning,
-              start: () => backpressureMonitorInstance.start(),
-              stop: () => backpressureMonitorInstance.stop(),
+              name: 'worker-manager',
+              isRunning: () => workerManager.isRunning(),
+              start: async () => {
+                logger.info('WorkerManager restarting after Redis reconnect');
+                await workerManager.startAll();
+              },
+              stop: async () => {
+                logger.info('WorkerManager stopping due to Redis disconnect');
+                await workerManager.stopAll();
+              },
               requiresRedis: true,
+            });
+            
+            logger.info('✅ WorkerManager registered with Redis recovery service');
+          } catch (error: any) {
+            logger.warn('Failed to register WorkerManager with recovery service', {
+              error: error.message,
+            });
+          }
+
+          // Register QueueMonitoringService for automatic monitoring restart
+          try {
+            const { queueMonitoringService } = await import('./services/QueueMonitoringService');
+            
+            recoveryService.registerService({
+              name: 'queue-monitoring',
+              isRunning: () => queueMonitoringService.isRunning(),
+              start: () => {
+                logger.info('QueueMonitoringService restarting after Redis reconnect');
+                queueMonitoringService.startMonitoring();
+              },
+              stop: () => {
+                logger.info('QueueMonitoringService stopping due to Redis disconnect');
+                queueMonitoringService.stopMonitoring();
+              },
+              requiresRedis: true,
+            });
+            
+            logger.info('✅ QueueMonitoringService registered with Redis recovery service');
+          } catch (error: any) {
+            logger.warn('Failed to register QueueMonitoringService with recovery service', {
+              error: error.message,
+            });
+          }
+
+          // FIX 3: Register AnalyticsCollectorWorker for automatic restart on Redis reconnect
+          try {
+            const { analyticsCollectorWorker } = await import('./workers/AnalyticsCollectorWorker');
+            
+            recoveryService.registerService({
+              name: 'analytics-collector',
+              isRunning: () => analyticsCollectorWorker.getStatus().isRunning,
+              start: () => {
+                logger.info('AnalyticsCollectorWorker restarting after Redis reconnect');
+                analyticsCollectorWorker.start();
+              },
+              stop: async () => {
+                logger.info('AnalyticsCollectorWorker stopping due to Redis disconnect');
+                await analyticsCollectorWorker.stop();
+              },
+              requiresRedis: true,
+            });
+            
+            logger.info('✅ AnalyticsCollectorWorker registered with Redis recovery service');
+          } catch (error: any) {
+            logger.warn('Failed to register AnalyticsCollectorWorker with recovery service', {
+              error: error.message,
             });
           }
 
@@ -712,7 +726,9 @@ const startServer = async () => {
               workerInstance ? 'publishing-worker' : null,
               tokenRefreshWorkerInstance ? 'token-refresh-worker' : null,
               systemMonitorInstance ? 'system-monitor' : null,
-              backpressureMonitorInstance ? 'backpressure-monitor' : null,
+              'worker-manager',
+              'queue-monitoring',
+              'analytics-collector',
             ].filter(Boolean),
           });
         }

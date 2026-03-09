@@ -95,50 +95,75 @@ export class AnalyticsCollectorWorker {
       jobId: job.id,
     });
 
+    // Acquire distributed lock to prevent concurrent analytics collection
+    const { distributedLockService } = await import('../services/DistributedLockService');
+    const lockKey = `lock:analytics:${postId}:${platform}`;
+    
     try {
-      // Get social account
-      const account = await SocialAccount.findById(socialAccountId)
-        .select('+accessToken');
+      await distributedLockService.withLock(
+        lockKey,
+        async () => {
+          // Get social account
+          const account = await SocialAccount.findById(socialAccountId)
+            .select('+accessToken');
 
-      if (!account) {
-        throw new Error('Social account not found');
+          if (!account) {
+            throw new Error('Social account not found');
+          }
+
+          // Get platform adapter
+          const adapter = await this.getAnalyticsAdapter(platform);
+
+          // Collect analytics from platform
+          const analytics = await adapter.collectAnalytics({
+            platformPostId,
+            accessToken: account.getDecryptedAccessToken(),
+            account,
+          });
+
+          // Save analytics to database
+          await this.saveAnalytics({
+            postId,
+            platform,
+            socialAccountId,
+            workspaceId: account.workspaceId.toString(),
+            collectionAttempt,
+            analytics,
+          });
+
+          const duration = Date.now() - startTime;
+          this.metrics.collection_success_total++;
+
+          // Record metrics
+          recordAnalyticsCollection(platform, 'success');
+          recordAnalyticsApiLatency(platform, duration);
+
+          logger.info('Analytics collection successful', {
+            postId,
+            platform,
+            attempt: collectionAttempt,
+            duration,
+            metrics: analytics,
+          });
+        },
+        {
+          ttl: 60000, // 60 seconds
+          retryCount: 1, // Don't retry - if another worker has it, skip
+        }
+      );
+    } catch (error: any) {
+      // Check if this is a lock acquisition error
+      if (error.name === 'LockAcquisitionError') {
+        logger.info('Analytics collection already in progress by another worker', {
+          postId,
+          platform,
+          attempt: collectionAttempt,
+        });
+        // Skip this job - another worker is processing it
+        return;
       }
 
-      // Get platform adapter
-      const adapter = await this.getAnalyticsAdapter(platform);
-
-      // Collect analytics from platform
-      const analytics = await adapter.collectAnalytics({
-        platformPostId,
-        accessToken: account.getDecryptedAccessToken(),
-        account,
-      });
-
-      // Save analytics to database
-      await this.saveAnalytics({
-        postId,
-        platform,
-        socialAccountId,
-        workspaceId: account.workspaceId.toString(),
-        collectionAttempt,
-        analytics,
-      });
-
-      const duration = Date.now() - startTime;
-      this.metrics.collection_success_total++;
-
-      // Record metrics
-      recordAnalyticsCollection(platform, 'success');
-      recordAnalyticsApiLatency(platform, duration);
-
-      logger.info('Analytics collection successful', {
-        postId,
-        platform,
-        attempt: collectionAttempt,
-        duration,
-        metrics: analytics,
-      });
-    } catch (error: any) {
+      // Other errors should be handled normally
       const duration = Date.now() - startTime;
       this.metrics.collection_failure_total++;
 
@@ -225,6 +250,38 @@ export class AnalyticsCollectorWorker {
         postId: data.postId,
         attempt: data.collectionAttempt,
       });
+
+      // Emit post.analytics.updated event for workflow automation
+      try {
+        const { EventDispatcherService } = await import('../services/EventDispatcherService');
+        
+        // Emit event for each metric that might have thresholds
+        const metrics = ['likes', 'comments', 'shares', 'views', 'impressions', 'engagementRate'];
+        for (const metric of metrics) {
+          if (data.analytics[metric] !== undefined) {
+            await EventDispatcherService.handleEvent({
+              eventId: `analytics-updated-${data.postId}-${metric}-${Date.now()}`,
+              eventType: 'post.analytics.updated',
+              workspaceId: data.workspaceId,
+              timestamp: new Date(),
+              data: {
+                postId: data.postId,
+                platform: data.platform,
+                metric,
+                currentValue: data.analytics[metric],
+                collectionAttempt: data.collectionAttempt,
+              },
+            });
+          }
+        }
+        logger.debug('post.analytics.updated events emitted', { postId: data.postId });
+      } catch (eventError: any) {
+        // Event emission failure should NOT block analytics save
+        logger.warn('Failed to emit post.analytics.updated event (non-blocking)', {
+          postId: data.postId,
+          error: eventError.message,
+        });
+      }
     } catch (error: any) {
       logger.error('Failed to save analytics', {
         postId: data.postId,

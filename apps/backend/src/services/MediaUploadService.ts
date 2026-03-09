@@ -5,13 +5,21 @@
  */
 
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { config } from '../config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { config } from '../config';
 import mongoose from 'mongoose';
+import { config } from '../config';
 import { v4 as uuidv4 } from 'uuid';
+import { config } from '../config';
 import { Media, MediaType, MediaStatus, IMedia } from '../models/Media';
+import { config } from '../config';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 import { withSpan } from '../config/telemetry';
+import { config } from '../config';
 import {
+import { config } from '../config';
   recordMediaUpload,
   recordMediaUploadFailure,
   recordSignedUrlGenerated,
@@ -70,7 +78,7 @@ export class MediaUploadService {
 
   constructor() {
     // Initialize S3 client
-    this.region = process.env.AWS_REGION || 'us-east-1';
+    this.region = config.aws.region || 'us-east-1';
     this.bucketName = process.env.S3_BUCKET_NAME || 'social-media-scheduler';
     this.cdnUrl = process.env.CDN_URL;
 
@@ -475,3 +483,4 @@ export class MediaUploadService {
 
 // Export singleton instance
 export const mediaUploadService = new MediaUploadService();
+

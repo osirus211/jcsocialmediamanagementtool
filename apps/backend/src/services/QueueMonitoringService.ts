@@ -12,6 +12,7 @@
 
 import { logger } from '../utils/logger';
 import { QueueManager } from '../queue/QueueManager';
+import { updateQueueMetrics, updateQueueLagMetrics } from '../config/metrics';
 
 export interface QueueStats {
   name: string;
@@ -23,6 +24,9 @@ export interface QueueStats {
   failureRate: number;
   health: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: Date;
+  lagP50?: number;  // Median lag in milliseconds
+  lagP95?: number;  // 95th percentile lag in milliseconds
+  lagP99?: number;  // 99th percentile lag in milliseconds
 }
 
 export interface AlertCondition {
@@ -38,8 +42,26 @@ export class QueueMonitoringService {
   private monitoringInterval: NodeJS.Timeout | null = null;
   private isMonitoring: boolean = false;
   private queueNames: string[] = [
-    'posting-queue',
+    // CORE_RUNTIME queues (CRITICAL - must be monitored)
     'scheduler-queue',
+    'facebook-publish-queue',
+    'instagram-publish-queue',
+    'twitter-publish-queue',
+    'linkedin-publish-queue',
+    'tiktok-publish-queue',
+    'token-refresh-queue',
+    
+    // FEATURE_RUNTIME queues (HIGH priority)
+    'media-processing-queue',
+    'email-queue',
+    'notification-queue',
+    'analytics-collection-queue',
+    
+    // OPERATIONAL queues (CRITICAL - must be monitored)
+    'dead-letter-queue',
+    
+    // LEGACY queues (for reference, may be deprecated)
+    'posting-queue', // Legacy - replaced by platform-specific queues
   ];
   
   // Alert thresholds
@@ -115,6 +137,55 @@ export class QueueMonitoringService {
   }
 
   /**
+   * Calculate queue lag percentiles
+   * Lag = time between job creation and current time for waiting jobs
+   */
+  private async calculateQueueLag(queueName: string): Promise<{
+    p50: number;
+    p95: number;
+    p99: number;
+  } | null> {
+    try {
+      const queueManager = QueueManager.getInstance();
+      const queue = queueManager.getQueue(queueName);
+      
+      // Get waiting jobs (limited to 100 for performance)
+      const waitingJobs = await queue.getWaiting(0, 99);
+      
+      if (waitingJobs.length === 0) {
+        return null;
+      }
+      
+      // Calculate lag for each job
+      const now = Date.now();
+      const lags = waitingJobs.map((job: any) => {
+        const createdAt = job.timestamp || job.processedOn || now;
+        return now - createdAt;
+      });
+      
+      // Sort lags for percentile calculation
+      lags.sort((a, b) => a - b);
+      
+      // Calculate percentiles
+      const p50Index = Math.floor(lags.length * 0.50);
+      const p95Index = Math.floor(lags.length * 0.95);
+      const p99Index = Math.floor(lags.length * 0.99);
+      
+      return {
+        p50: lags[p50Index] || 0,
+        p95: lags[p95Index] || 0,
+        p99: lags[p99Index] || 0,
+      };
+    } catch (error: any) {
+      logger.error('Error calculating queue lag', {
+        queue: queueName,
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  /**
    * Collect metrics from all queues
    */
   private async collectMetrics(): Promise<void> {
@@ -124,6 +195,9 @@ export class QueueMonitoringService {
     for (const queueName of this.queueNames) {
       try {
         const stats = await queueManager.getQueueStats(queueName);
+        
+        // Calculate queue lag
+        const lagMetrics = await this.calculateQueueLag(queueName);
         
         const queueStats: QueueStats = {
           name: queueName,
@@ -135,12 +209,23 @@ export class QueueMonitoringService {
           failureRate: parseFloat(stats.failureRate),
           health: stats.health,
           timestamp: new Date(),
+          lagP50: lagMetrics?.p50,
+          lagP95: lagMetrics?.p95,
+          lagP99: lagMetrics?.p99,
         };
         
         allStats.push(queueStats);
         
         // Store in history
         this.addToHistory(queueName, queueStats);
+        
+        // Export to Prometheus
+        await updateQueueMetrics(queueName, queueStats.waiting, queueStats.active);
+        
+        // Export lag metrics to Prometheus if available
+        if (queueStats.lagP50 !== undefined && queueStats.lagP95 !== undefined && queueStats.lagP99 !== undefined) {
+          updateQueueLagMetrics(queueName, queueStats.lagP50, queueStats.lagP95, queueStats.lagP99);
+        }
         
         // Log metrics
         logger.info('Queue metrics', {
@@ -152,6 +237,9 @@ export class QueueMonitoringService {
           completed: queueStats.completed,
           failureRate: queueStats.failureRate,
           health: queueStats.health,
+          lagP50: queueStats.lagP50,
+          lagP95: queueStats.lagP95,
+          lagP99: queueStats.lagP99,
         });
       } catch (error: any) {
         logger.error('Error collecting queue metrics', {
@@ -211,6 +299,18 @@ export class QueueMonitoringService {
         message: (stats) => {
           const queue = stats.find(s => s.health === 'unhealthy');
           return `Queue unhealthy: ${queue?.name}`;
+        },
+        severity: 'critical',
+      },
+      {
+        name: 'dlq_threshold_exceeded',
+        check: (stats) => {
+          const dlq = stats.find(s => s.name === 'dead-letter-queue');
+          return dlq !== undefined && dlq.waiting > 100;
+        },
+        message: (stats) => {
+          const dlq = stats.find(s => s.name === 'dead-letter-queue');
+          return `Dead-letter queue has ${dlq?.waiting} failed jobs requiring manual intervention`;
         },
         severity: 'critical',
       },
@@ -340,6 +440,15 @@ export class QueueMonitoringService {
     this.metricsHistory.clear();
     logger.info('Queue metrics history cleared');
   }
+
+  /**
+   * Check if monitoring is running
+   * (Required by RedisRecoveryService)
+   */
+  isRunning(): boolean {
+    return this.isMonitoring;
+  }
+
 
   /**
    * Get monitoring status

@@ -6,9 +6,14 @@
 
 // Authentication
 export * from './auth';
+export * from './apiKeyAuth';
+
+// API Key Scopes
+export * from './apiKeyScope';
 
 // Rate Limiting
 export { apiRateLimiter, authRateLimiter, aiRateLimiter } from './rateLimiter';
+export * from './apiKeyRateLimit';
 
 // Security
 export * from './security';

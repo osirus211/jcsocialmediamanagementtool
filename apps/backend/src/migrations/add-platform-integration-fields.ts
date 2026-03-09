@@ -16,6 +16,7 @@
 import mongoose from 'mongoose';
 import { SocialAccount } from '../models/SocialAccount';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 export async function up(): Promise<void> {
   logger.info('Starting migration: add-platform-integration-fields');
@@ -148,7 +149,7 @@ if (require.main === module) {
   const run = async () => {
     try {
       // Connect to MongoDB
-      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/social-scheduler';
+      const mongoUri = config.database.uri;
       await mongoose.connect(mongoUri);
       logger.info('Connected to MongoDB');
 

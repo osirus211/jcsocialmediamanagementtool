@@ -5,6 +5,7 @@ import { PostStatus } from '../models/Post';
 import { logger } from '../utils/logger';
 import { captureException, addBreadcrumb } from '../monitoring/sentry';
 import { createWorkerHeartbeatService } from '../services/WorkerHeartbeatService';
+import { config } from '../config';
 // import { publishingWorkerWrapper } from '../../../../.kiro/execution/reliability/PublishingWorkerWrapper';
 
 // Mock publishingWorkerWrapper for Docker environment
@@ -69,7 +70,7 @@ export class PublishingWorker {
 
   constructor() {
     // Read feature flag from environment
-    this.gracefulDegradationEnabled = process.env.GRACEFUL_DEGRADATION_ENABLED === 'true';
+    this.gracefulDegradationEnabled = config.features.gracefulDegradation;
     
     logger.info('PublishingWorker initialized', {
       gracefulDegradationEnabled: this.gracefulDegradationEnabled,
@@ -1079,6 +1080,78 @@ export class PublishingWorker {
         status: 'success',
       });
 
+      // Emit post.published event for workflow automation
+      try {
+        const { EventDispatcherService } = await import('../services/EventDispatcherService');
+        await EventDispatcherService.handleEvent({
+          eventId: `post-published-${postId}-${Date.now()}`,
+          eventType: 'post.published',
+          workspaceId: post.workspaceId.toString(),
+          timestamp: new Date(),
+          data: {
+            postId: postId.toString(),
+            platform: account.provider,
+            content: post.content,
+            publishedAt: updated.publishedAt || new Date(),
+            socialAccountId: account._id.toString(),
+            platformPostId: result.platformPostId,
+          },
+        });
+        logger.debug('post.published event emitted', { postId });
+      } catch (eventError: any) {
+        // Event emission failure should NOT block publish success
+        logger.warn('Failed to emit post.published event (non-blocking)', {
+          postId,
+          error: eventError.message,
+        });
+      }
+
+      // FIX 1: Schedule analytics collection immediately after successful publish
+      // This ensures analytics are scheduled right away instead of waiting for scheduler polling
+      if (result.platformPostId && updated) {
+        try {
+          const { analyticsCollectionQueue } = await import('../queue/AnalyticsCollectionQueue');
+          
+          // Only schedule if not already scheduled (prevent duplicates)
+          if (!updated.metadata?.analyticsScheduled) {
+            await analyticsCollectionQueue.scheduleCollection({
+              postId: postId.toString(),
+              platform: account.provider,
+              socialAccountId: account._id.toString(),
+              workspaceId: post.workspaceId.toString(),
+              platformPostId: result.platformPostId,
+              publishedAt: updated.publishedAt || new Date(),
+            });
+            
+            // Mark as scheduled to prevent duplicate scheduling by scheduler service
+            await Post.findByIdAndUpdate(postId, {
+              $set: {
+                'metadata.analyticsScheduled': true,
+                'metadata.analyticsScheduledAt': new Date(),
+              },
+            });
+            
+            logger.info('Analytics collection scheduled immediately after publish', {
+              postId,
+              platform: account.provider,
+              platformPostId: result.platformPostId,
+            });
+          } else {
+            logger.debug('Analytics already scheduled, skipping duplicate', {
+              postId,
+              platform: account.provider,
+            });
+          }
+        } catch (analyticsScheduleError: any) {
+          // Analytics scheduling failure should NOT block publish success
+          logger.warn('Failed to schedule analytics (non-blocking)', {
+            postId,
+            platform: account.provider,
+            error: analyticsScheduleError.message,
+          });
+        }
+      }
+
       // Send success email notification with graceful degradation
       // Email failure will NOT block publish success
       if (this.gracefulDegradationEnabled) {
@@ -1314,6 +1387,10 @@ export class PublishingWorker {
   /**
    * Prepare media for publishing
    * Checks for pre-uploaded platform media IDs, falls back to URLs if needed
+   * 
+   * IMPORTANT: Only uses media where:
+   * - uploadStatus = 'uploaded'
+   * - processingStatus = 'completed'
    */
   private async prepareMedia(post: any, account: any): Promise<{ mediaIds: string[], mediaUrls: string[], preUploaded: boolean }> {
     // If post has no media, return empty
@@ -1324,12 +1401,30 @@ export class PublishingWorker {
     // Try to get pre-uploaded platform media IDs
     if (post.mediaIds && post.mediaIds.length > 0) {
       try {
-        const { Media } = await import('../models/Media');
+        const { Media, UploadStatus, ProcessingStatus } = await import('../models/Media');
         
+        // CRITICAL: Only fetch media that is fully uploaded and processed
         const mediaDocuments = await Media.find({
           _id: { $in: post.mediaIds },
           workspaceId: post.workspaceId,
+          uploadStatus: UploadStatus.UPLOADED, // Must be uploaded
+          processingStatus: ProcessingStatus.COMPLETED, // Must be processed
         });
+
+        // Log if any media was filtered out
+        if (mediaDocuments.length < post.mediaIds.length) {
+          logger.warn('Some media not ready for publishing', {
+            postId: post._id,
+            requestedCount: post.mediaIds.length,
+            readyCount: mediaDocuments.length,
+            message: 'Media must be uploaded and processed before publishing',
+          });
+        }
+
+        // If no media is ready, throw error
+        if (mediaDocuments.length === 0) {
+          throw new Error('No media ready for publishing. Media must be uploaded and processed.');
+        }
 
         // Extract platform-specific media IDs for this account's platform
         const platformMediaIds: string[] = [];
@@ -1370,7 +1465,7 @@ export class PublishingWorker {
           preUploaded: false,
         });
 
-        // Get storage URLs from media documents
+        // Get storage URLs from media documents (only ready media)
         const mediaUrls = mediaDocuments.map(m => m.storageUrl).filter(Boolean);
         return {
           mediaIds: [],

@@ -153,7 +153,7 @@ export function logAudit(data: AuditLogData): void {
       });
 
       // Debug log (only in development)
-      if (process.env.NODE_ENV === 'development') {
+      if (config.env === 'development') {
         logger.debug('Audit log created', {
           action: data.action,
           entityType: data.entityType,
@@ -233,7 +233,7 @@ export function logAuditBatch(entries: AuditLogData[]): void {
       await AuditLog.logBatch(logs);
 
       // Debug log (only in development)
-      if (process.env.NODE_ENV === 'development') {
+      if (config.env === 'development') {
         logger.debug('Batch audit logs created', {
           count: entries.length,
         });

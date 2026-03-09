@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/AuthService';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 export class AuthController {
   /**
@@ -22,7 +23,7 @@ export class AuthController {
       // Set refresh token in httpOnly cookie
       res.cookie('refreshToken', result.tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        secure: config.env === 'production', // HTTPS only in production
         sameSite: 'strict', // CSRF protection
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         path: '/api/v1/auth', // Limit cookie to auth endpoints
@@ -55,7 +56,7 @@ export class AuthController {
       // Set refresh token in httpOnly cookie
       res.cookie('refreshToken', result.tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        secure: config.env === 'production', // HTTPS only in production
         sameSite: 'strict', // CSRF protection
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         path: '/api/v1/auth', // Limit cookie to auth endpoints
@@ -147,7 +148,7 @@ export class AuthController {
       // Set new refresh token in httpOnly cookie
       res.cookie('refreshToken', tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        secure: config.env === 'production', // HTTPS only in production
         sameSite: 'strict', // CSRF protection
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         path: '/api/v1/auth', // Limit cookie to auth endpoints
