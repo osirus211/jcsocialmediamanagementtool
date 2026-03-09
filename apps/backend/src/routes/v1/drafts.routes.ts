@@ -10,7 +10,6 @@ import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
 import { rateLimit } from 'express-rate-limit';
 import {
-  validateCreateDraft,
   validateUpdateDraft,
   validateGetDrafts,
   validateScheduleFromDraft,
@@ -90,7 +89,7 @@ router.use(draftRateLimiter);
  *       401:
  *         description: Unauthorized
  */
-router.post('/', validateCreateDraft, (req, res, next) => {
+router.post('/', validateBody(createDraftSchema), (req, res, next) => {
   draftController.createDraft(req, res, next);
 });
 

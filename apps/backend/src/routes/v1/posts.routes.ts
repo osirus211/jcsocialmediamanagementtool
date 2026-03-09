@@ -12,7 +12,6 @@ import { requireWorkspace } from '../../middleware/tenant';
 import { rateLimit } from 'express-rate-limit';
 import multer from 'multer';
 import {
-  validateCreatePost,
   validateUpdatePost,
   validateGetPosts,
   validatePostId,
@@ -135,7 +134,7 @@ router.use(postRateLimiter);
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/', validateCreatePost, (req, res, next) => {
+router.post('/', validateBody(createPostSchema), (req, res, next) => {
   postController.createPost(req, res, next);
 });
 
