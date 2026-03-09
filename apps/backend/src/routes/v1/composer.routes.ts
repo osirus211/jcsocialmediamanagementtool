@@ -67,5 +67,8 @@ router.get('/media', composerController.getMedia.bind(composerController));
 // Delete media
 router.delete('/media/:id', composerController.deleteMedia.bind(composerController));
 
+// Get queue slots
+router.get('/queue-slots', composerController.getQueueSlots.bind(composerController));
+
 export default router;
 

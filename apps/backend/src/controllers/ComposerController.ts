@@ -273,6 +273,34 @@ export class ComposerController {
       next(error);
     }
   }
+
+  /**
+   * Get queue slots
+   * GET /api/composer/queue-slots
+   */
+  async getQueueSlots(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const { platform } = req.query;
+
+      if (!workspaceId) {
+        throw new BadRequestError('Workspace context required');
+      }
+
+      const { queueSlotService } = await import('../services/QueueSlotService');
+      const slots = await queueSlotService.getSlots(
+        workspaceId,
+        platform as string | undefined
+      );
+
+      res.json({
+        success: true,
+        slots: slots.map((s) => s.toJSON()),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const composerController = new ComposerController();

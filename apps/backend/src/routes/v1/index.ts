@@ -18,6 +18,7 @@ import platformRoutes from './platform.routes';
 import dashboardRoutes from './dashboard.routes';
 import apiKeysRoutes from './apiKeys.routes';
 import templatesRoutes from './templates.routes'; // Phase-2: Post templates
+import queueSlotsRoutes from './queue-slots.routes'; // Phase-2: Queue slots
 import followersRoutes from './followers.routes'; // Phase-3: Follower analytics
 import competitorsRoutes from './competitors.routes'; // Phase-3: Competitor analytics
 import listeningRulesRoutes from './listening-rules.routes'; // Phase-4: Social listening
@@ -40,6 +41,7 @@ router.get('/', (_req, res) => {
       posts: '/api/v1/posts',
       drafts: '/api/v1/drafts',
       templates: '/api/v1/templates',
+      queueSlots: '/api/v1/queue-slots',
       media: '/api/v1/media',
       platforms: '/api/v1/platforms',
       social: '/api/v1/social',
@@ -72,6 +74,7 @@ router.use('/posts', postsRoutes); // New comprehensive posts API
 router.use('/post', postRoutes); // Legacy post API
 router.use('/drafts', draftsRoutes); // Draft posts API
 router.use('/templates', templatesRoutes); // Phase-2: Post templates
+router.use('/queue-slots', queueSlotsRoutes); // Phase-2: Queue slots
 router.use('/media', mediaRoutes); // Media API
 router.use('/platforms', platformRoutes); // Platforms API
 router.use('/social', socialRoutes);
