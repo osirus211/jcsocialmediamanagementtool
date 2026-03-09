@@ -11,6 +11,7 @@ import {
   RefreshResponse,
   MeResponse,
 } from '@/types/auth.types';
+import { logger } from '@/lib/logger';
 
 interface AuthStore extends AuthState, AuthActions {}
 
@@ -58,7 +59,7 @@ export const useAuthStore = create<AuthStore>()(
        */
       login: async (email, password) => {
         try {
-          console.log('login: Starting login for:', email);
+          logger.debug('Starting login', { email });
           set({ isLoading: true });
 
           const response = await apiClient.post<LoginResponse>('/auth/login', {
@@ -66,7 +67,7 @@ export const useAuthStore = create<AuthStore>()(
             password,
           });
 
-          console.log('login: Response received:', response);
+          logger.debug('Login response received');
           const { user, accessToken } = response;
 
           set({
@@ -76,10 +77,9 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
             authChecked: true,
           });
-          console.log('login: Login successful');
+          logger.info('Login successful');
         } catch (error: any) {
-          console.error('login: Login failed:', error);
-          console.error('login: Error response:', error.response);
+          logger.error('Login failed', { error: error.message });
           set({ isLoading: false });
           throw new Error(error.response?.data?.message || 'Login failed');
         }
@@ -137,7 +137,7 @@ export const useAuthStore = create<AuthStore>()(
           // If we have a user but no access token, skip /me and go straight to refresh
           const currentState = get();
           if (currentState.user && !currentState.accessToken) {
-            console.log('fetchMe: User exists but no token, attempting refresh...');
+            logger.debug('User exists but no token, attempting refresh...');
             const newToken = await get().refreshToken();
             
             if (newToken) {
@@ -152,12 +152,12 @@ export const useAuthStore = create<AuthStore>()(
                 });
                 return;
               } catch (retryError) {
-                console.error('fetchMe: Failed to get user after refresh:', retryError);
+                logger.error('Failed to get user after refresh', { error: retryError });
                 get().clearAuth();
                 return;
               }
             } else {
-              console.log('fetchMe: Refresh failed, clearing auth');
+              logger.debug('Refresh failed, clearing auth');
               get().clearAuth();
               return;
             }
@@ -172,13 +172,13 @@ export const useAuthStore = create<AuthStore>()(
             authChecked: true,
           });
         } catch (error) {
-          console.error('fetchMe: /auth/me failed, attempting token refresh...', error);
+          logger.error('/auth/me failed, attempting token refresh', { error });
           // If /me fails, try to refresh token
           try {
             const newToken = await get().refreshToken();
             
             if (newToken) {
-              console.log('🔑 About to retry /auth/me with new token:', newToken.substring(0, 20) + '...');
+              logger.debug('Retrying /auth/me with new token');
               // Retry /me with new token
               try {
                 const response = await apiClient.get<MeResponse>('/auth/me');
@@ -189,16 +189,16 @@ export const useAuthStore = create<AuthStore>()(
                   authChecked: true,
                 });
               } catch (retryError) {
-                console.error('fetchMe: Retry failed after refresh:', retryError);
+                logger.error('Retry failed after refresh', { error: retryError });
                 get().clearAuth();
               }
             } else {
-              console.log('fetchMe: No token from refresh, clearing auth');
+              logger.debug('No token from refresh, clearing auth');
               get().clearAuth();
             }
           } catch (refreshError) {
             // Refresh failed, clear auth
-            console.error('fetchMe: Refresh error:', refreshError);
+            logger.error('Refresh error', { error: refreshError });
             get().clearAuth();
           }
         }
@@ -210,11 +210,11 @@ export const useAuthStore = create<AuthStore>()(
        */
       refreshToken: async () => {
         try {
-          console.log('refreshToken: Attempting to refresh token...');
+          logger.debug('Attempting to refresh token...');
           const response = await apiClient.post<RefreshResponse>('/auth/refresh', {});
 
           const { accessToken } = response;
-          console.log('refreshToken: Success! Got new access token');
+          logger.debug('Token refresh successful');
 
           set({ accessToken });
 
@@ -224,14 +224,9 @@ export const useAuthStore = create<AuthStore>()(
             (window as any).__AUTH_STORE__ = { ...get(), accessToken };
           }
 
-          console.log('🔑 Token stored in Zustand:', accessToken.substring(0, 20) + '...');
-          console.log('🔑 Window store updated:', (window as any).__AUTH_STORE__?.accessToken?.substring(0, 20) + '...');
-
           return accessToken;
         } catch (error: any) {
-          console.error('Token refresh failed:', error);
-          console.error('Error response:', error.response?.data);
-          console.error('Error status:', error.response?.status);
+          logger.error('Token refresh failed', { error: error.message });
           get().clearAuth();
           return null;
         }

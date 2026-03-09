@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../lib/api-client';
+import { logger } from '../../lib/logger';
 
 interface Platform {
   name: string;
@@ -53,11 +54,11 @@ export const ConnectChannelV2Page = () => {
         setLoading(true);
         const response = await apiClient.get('/oauth/platforms');
         
-        console.log('API Response:', response);
+        logger.debug('API Response received', { platforms: response.platforms });
         
         // Check if response has the expected structure
         if (!response || !response.platforms) {
-          console.error('Invalid response structure:', response);
+          logger.error('Invalid response structure', { response });
           setError('Invalid response from server');
           setLoading(false);
           return;
@@ -79,8 +80,7 @@ export const ConnectChannelV2Page = () => {
         setPlatforms(platformList);
         setLoading(false);
       } catch (err: any) {
-        console.error('Failed to fetch platforms:', err);
-        console.error('Error response:', err.response?.data);
+        logger.error('Failed to fetch platforms', { error: err.message });
         setError(`Failed to load platforms: ${err.response?.data?.message || err.message}`);
         setLoading(false);
       }
@@ -105,7 +105,7 @@ export const ConnectChannelV2Page = () => {
         window.location.href = response.authorizationUrl;
       }
     } catch (err: any) {
-      console.error('Failed to initiate OAuth:', err);
+      logger.error('Failed to initiate OAuth', { error: err.message });
       setError(`Failed to connect: ${err.response?.data?.message || err.message}`);
       setLoading(false);
     }

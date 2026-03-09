@@ -6,6 +6,7 @@ import {
   QueueSlot,
   SocialPlatform,
 } from '@/types/composer.types';
+import { logger } from '@/lib/logger';
 
 /**
  * Composer Store State
@@ -167,7 +168,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       const isVideo = file.type.startsWith('video/');
       
       if (!isImage && !isVideo) {
-        console.error(`Invalid file type: ${file.type}`);
+        logger.error(`Invalid file type: ${file.type}`);
         continue;
       }
 
@@ -256,7 +257,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
           ),
         }));
       } catch (error: any) {
-        console.error('Failed to upload media:', error);
+        logger.error('Failed to upload media:', { error: error.message });
         
         set((state) => ({
           media: state.media.map((m) =>
@@ -420,7 +421,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       }, 3000);
 
     } catch (error: any) {
-      console.error('Failed to save draft:', error);
+      logger.error('Failed to save draft:', { error: error.message });
       
       const isNetworkError = !navigator.onLine || error.message?.includes('network') || error.message?.includes('fetch');
       const errorMessage = isNetworkError 
@@ -440,13 +441,13 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         setTimeout(() => {
           const currentState = get();
           if (currentState.saveStatus === 'error' && currentState.hasUnsavedChanges) {
-            console.log(`Retrying auto-save (attempt ${retryAttempts + 1}/${maxRetries})...`);
+            logger.debug(`Retrying auto-save (attempt ${retryAttempts + 1}/${maxRetries})...`);
             currentState.saveDraft();
           }
         }, retryDelay);
       } else {
         // Max retries reached
-        console.error('Max auto-save retries reached. Manual save required.');
+        logger.error('Max auto-save retries reached. Manual save required.');
       }
     }
   },

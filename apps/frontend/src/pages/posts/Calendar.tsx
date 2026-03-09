@@ -6,6 +6,7 @@ import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { WeekView } from '@/components/calendar/WeekView';
 import { Post } from '@/types/post.types';
 import { AlertCircle, Calendar as CalendarIcon, List } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 type ViewMode = 'month' | 'week';
 
@@ -156,7 +157,7 @@ export const CalendarPage = () => {
     
     if (success) {
       // Show success feedback (optional)
-      console.log('Post rescheduled successfully');
+      logger.info('Post rescheduled successfully');
     }
   }, [reschedulePost]);
 

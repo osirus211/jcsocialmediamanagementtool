@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MessageSquare, X, Send } from 'lucide-react';
+import { logger } from '../../lib/logger';
 
 /**
  * FeedbackButton Component
@@ -25,7 +26,7 @@ export function FeedbackButton() {
     e.preventDefault();
     
     // TODO: Integrate with feedback service
-    console.log('Feedback submitted:', feedback);
+    logger.info('Feedback submitted', { feedback });
     
     // For now, just show success
     setSubmitted(true);

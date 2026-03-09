@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import { logger } from './logger';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
@@ -58,7 +59,7 @@ class ApiClient {
       (config) => {
         // Get access token from window reference (set by auth store)
         const token = getAccessTokenForInterceptor();
-        console.log('🔑 Interceptor reading token:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
+        logger.debug('Interceptor reading token', { hasToken: !!token });
         
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;

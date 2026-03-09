@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { socialService, SocialAccount } from '../../services/social.service';
 import { Twitter, Linkedin, Facebook, Instagram, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { InstagramConnectModal } from '../../components/social/InstagramConnectModal';
+import { logger } from '../../lib/logger';
 
 /**
  * Social Accounts Page
@@ -42,9 +43,6 @@ export function SocialAccounts() {
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
 
-  // Debug log
-  console.log('🔍 SocialAccounts render - showInstagramModal:', showInstagramModal);
-
   useEffect(() => {
     // Check for OAuth callback success/error first
     const urlParams = new URLSearchParams(window.location.search);
@@ -52,11 +50,11 @@ export function SocialAccounts() {
     const oauthError = urlParams.get('error');
     
     if (success === 'true') {
-      console.log('✅ OAuth success detected, loading accounts...');
+      logger.info('OAuth success detected, loading accounts');
       // Clear query params from URL
       window.history.replaceState({}, '', '/social/accounts');
     } else if (oauthError) {
-      console.log('❌ OAuth error detected:', oauthError);
+      logger.warn('OAuth error detected', { error: oauthError });
       const message = urlParams.get('message') || 'OAuth connection failed';
       setError(decodeURIComponent(message));
       // Clear query params from URL
@@ -80,11 +78,11 @@ export function SocialAccounts() {
   };
 
   const handleConnect = async (platform: string) => {
-    console.log('🔍 handleConnect called for platform:', platform);
+    logger.debug('handleConnect called', { platform });
     
     // Special handling for Instagram - show options modal
     if (platform === 'instagram') {
-      console.log('✅ Opening Instagram modal');
+      logger.debug('Opening Instagram modal');
       setShowInstagramModal(true);
       return;
     }
