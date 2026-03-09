@@ -18,13 +18,9 @@
 import { OAuthProvider } from './OAuthProvider';
 import { config } from '../../config';
 import { InstagramBusinessProvider } from './InstagramBusinessProvider';
-import { config } from '../../config';
 import { InstagramBasicDisplayProvider } from './InstagramBasicDisplayProvider';
-import { config } from '../../config';
 import { GoogleBusinessProvider } from './GoogleBusinessProvider';
-import { config } from '../../config';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
 
 export enum ProviderType {
   INSTAGRAM_BUSINESS = 'INSTAGRAM_BUSINESS',
@@ -61,9 +57,9 @@ export class OAuthProviderFactory {
   private initializeProviders(): void {
     // Initialize Instagram Business Provider (via Facebook)
     try {
-      const businessClientId = process.env.INSTAGRAM_CLIENT_ID || config.oauth.facebook.appId;
-      const businessClientSecret = process.env.INSTAGRAM_CLIENT_SECRET || config.oauth.facebook.appSecret;
-      const businessRedirectUri = process.env.INSTAGRAM_REDIRECT_URI || process.env.FACEBOOK_CALLBACK_URL;
+      const businessClientId = config.oauth.instagram.clientId || config.oauth.facebook.appId;
+      const businessClientSecret = config.oauth.instagram.clientSecret || config.oauth.facebook.appSecret;
+      const businessRedirectUri = config.oauth.instagram.redirectUri || config.oauth.facebook.callbackUrl;
 
       if (!businessClientId || !businessClientSecret || !businessRedirectUri) {
         logger.warn('Instagram Business provider not configured', {
@@ -88,9 +84,9 @@ export class OAuthProviderFactory {
 
     // Initialize Instagram Basic Display Provider
     try {
-      const basicClientId = process.env.INSTAGRAM_BASIC_APP_ID;
-      const basicClientSecret = process.env.INSTAGRAM_BASIC_APP_SECRET;
-      const basicRedirectUri = process.env.INSTAGRAM_BASIC_REDIRECT_URI;
+      const basicClientId = config.oauth.instagramBasic.appId;
+      const basicClientSecret = config.oauth.instagramBasic.appSecret;
+      const basicRedirectUri = config.oauth.instagramBasic.redirectUri;
 
       if (!basicClientId || !basicClientSecret || !basicRedirectUri) {
         logger.warn('Instagram Basic Display provider not configured', {
@@ -115,9 +111,9 @@ export class OAuthProviderFactory {
 
     // Initialize Google Business Profile Provider
     try {
-      const gbpClientId = process.env.GOOGLE_BUSINESS_CLIENT_ID;
-      const gbpClientSecret = process.env.GOOGLE_BUSINESS_CLIENT_SECRET;
-      const gbpRedirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI;
+      const gbpClientId = config.oauth.googleBusiness.clientId;
+      const gbpClientSecret = config.oauth.googleBusiness.clientSecret;
+      const gbpRedirectUri = config.oauth.googleBusiness.redirectUri;
 
       if (!gbpClientId || !gbpClientSecret || !gbpRedirectUri) {
         logger.warn('Google Business Profile provider not configured', {

@@ -165,7 +165,7 @@ export function createS3StorageFromEnv(): S3StorageProvider {
     endpoint: storageConfig.storage.s3.endpoint, // For R2: https://[account-id].r2.cloudflarestorage.com
     accessKeyId: storageConfig.storage.s3.accessKey || '',
     secretAccessKey: storageConfig.storage.s3.secretKey || '',
-    publicUrl: process.env.S3_PUBLIC_URL, // CDN URL: https://cdn.example.com
+    publicUrl: storageConfig.storage.s3.publicUrl, // CDN URL: https://cdn.example.com
   };
 
   // Validate required config

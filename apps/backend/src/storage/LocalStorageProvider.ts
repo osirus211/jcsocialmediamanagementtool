@@ -8,6 +8,7 @@
  */
 
 import { StorageProvider, UploadOptions, UploadResult } from './StorageProvider';
+import { config as appConfig } from '../config';
 import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs/promises';
@@ -108,10 +109,10 @@ export class LocalStorageProvider implements StorageProvider {
  * Create local storage provider from environment variables
  */
 export function createLocalStorageFromEnv(): LocalStorageProvider {
-  const config: LocalStorageConfig = {
-    basePath: process.env.LOCAL_STORAGE_PATH || './uploads',
-    baseUrl: process.env.LOCAL_STORAGE_URL || 'http://localhost:3000/uploads',
+  const localConfig: LocalStorageConfig = {
+    basePath: appConfig.storage.localStorage.path || './uploads',
+    baseUrl: appConfig.storage.localStorage.url || 'http://localhost:3000/uploads',
   };
 
-  return new LocalStorageProvider(config);
+  return new LocalStorageProvider(localConfig);
 }

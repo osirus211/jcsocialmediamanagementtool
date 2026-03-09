@@ -129,14 +129,14 @@ export class OAuthManager {
     }
 
     // Google Business Profile
-    if (process.env.GOOGLE_BUSINESS_CLIENT_ID && process.env.GOOGLE_BUSINESS_CLIENT_SECRET) {
-      const redirectUri = process.env.GOOGLE_BUSINESS_REDIRECT_URI || `${baseUrl}/api/v1/oauth/google-business/callback`;
+    if (config.oauth?.googleBusiness?.clientId && config.oauth?.googleBusiness?.clientSecret) {
+      const redirectUri = config.oauth.googleBusiness.redirectUri || `${baseUrl}/api/v1/oauth/google-business/callback`;
       const { GoogleBusinessProvider } = require('./GoogleBusinessProvider');
       this.providers.set(
         SocialPlatform.GOOGLE_BUSINESS,
         new GoogleBusinessProvider(
-          process.env.GOOGLE_BUSINESS_CLIENT_ID,
-          process.env.GOOGLE_BUSINESS_CLIENT_SECRET,
+          config.oauth.googleBusiness.clientId,
+          config.oauth.googleBusiness.clientSecret,
           redirectUri
         )
       );

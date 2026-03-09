@@ -32,9 +32,7 @@
 import mongoose, { ClientSession } from 'mongoose';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import {
-import { config } from '../config';
   updateTransactionMetrics,
   recordTransactionError,
 } from '../config/metrics';
@@ -182,7 +180,7 @@ export class TransactionManager {
     options?: TransactionOptions
   ): Promise<T> {
     // Check if feature is enabled
-    const enabled = process.env.TRANSACTION_ENABLED !== 'false';
+    const enabled = config.features.transactionEnabled;
     if (!enabled) {
       logger.warn('Transactions disabled, executing without transaction');
       // Execute without session (no transaction)

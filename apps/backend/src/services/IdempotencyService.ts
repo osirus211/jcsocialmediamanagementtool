@@ -29,9 +29,7 @@
 import { getRedisClientSafe, recordCircuitBreakerSuccess, recordCircuitBreakerError } from '../config/redis';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import {
-import { config } from '../config';
   updateIdempotencyMetrics,
   recordIdempotencyError,
   updateIdempotencyCacheSize,
@@ -147,7 +145,7 @@ export class IdempotencyService {
     this.metrics.checks.total++;
     
     // Check if feature is enabled
-    const enabled = process.env.IDEMPOTENCY_ENABLED !== 'false';
+    const enabled = config.features.idempotencyEnabled;
     if (!enabled) {
       logger.debug('Idempotency disabled, skipping check', { key });
       this.metrics.checks.miss++;
@@ -221,7 +219,7 @@ export class IdempotencyService {
       });
       
       // Fall back to memory cache on error
-      const fallbackEnabled = process.env.IDEMPOTENCY_FALLBACK_TO_MEMORY !== 'false';
+      const fallbackEnabled = config.features.idempotencyFallbackToMemory;
       if (fallbackEnabled) {
         this.metrics.fallback.memoryUsageCount++;
         return this.checkMemoryCache<T>(key);
@@ -244,7 +242,7 @@ export class IdempotencyService {
     const ttl = options?.ttl ?? this.DEFAULT_TTL;
     
     // Check if feature is enabled
-    const enabled = process.env.IDEMPOTENCY_ENABLED !== 'false';
+    const enabled = config.features.idempotencyEnabled;
     if (!enabled) {
       logger.debug('Idempotency disabled, skipping store', { key });
       return;
@@ -294,7 +292,7 @@ export class IdempotencyService {
       });
       
       // Fall back to memory cache on error
-      const fallbackEnabled = process.env.IDEMPOTENCY_FALLBACK_TO_MEMORY !== 'false';
+      const fallbackEnabled = config.features.idempotencyFallbackToMemory;
       if (fallbackEnabled) {
         this.metrics.fallback.memoryUsageCount++;
         this.storeInMemory(key, cachedResult);

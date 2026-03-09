@@ -7,17 +7,11 @@
 import Stripe from 'stripe';
 import { config } from '../config';
 import mongoose from 'mongoose';
-import { config } from '../config';
 import { Subscription as SubscriptionModel, SubscriptionStatus, BillingCycle, ISubscription } from '../models/Subscription';
-import { config } from '../config';
 import { Plan } from '../models/Plan';
-import { config } from '../config';
 import { Workspace } from '../models/Workspace';
-import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import {
-import { config } from '../config';
   recordSubscriptionCreated,
   recordSubscriptionCanceled,
   recordPaymentSucceeded,
@@ -480,7 +474,7 @@ export class StripeService {
    * Construct webhook event from request
    */
   constructWebhookEvent(payload: string | Buffer, signature: string): Stripe.Event {
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+    const webhookSecret = config.stripe.webhookSecret || '';
     return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
   }
 }

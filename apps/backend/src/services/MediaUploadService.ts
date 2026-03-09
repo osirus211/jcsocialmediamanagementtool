@@ -7,19 +7,12 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../config';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { config } from '../config';
 import mongoose from 'mongoose';
-import { config } from '../config';
 import { v4 as uuidv4 } from 'uuid';
-import { config } from '../config';
 import { Media, MediaType, MediaStatus, IMedia } from '../models/Media';
-import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import { withSpan } from '../config/telemetry';
-import { config } from '../config';
 import {
-import { config } from '../config';
   recordMediaUpload,
   recordMediaUploadFailure,
   recordSignedUrlGenerated,
@@ -79,17 +72,17 @@ export class MediaUploadService {
   constructor() {
     // Initialize S3 client
     this.region = config.aws.region || 'us-east-1';
-    this.bucketName = process.env.S3_BUCKET_NAME || 'social-media-scheduler';
-    this.cdnUrl = process.env.CDN_URL;
+    this.bucketName = config.storage.s3.bucketName || 'social-media-scheduler';
+    this.cdnUrl = config.storage.cdn.url;
 
     this.s3Client = new S3Client({
       region: this.region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+        accessKeyId: config.aws.accessKeyId || '',
+        secretAccessKey: config.aws.secretAccessKey || '',
       },
-      endpoint: process.env.S3_ENDPOINT, // For S3-compatible services like MinIO
-      forcePathStyle: !!process.env.S3_ENDPOINT, // Required for MinIO
+      endpoint: config.storage.s3.endpoint, // For S3-compatible services like MinIO
+      forcePathStyle: !!config.storage.s3.endpoint, // Required for MinIO
     });
 
     logger.info('MediaUploadService initialized', {

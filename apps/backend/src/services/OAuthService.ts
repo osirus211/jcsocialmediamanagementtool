@@ -1,11 +1,8 @@
 import { SocialAccount, SocialPlatform, AccountStatus } from '../models/SocialAccount';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import { encrypt } from '../utils/encryption';
-import { config } from '../config';
 import crypto from 'crypto';
-import { config } from '../config';
 
 /**
  * OAuth Service
@@ -52,7 +49,7 @@ export class OAuthService {
     [SocialPlatform.TWITTER]: {
       clientId: config.oauth.twitter.clientId || 'mock_twitter_client_id',
       clientSecret: config.oauth.twitter.clientSecret || 'mock_twitter_secret',
-      redirectUri: process.env.TWITTER_REDIRECT_URI || 'http://localhost:3000/auth/twitter/callback',
+      redirectUri: config.oauth.twitter.redirectUri || 'http://localhost:3000/auth/twitter/callback',
       scopes: ['tweet.read', 'tweet.write', 'users.read'],
       authUrl: 'https://twitter.com/i/oauth2/authorize',
       tokenUrl: 'https://api.twitter.com/2/oauth2/token',
@@ -60,15 +57,15 @@ export class OAuthService {
     [SocialPlatform.LINKEDIN]: {
       clientId: config.oauth.linkedin.clientId || 'mock_linkedin_client_id',
       clientSecret: config.oauth.linkedin.clientSecret || 'mock_linkedin_secret',
-      redirectUri: process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:3000/auth/linkedin/callback',
+      redirectUri: config.oauth.linkedin.redirectUri || 'http://localhost:3000/auth/linkedin/callback',
       scopes: ['w_member_social', 'r_liteprofile'],
       authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
     },
     [SocialPlatform.FACEBOOK]: {
-      clientId: process.env.FACEBOOK_CLIENT_ID || 'mock_facebook_client_id',
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || 'mock_facebook_secret',
-      redirectUri: process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:3000/auth/facebook/callback',
+      clientId: config.oauth.facebook.clientId || 'mock_facebook_client_id',
+      clientSecret: config.oauth.facebook.clientSecret || 'mock_facebook_secret',
+      redirectUri: config.oauth.facebook.redirectUri || 'http://localhost:3000/auth/facebook/callback',
       scopes: ['pages_manage_posts', 'pages_read_engagement'],
       authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
       tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',

@@ -48,7 +48,7 @@ export class MediaStorageService {
       provider: StorageProvider.S3,
       bucket: config.aws.s3Bucket || '',
       region: config.aws.region,
-      cdnBaseUrl: process.env.CDN_BASE_URL,
+      cdnBaseUrl: config.storage.cdn.baseUrl,
     };
 
     // Initialize S3 client if AWS credentials are available

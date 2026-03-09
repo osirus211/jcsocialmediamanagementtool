@@ -10,8 +10,6 @@
  * - Provides clear error messages for missing configuration
  */
 
-import { logger } from '../utils/logger';
-
 export interface OAuthEnvValidationResult {
   valid: boolean;
   errors: string[];
@@ -70,7 +68,7 @@ export function validateOAuthEnvironment(): OAuthEnvValidationResult {
   const isValidationMode = process.env.VALIDATION_MODE === 'true';
 
   if (isValidationMode) {
-    logger.info('[OAuth Config] VALIDATION_MODE enabled - skipping strict OAuth validation');
+    console.log('[OAuth Config] VALIDATION_MODE enabled - skipping strict OAuth validation');
     return {
       valid: true,
       errors: [],
@@ -217,7 +215,7 @@ export function getValidatedOAuthConfig(): ValidatedOAuthConfig {
   // Log warnings (non-blocking)
   if (validation.warnings.length > 0) {
     validation.warnings.forEach(warning => {
-      logger.warn(`[OAuth Config] ${warning}`);
+      console.warn(`[OAuth Config] ${warning}`);
     });
   }
 
@@ -242,7 +240,7 @@ export function getValidatedOAuthConfig(): ValidatedOAuthConfig {
       ] : []),
     ].join('\n');
 
-    logger.error('[OAuth Config] Validation failed', {
+    console.error('[OAuth Config] Validation failed', {
       errors: validation.errors,
       warnings: validation.warnings,
       environment: process.env.NODE_ENV,
@@ -251,7 +249,7 @@ export function getValidatedOAuthConfig(): ValidatedOAuthConfig {
     throw new Error(errorMessage);
   }
 
-  logger.info('[OAuth Config] Validation passed', {
+  console.log('[OAuth Config] Validation passed', {
     facebook: {
       appIdSet: !!process.env.FACEBOOK_APP_ID,
       appSecretSet: !!process.env.FACEBOOK_APP_SECRET,

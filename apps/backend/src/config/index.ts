@@ -104,6 +104,12 @@ const envSchema = z.object({
   S3_ENDPOINT: z.string().url().optional(),
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
+  S3_PUBLIC_URL: z.string().url().optional(),
+  S3_BUCKET_NAME: z.string().optional(),
+  LOCAL_STORAGE_PATH: z.string().default('./uploads'),
+  LOCAL_STORAGE_URL: z.string().url().default('http://localhost:3000/uploads'),
+  CDN_URL: z.string().url().optional(),
+  CDN_BASE_URL: z.string().url().optional(),
 
   // Encryption
   ENCRYPTION_KEY: z.string().length(64, 'Encryption key must be 64 hex characters (32 bytes)'),
@@ -116,6 +122,12 @@ const envSchema = z.object({
   // Frontend
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   ALLOWED_ORIGINS: z.string().optional(),
+
+  // Feature Flags
+  TRANSACTION_ENABLED: z.string().transform(val => val !== 'false').default('true'),
+  QUEUE_LIMITS_ENABLED: z.string().transform(val => val !== 'false').default('true'),
+  IDEMPOTENCY_ENABLED: z.string().transform(val => val !== 'false').default('true'),
+  IDEMPOTENCY_FALLBACK_TO_MEMORY: z.string().transform(val => val !== 'false').default('true'),
 
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
@@ -419,10 +431,20 @@ export const config = {
     type: env.STORAGE_TYPE as 'local' | 's3',
     s3: {
       bucket: env.S3_BUCKET,
+      bucketName: env.S3_BUCKET_NAME,
       region: env.S3_REGION,
       endpoint: env.S3_ENDPOINT,
       accessKey: env.S3_ACCESS_KEY,
       secretKey: env.S3_SECRET_KEY,
+      publicUrl: env.S3_PUBLIC_URL,
+    },
+    localStorage: {
+      path: env.LOCAL_STORAGE_PATH,
+      url: env.LOCAL_STORAGE_URL,
+    },
+    cdn: {
+      url: env.CDN_URL,
+      baseUrl: env.CDN_BASE_URL,
     },
   },
 
@@ -502,6 +524,10 @@ export const config = {
   features: {
     gracefulDegradation: env.GRACEFUL_DEGRADATION_ENABLED,
     useInstagramProfessional: env.USE_INSTAGRAM_PROFESSIONAL,
+    transactionEnabled: env.TRANSACTION_ENABLED,
+    queueLimitsEnabled: env.QUEUE_LIMITS_ENABLED,
+    idempotencyEnabled: env.IDEMPOTENCY_ENABLED,
+    idempotencyFallbackToMemory: env.IDEMPOTENCY_FALLBACK_TO_MEMORY,
   },
 
   distributedLock: {

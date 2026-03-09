@@ -30,9 +30,7 @@
 import { Queue } from 'bullmq';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import {
-import { config } from '../config';
   updateQueueLimiterMetrics,
   recordQueueRejection,
   updateQueuePressure,
@@ -247,7 +245,7 @@ export class QueueLimiterService {
    */
   async canAddJob(queue: Queue): Promise<boolean> {
     // Check if feature is enabled
-    const enabled = process.env.QUEUE_LIMITS_ENABLED !== 'false';
+    const enabled = config.features.queueLimitsEnabled;
     if (!enabled) {
       return true;
     }
