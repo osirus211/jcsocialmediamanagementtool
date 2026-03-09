@@ -149,7 +149,7 @@ app.get('/health/detailed', async (_req: Request, res: Response) => {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
-      version: process.env.npm_package_version || '1.0.0',
+      version: config.sentry.appVersion,
       error: 'Health check failed',
       details: {
         error: error.message,
