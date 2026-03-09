@@ -1,10 +1,11 @@
 import { PublishMode } from '@/types/composer.types';
-import { Save, Send, X, Loader2 } from 'lucide-react';
+import { Save, Send, X, Loader2, FileText } from 'lucide-react';
 
 interface ComposerActionsProps {
   onSave: () => void;
   onPublish: () => void;
   onCancel: () => void;
+  onTemplates?: () => void;
   publishMode: PublishMode;
   isLoading: boolean;
   isSaving: boolean;
@@ -16,6 +17,7 @@ export function ComposerActions({
   onSave,
   onPublish,
   onCancel,
+  onTemplates,
   publishMode,
   isLoading,
   isSaving,
@@ -80,6 +82,19 @@ export function ComposerActions({
       </button>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {onTemplates && (
+          <button
+            type="button"
+            onClick={onTemplates}
+            disabled={isLoading || isSaving}
+            className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+            aria-label="Open templates"
+          >
+            <FileText className="h-4 w-4" aria-hidden="true" />
+            <span>Templates</span>
+          </button>
+        )}
+        
         <button
           type="button"
           onClick={onSave}

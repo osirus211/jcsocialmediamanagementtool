@@ -12,6 +12,7 @@ import { PreviewSection } from './PreviewSection';
 import { ComposerActions } from './ComposerActions';
 import { AlertBanner } from './AlertBanner';
 import { ToastContainer, ToastMessage } from './ToastContainer';
+import { TemplatesPanel } from './TemplatesPanel';
 
 interface ComposerContainerProps {
   draftId?: string;
@@ -56,6 +57,7 @@ export function ComposerContainer({
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get unique platforms from selected accounts
@@ -293,6 +295,8 @@ export function ComposerContainer({
     <>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       
+      {showTemplates && <TemplatesPanel onClose={() => setShowTemplates(false)} />}
+      
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
       <div className="bg-white rounded-lg shadow-lg" role="main" aria-label="Post composer">
         {/* Header */}
@@ -385,6 +389,7 @@ export function ComposerContainer({
           onSave={saveDraft}
           onPublish={handlePublish}
           onCancel={handleCancel}
+          onTemplates={() => setShowTemplates(true)}
           publishMode={publishMode}
           isLoading={isPublishing}
           isSaving={saveStatus === 'saving'}

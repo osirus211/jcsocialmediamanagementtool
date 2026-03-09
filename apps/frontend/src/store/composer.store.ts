@@ -77,6 +77,9 @@ interface ComposerActions {
   
   // Reset
   reset: () => void;
+  
+  // Templates
+  applyTemplate: (templateId: string) => Promise<void>;
 }
 
 type ComposerStore = ComposerState & ComposerActions;
@@ -462,6 +465,30 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
     
     // Reset to initial state
     set(initialState);
+  },
+
+  // ============================================
+  // TEMPLATES
+  // ============================================
+
+  applyTemplate: async (templateId: string) => {
+    try {
+      const { templateService } = await import('@/services/template.service');
+      
+      // Apply template (increments usage count)
+      const template = await templateService.applyTemplate(templateId);
+      
+      // Load template content into composer
+      set({
+        mainContent: template.content,
+        hasUnsavedChanges: true,
+      });
+      
+      logger.info('Template applied', { templateId, name: template.name });
+    } catch (error: any) {
+      logger.error('Failed to apply template:', { error: error.message });
+      throw error;
+    }
   },
 }));
 
