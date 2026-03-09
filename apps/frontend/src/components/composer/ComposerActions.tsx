@@ -1,5 +1,5 @@
 import { PublishMode } from '@/types/composer.types';
-import { Save, Send, X, Loader2, FileText } from 'lucide-react';
+import { Save, Send, X, Loader2, FileText, Link } from 'lucide-react';
 
 interface ComposerActionsProps {
   onSave: () => void;
@@ -11,6 +11,9 @@ interface ComposerActionsProps {
   isSaving: boolean;
   canPublish: boolean;
   hasUnsavedChanges: boolean;
+  autoShortenLinks?: boolean;
+  onToggleAutoShorten?: () => void;
+  urlCount?: number;
 }
 
 export function ComposerActions({
@@ -23,6 +26,9 @@ export function ComposerActions({
   isSaving,
   canPublish,
   hasUnsavedChanges,
+  autoShortenLinks = false,
+  onToggleAutoShorten,
+  urlCount = 0,
 }: ComposerActionsProps) {
   const handleCancel = () => {
     if (hasUnsavedChanges) {
@@ -82,6 +88,28 @@ export function ComposerActions({
       </button>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        {onToggleAutoShorten && (
+          <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white">
+            <input
+              type="checkbox"
+              id="auto-shorten"
+              checked={autoShortenLinks}
+              onChange={onToggleAutoShorten}
+              disabled={isLoading || isSaving}
+              className="h-4 w-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <label htmlFor="auto-shorten" className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <Link className="h-4 w-4" />
+              <span>Auto-shorten links</span>
+              {autoShortenLinks && urlCount > 0 && (
+                <span className="text-xs text-blue-600 font-medium">
+                  ({urlCount} {urlCount === 1 ? 'link' : 'links'})
+                </span>
+              )}
+            </label>
+          </div>
+        )}
+
         {onTemplates && (
           <button
             type="button"

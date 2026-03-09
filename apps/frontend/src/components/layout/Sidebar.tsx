@@ -66,6 +66,15 @@ export const Sidebar = () => {
             </li>
             <li>
               <a
+                href="/links"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <span>🔗</span>
+                <span>Links</span>
+              </a>
+            </li>
+            <li>
+              <a
                 href="/billing"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
               >

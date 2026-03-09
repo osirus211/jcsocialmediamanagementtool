@@ -18,6 +18,7 @@ import { CreatePostPage } from '@/pages/posts/CreatePost';
 import { CalendarPage } from '@/pages/posts/Calendar';
 import { FailedPostsPage } from '@/pages/posts/FailedPosts';
 import { MediaLibraryPage } from '@/pages/media/MediaLibrary';
+import { LinksPage } from '@/pages/links/Links';
 import { SimpleAnalyticsPage } from '@/pages/analytics/SimpleAnalytics';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
@@ -82,6 +83,10 @@ const router = createBrowserRouter([
       {
         path: 'media',
         element: <MediaLibraryPage />,
+      },
+      {
+        path: 'links',
+        element: <LinksPage />,
       },
       {
         path: 'analytics',

@@ -59,6 +59,7 @@ export function ComposerContainer({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [autoShortenLinks, setAutoShortenLinks] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get unique platforms from selected accounts
@@ -69,6 +70,11 @@ export function ComposerContainer({
         .map((acc) => acc.platform.toLowerCase() as SocialPlatform)
     )
   );
+
+  // Detect URLs in content
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const urlsInContent = mainContent.match(urlRegex) || [];
+  const urlCount = urlsInContent.length;
 
   // Toast management
   const addToast = useCallback((type: ToastMessage['type'], message: string) => {
@@ -230,6 +236,26 @@ export function ComposerContainer({
     setPublishError(null);
 
     try {
+      // Auto-shorten links if enabled
+      let contentToPublish = mainContent;
+      if (autoShortenLinks && urlsInContent.length > 0) {
+        const { linkService } = await import('@/services/link.service');
+        
+        // Shorten each URL
+        for (const url of urlsInContent) {
+          try {
+            const shortLink = await linkService.shortenUrl(url);
+            contentToPublish = contentToPublish.replace(url, shortLink.shortUrl);
+          } catch (error: any) {
+            console.error(`Failed to shorten URL ${url}:`, error);
+            // Continue with original URL if shortening fails
+          }
+        }
+        
+        // Update content with shortened URLs
+        setContent('main', contentToPublish);
+      }
+
       // Save draft first if there are unsaved changes
       if (hasUnsavedChanges) {
         await saveDraft();
@@ -411,6 +437,9 @@ export function ComposerContainer({
             isSaving={saveStatus === 'saving'}
             canPublish={canPublish}
             hasUnsavedChanges={hasUnsavedChanges}
+            autoShortenLinks={autoShortenLinks}
+            onToggleAutoShorten={() => setAutoShortenLinks(!autoShortenLinks)}
+            urlCount={urlCount}
           />
         </div>
 

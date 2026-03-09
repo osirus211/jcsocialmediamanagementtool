@@ -26,6 +26,7 @@ import {
 } from './monitoring/sentry';
 import apiV1Routes from './routes/v1';
 import publicApiV1Routes from './routes/public/v1';
+import redirectRoutes from './routes/redirect.routes';
 
 const app: Application = express();
 
@@ -393,6 +394,9 @@ app.get('/internal/publishing-health', async (_req: Request, res: Response) => {
     });
   }
 });
+
+// Redirect routes (must be before API routes)
+app.use('/r', redirectRoutes);
 
 // API v1 routes
 app.use('/api/v1', apiV1Routes);
