@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Post } from '@/types/post.types';
 import { StatusBadge } from '@/components/posts/StatusBadge';
 
@@ -6,6 +6,7 @@ interface WeekViewProps {
   currentWeek: Date; // Start of week (Sunday)
   posts: Post[];
   onPostClick: (post: Post) => void;
+  onReschedule: (postId: string, newDate: string) => void;
 }
 
 /**
@@ -18,12 +19,17 @@ interface WeekViewProps {
  * - Hourly time slots vertical
  * - Shows post time
  * - Click to edit
+ * - Drag & drop reschedule
  * 
  * Performance:
  * - Memoized post grouping
  * - Efficient rendering
  */
-export function WeekView({ currentWeek, posts, onPostClick }: WeekViewProps) {
+export function WeekView({ currentWeek, posts, onPostClick, onReschedule }: WeekViewProps) {
+  /**
+   * Drag & drop state
+   */
+  const [draggedPost, setDraggedPost] = useState<Post | null>(null);
   /**
    * Generate week days (memoized)
    */
@@ -86,6 +92,40 @@ export function WeekView({ currentWeek, posts, onPostClick }: WeekViewProps) {
    */
   const hours = Array.from({ length: 10 }, (_, i) => i + 9);
 
+  /**
+   * Drag & drop handlers
+   */
+  const handleDragStart = useCallback((post: Post, e: React.DragEvent) => {
+    setDraggedPost(post);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDrop = useCallback((dateKey: string, hour: number, e: React.DragEvent) => {
+    e.preventDefault();
+    
+    if (!draggedPost || !dateKey) {
+      return;
+    }
+    
+    // Get minutes from original scheduledAt
+    const originalDate = new Date(draggedPost.scheduledAt!);
+    const minutes = originalDate.getMinutes();
+    
+    // Create new date with dropped hour
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const newDate = new Date(year, month - 1, day, hour, minutes);
+    
+    // Call reschedule
+    onReschedule(draggedPost._id, newDate.toISOString());
+    
+    setDraggedPost(null);
+  }, [draggedPost, onReschedule]);
+
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[800px]">
@@ -121,6 +161,8 @@ export function WeekView({ currentWeek, posts, onPostClick }: WeekViewProps) {
                 return (
                   <div
                     key={day.dateKey}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(day.dateKey, hour, e)}
                     className={`min-h-[60px] border rounded p-1 ${
                       day.isToday ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
                     }`}
@@ -134,8 +176,10 @@ export function WeekView({ currentWeek, posts, onPostClick }: WeekViewProps) {
                       return (
                         <div
                           key={post._id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(post, e)}
                           onClick={() => onPostClick(post)}
-                          className="text-xs cursor-pointer hover:bg-white rounded p-1 mb-1 border border-transparent hover:border-gray-300 transition-all"
+                          className="text-xs cursor-move hover:bg-white rounded p-1 mb-1 border border-transparent hover:border-gray-300 transition-all"
                           title={post.content}
                         >
                           <div className="flex items-center gap-1 mb-0.5">

@@ -144,9 +144,7 @@ export const CalendarPage = () => {
    * Post click handler - navigate to composer with post ID
    */
   const handlePostClick = useCallback((post: Post) => {
-    // TODO: Navigate to composer with post ID for editing
-    // For now, navigate to posts list
-    navigate(`/posts`);
+    navigate(`/posts/create?draftId=${post._id}`);
   }, [navigate]);
 
   /**
@@ -330,6 +328,7 @@ export const CalendarPage = () => {
                   currentWeek={currentWeek}
                   posts={posts}
                   onPostClick={handlePostClick}
+                  onReschedule={handleReschedule}
                 />
               )}
             </>

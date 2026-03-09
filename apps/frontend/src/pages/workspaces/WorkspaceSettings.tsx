@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useAuthStore } from '@/store/auth.store';
 import { WorkspaceRole, WorkspaceMember } from '@/types/workspace.types';
+import { QueueSlotSettings } from '@/components/settings/QueueSlotSettings';
 
 /**
  * Workspace Settings Page
@@ -34,7 +35,7 @@ export const WorkspaceSettingsPage = () => {
     leaveWorkspace,
   } = useWorkspaceStore();
 
-  const [activeTab, setActiveTab] = useState<'general' | 'members'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'members' | 'queue'>('general');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [error, setError] = useState('');
@@ -194,6 +195,16 @@ export const WorkspaceSettingsPage = () => {
               }`}
             >
               Members ({workspace.membersCount})
+            </button>
+            <button
+              onClick={() => setActiveTab('queue')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'queue'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              Queue Schedule
             </button>
           </nav>
         </div>
@@ -390,6 +401,13 @@ export const WorkspaceSettingsPage = () => {
                 })
               )}
             </div>
+          </div>
+        )}
+
+        {/* Queue Schedule Tab */}
+        {activeTab === 'queue' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <QueueSlotSettings />
           </div>
         )}
       </div>
