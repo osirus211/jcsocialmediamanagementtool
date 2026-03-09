@@ -8,11 +8,11 @@ import { AccountSelector } from '../posts/AccountSelector';
 import { ContentSection } from './ContentSection';
 import { MediaUploadSection } from './MediaUploadSection';
 import { PublishModeSelector } from './PublishModeSelector';
-import { PreviewSection } from './PreviewSection';
 import { ComposerActions } from './ComposerActions';
 import { AlertBanner } from './AlertBanner';
 import { ToastContainer, ToastMessage } from './ToastContainer';
 import { TemplatesPanel } from './TemplatesPanel';
+import { PostPreviewPanel } from './preview/PostPreviewPanel';
 
 interface ComposerContainerProps {
   draftId?: string;
@@ -58,6 +58,7 @@ export function ComposerContainer({
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get unique platforms from selected accounts
@@ -297,105 +298,128 @@ export function ComposerContainer({
       
       {showTemplates && <TemplatesPanel onClose={() => setShowTemplates(false)} />}
       
-      <div className="max-w-7xl mx-auto p-4 sm:p-6">
-      <div className="bg-white rounded-lg shadow-lg" role="main" aria-label="Post composer">
-        {/* Header */}
-        <div className="p-4 sm:p-6 border-b">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Post</h1>
-            <StatusBar
-              saveStatus={saveStatus}
-              lastSaved={lastSaved}
-              errorMessage={saveError}
-            />
+      <div className="max-w-[1600px] mx-auto p-4 sm:p-6">
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Main Composer */}
+        <div className="flex-1 bg-white rounded-lg shadow-lg" role="main" aria-label="Post composer">
+          {/* Header */}
+          <div className="p-4 sm:p-6 border-b">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Post</h1>
+              <StatusBar
+                saveStatus={saveStatus}
+                lastSaved={lastSaved}
+                errorMessage={saveError}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          {/* Account Selection */}
-          <section aria-labelledby="account-selection-label">
-            <h2 id="account-selection-label" className="sr-only">Select social media accounts</h2>
-            <AccountSelector
-              value={selectedAccounts}
-              onChange={setSelectedAccounts}
-              multiSelect
-            />
-          </section>
+          {/* Mobile Preview Toggle */}
+          <div className="lg:hidden border-b border-gray-200">
+            <div className="flex">
+              <button
+                onClick={() => setShowPreview(false)}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  !showPreview
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Write
+              </button>
+              <button
+                onClick={() => setShowPreview(true)}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  showPreview
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Preview
+              </button>
+            </div>
+          </div>
 
-          {/* Content Section */}
-          <section aria-labelledby="content-section-label">
-            <h2 id="content-section-label" className="sr-only">Post content</h2>
-            <ContentSection
-              platforms={selectedPlatforms}
-              mainContent={mainContent}
-              platformContent={platformContent}
-              onContentChange={setContent}
-            />
-          </section>
+          {/* Main Content */}
+          <div className={`p-4 sm:p-6 space-y-4 sm:space-y-6 ${showPreview ? 'hidden lg:block' : ''}`}>
+            {/* Account Selection */}
+            <section aria-labelledby="account-selection-label">
+              <h2 id="account-selection-label" className="sr-only">Select social media accounts</h2>
+              <AccountSelector
+                value={selectedAccounts}
+                onChange={setSelectedAccounts}
+                multiSelect
+              />
+            </section>
 
-          {/* Media Upload */}
-          <section aria-labelledby="media-section-label">
-            <h2 id="media-section-label" className="sr-only">Media attachments</h2>
-            <MediaUploadSection
-              media={media}
-              onUpload={addMedia}
-              onRemove={removeMedia}
-            />
-          </section>
-
-          {/* Publish Mode */}
-          <section aria-labelledby="publish-mode-label">
-            <h2 id="publish-mode-label" className="sr-only">Publishing options</h2>
-            <PublishModeSelector
-              mode={publishMode}
-              onChange={setPublishMode}
-              scheduledDate={scheduledDate}
-              onScheduledDateChange={setScheduledDate}
-              selectedSlot={selectedQueueSlot}
-              onSlotChange={setQueueSlot}
-              availableSlots={availableSlots}
-              onFetchSlots={fetchQueueSlots}
-              isLoadingSlots={isLoadingSlots}
-            />
-          </section>
-
-          {/* Preview */}
-          {selectedPlatforms.length > 0 && (
-            <section aria-labelledby="preview-section-label">
-              <h2 id="preview-section-label" className="sr-only">Post preview</h2>
-              <PreviewSection
+            {/* Content Section */}
+            <section aria-labelledby="content-section-label">
+              <h2 id="content-section-label" className="sr-only">Post content</h2>
+              <ContentSection
                 platforms={selectedPlatforms}
                 mainContent={mainContent}
                 platformContent={platformContent}
-                media={media}
+                onContentChange={setContent}
               />
             </section>
-          )}
 
-          {/* Error Display */}
-          {publishError && (
-            <AlertBanner
-              message={publishError}
-              onRetry={handleRetryPublish}
-              onDismiss={() => setPublishError(null)}
-              isRetrying={isRetryingPublish}
-            />
-          )}
+            {/* Media Upload */}
+            <section aria-labelledby="media-section-label">
+              <h2 id="media-section-label" className="sr-only">Media attachments</h2>
+              <MediaUploadSection
+                media={media}
+                onUpload={addMedia}
+                onRemove={removeMedia}
+              />
+            </section>
+
+            {/* Publish Mode */}
+            <section aria-labelledby="publish-mode-label">
+              <h2 id="publish-mode-label" className="sr-only">Publishing options</h2>
+              <PublishModeSelector
+                mode={publishMode}
+                onChange={setPublishMode}
+                scheduledDate={scheduledDate}
+                onScheduledDateChange={setScheduledDate}
+                selectedSlot={selectedQueueSlot}
+                onSlotChange={setQueueSlot}
+                availableSlots={availableSlots}
+                onFetchSlots={fetchQueueSlots}
+                isLoadingSlots={isLoadingSlots}
+              />
+            </section>
+
+            {/* Error Display */}
+            {publishError && (
+              <AlertBanner
+                message={publishError}
+                onRetry={handleRetryPublish}
+                onDismiss={() => setPublishError(null)}
+                isRetrying={isRetryingPublish}
+              />
+            )}
+          </div>
+
+          {/* Actions */}
+          <ComposerActions
+            onSave={saveDraft}
+            onPublish={handlePublish}
+            onCancel={handleCancel}
+            onTemplates={() => setShowTemplates(true)}
+            publishMode={publishMode}
+            isLoading={isPublishing}
+            isSaving={saveStatus === 'saving'}
+            canPublish={canPublish}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
         </div>
 
-        {/* Actions */}
-        <ComposerActions
-          onSave={saveDraft}
-          onPublish={handlePublish}
-          onCancel={handleCancel}
-          onTemplates={() => setShowTemplates(true)}
-          publishMode={publishMode}
-          isLoading={isPublishing}
-          isSaving={saveStatus === 'saving'}
-          canPublish={canPublish}
-          hasUnsavedChanges={hasUnsavedChanges}
-        />
+        {/* Preview Panel - Desktop: side by side, Mobile: toggled */}
+        <div className={`${showPreview ? 'block' : 'hidden'} lg:block lg:w-[375px]`}>
+          <div className="bg-white rounded-lg shadow-lg h-full">
+            <PostPreviewPanel />
+          </div>
+        </div>
       </div>
       </div>
     </>
