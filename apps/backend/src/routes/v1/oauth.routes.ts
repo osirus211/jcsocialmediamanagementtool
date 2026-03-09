@@ -34,7 +34,7 @@ const instagramConnectRateLimit = rateLimit({
   max: 10, // 10 requests per minute per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.userId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
   message: 'Too many Instagram connection attempts. Please try again later.',
 });
 

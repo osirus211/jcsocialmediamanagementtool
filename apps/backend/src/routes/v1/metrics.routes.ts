@@ -20,9 +20,10 @@ router.get('/', async (req: Request, res: Response) => {
     res.set('Content-Type', metricsRegistry.contentType);
     const metrics = await metricsRegistry.metrics();
     res.send(metrics);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Failed to generate metrics', {
-      error: error.message,
+      error: errorMessage,
     });
     res.status(500).send('Failed to generate metrics');
   }

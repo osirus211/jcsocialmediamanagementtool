@@ -1,32 +1,28 @@
+/**
+ * Zod Request Validation Middleware
+ * 
+ * Validates request body against Zod schemas
+ */
+
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
-import { ValidationError } from '../utils/errors';
+import { ZodSchema, ZodError } from 'zod';
+import { BadRequestError } from '../utils/errors';
 
 /**
- * Validation middleware factory
- * Validates request body, query, or params against Zod schema
+ * Validate request body against Zod schema
  */
-export const validate = (schema: AnyZodObject) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
+export const validateBody = (schema: ZodSchema) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await schema.parseAsync({
-        body: req.body,
-        query: req.query,
-        params: req.params,
-      });
+      req.body = await schema.parseAsync(req.body);
       next();
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof ZodError) {
         const errors = error.errors.map((err) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
-
-        next(
-          new ValidationError('Validation failed', {
-            errors,
-          })
-        );
+        next(new BadRequestError('Validation failed', errors));
       } else {
         next(error);
       }
@@ -35,59 +31,45 @@ export const validate = (schema: AnyZodObject) => {
 };
 
 /**
- * Sanitize input to prevent XSS and injection attacks
+ * Validate request query against Zod schema
  */
-export const sanitizeInput = (req: Request, _res: Response, next: NextFunction) => {
-  // Sanitize body
-  if (req.body) {
-    req.body = sanitizeObject(req.body);
-  }
-
-  // Sanitize query
-  if (req.query) {
-    req.query = sanitizeObject(req.query);
-  }
-
-  // Sanitize params
-  if (req.params) {
-    req.params = sanitizeObject(req.params);
-  }
-
-  next();
+export const validateQuery = (schema: ZodSchema) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      req.query = await schema.parseAsync(req.query);
+      next();
+    } catch (error: unknown) {
+      if (error instanceof ZodError) {
+        const errors = error.errors.map((err) => ({
+          field: err.path.join('.'),
+          message: err.message,
+        }));
+        next(new BadRequestError('Validation failed', errors));
+      } else {
+        next(error);
+      }
+    }
+  };
 };
 
 /**
- * Recursively sanitize object
+ * Validate request params against Zod schema
  */
-function sanitizeObject(obj: any): any {
-  if (typeof obj === 'string') {
-    return sanitizeString(obj);
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeObject);
-  }
-
-  if (obj && typeof obj === 'object') {
-    const sanitized: any = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        sanitized[key] = sanitizeObject(obj[key]);
+export const validateParams = (schema: ZodSchema) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      req.params = await schema.parseAsync(req.params);
+      next();
+    } catch (error: unknown) {
+      if (error instanceof ZodError) {
+        const errors = error.errors.map((err) => ({
+          field: err.path.join('.'),
+          message: err.message,
+        }));
+        next(new BadRequestError('Validation failed', errors));
+      } else {
+        next(error);
       }
     }
-    return sanitized;
-  }
-
-  return obj;
-}
-
-/**
- * Sanitize string to prevent XSS
- */
-function sanitizeString(str: string): string {
-  return str
-    .replace(/[<>]/g, '') // Remove < and >
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+=/gi, '') // Remove event handlers
-    .trim();
-}
+  };
+};

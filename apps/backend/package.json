@@ -18,6 +18,7 @@
     "migrate:all-to-v2": "tsx scripts/migrate-all-to-v2.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1004.0",
     "@opentelemetry/auto-instrumentations-node": "^0.70.1",
     "@opentelemetry/exporter-jaeger": "^2.6.0",
     "@opentelemetry/sdk-node": "^0.213.0",
@@ -28,6 +29,7 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "cron": "^3.1.6",
+    "csrf-csrf": "^4.0.3",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-mongo-sanitize": "^2.2.0",

@@ -43,7 +43,18 @@ app.use(sentryTracingHandler());
 
 // Security middleware
 app.use(helmet({
-  contentSecurityPolicy: false, // We set our own CSP
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", "https:"],
+      objectSrc: ["'none'"],
+      ...(config.env === 'production' ? { upgradeInsecureRequests: [] } : {}),
+    },
+  },
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
@@ -90,6 +101,27 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Cookie parser middleware
 app.use(cookieParser());
+
+// CSRF Protection (exclude specific routes)
+import { csrfProtection } from './middleware/csrf';
+app.use((req, res, next) => {
+  // Exclude routes that don't need CSRF protection
+  const excludedPaths = [
+    '/api/v1/auth/refresh',
+    '/api/v1/webhooks',
+    '/api/v1/oauth/callback',
+    '/health',
+    '/metrics',
+  ];
+  
+  const isExcluded = excludedPaths.some(path => req.path.startsWith(path));
+  
+  if (isExcluded || req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next();
+  }
+  
+  return csrfProtection(req, res, next);
+});
 
 // Security hardening
 app.use(mongoSanitization);

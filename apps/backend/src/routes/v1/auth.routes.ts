@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AuthController } from '../../controllers/AuthController';
 import { requireAuth } from '../../middleware/auth';
 import { validate, sanitizeInput } from '../../middleware/validate';
+import { getCsrfToken } from '../../middleware/csrf';
 import {
   authRateLimiter,
   registrationRateLimiter,
@@ -22,6 +23,9 @@ const router = Router();
 /**
  * Public routes (no authentication required)
  */
+
+// Get CSRF token
+router.get('/csrf-token', getCsrfToken);
 
 // Register new user
 router.post(

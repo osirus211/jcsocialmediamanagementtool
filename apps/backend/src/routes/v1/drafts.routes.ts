@@ -15,6 +15,8 @@ import {
   validateGetDrafts,
   validateScheduleFromDraft,
 } from '../../validators/draftValidators';
+import { validateBody } from '../../middleware/validate';
+import { createDraftSchema, updateDraftSchema } from '../../schemas/draft.schemas';
 
 const router = Router();
 

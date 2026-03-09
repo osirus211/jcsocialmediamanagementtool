@@ -26,6 +26,8 @@ import {
   validateCalendar,
   validateHistory,
 } from '../../validators/uiValidators';
+import { validateBody } from '../../middleware/validate';
+import { createPostSchema, updatePostSchema, bulkScheduleSchema } from '../../schemas/post.schemas';
 
 const router = Router();
 

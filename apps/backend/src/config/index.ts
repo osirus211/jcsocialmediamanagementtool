@@ -96,6 +96,7 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().default('us-east-1'),
   AWS_S3_BUCKET: z.string().optional(),
+  AWS_SECRET_NAME: z.string().optional(),
 
   // Storage
   STORAGE_TYPE: z.enum(['local', 's3']).default('local'),
@@ -425,6 +426,7 @@ export const config = {
     secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
     region: env.AWS_REGION,
     s3Bucket: env.AWS_S3_BUCKET,
+    secretName: env.AWS_SECRET_NAME,
   },
 
   storage: {

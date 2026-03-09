@@ -33,7 +33,7 @@ const initiateRateLimit = rateLimit({
   max: 10, // 10 requests per minute per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.userId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
   message: 'Too many OAuth initiation attempts. Please try again later.',
 });
 
@@ -50,7 +50,7 @@ const disconnectRateLimit = rateLimit({
   max: 10, // 10 requests per minute per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.userId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
   message: 'Too many disconnect attempts. Please try again later.',
 });
 
@@ -127,10 +127,12 @@ router.post(
           state,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('Failed to initiate Google Business Profile OAuth', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
       });
       next(error);
     }
@@ -217,16 +219,18 @@ router.get(
       res.redirect(
         `${config.frontend.url}/integrations?success=true&platform=google-business&locations=${result.locations.length}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('Google Business Profile OAuth callback failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
       });
 
       // Redirect to frontend with error
       res.redirect(
         `${config.frontend.url}/integrations?error=${encodeURIComponent(
-          error.message || 'Failed to connect Google Business Profile'
+          errorMessage || 'Failed to connect Google Business Profile'
         )}`
       );
     }
@@ -284,10 +288,12 @@ router.delete(
         success: true,
         message: 'Google Business Profile account disconnected successfully',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('Failed to disconnect Google Business Profile account', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage,
+        stack: errorStack,
       });
       next(error);
     }

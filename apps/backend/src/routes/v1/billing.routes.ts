@@ -7,6 +7,8 @@ import { Router } from 'express';
 import { billingController } from '../../controllers/BillingController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
+import { validateBody } from '../../middleware/validate';
+import { createCheckoutSessionSchema, updateSubscriptionSchema, createPortalSessionSchema } from '../../schemas/billing.schemas';
 
 const router = Router();
 
@@ -18,10 +20,10 @@ const router = Router();
 router.get('/', requireAuth, requireWorkspace, billingController.getBilling.bind(billingController));
 
 // Create checkout session
-router.post('/checkout', requireAuth, requireWorkspace, billingController.createCheckout.bind(billingController));
+router.post('/checkout', requireAuth, requireWorkspace, validateBody(createCheckoutSessionSchema), billingController.createCheckout.bind(billingController));
 
 // Create customer portal session
-router.post('/portal', requireAuth, requireWorkspace, billingController.createPortal.bind(billingController));
+router.post('/portal', requireAuth, requireWorkspace, validateBody(createPortalSessionSchema), billingController.createPortal.bind(billingController));
 
 // Cancel subscription
 router.post('/cancel', requireAuth, requireWorkspace, billingController.cancelSubscription.bind(billingController));

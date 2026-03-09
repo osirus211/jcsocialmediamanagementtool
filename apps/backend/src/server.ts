@@ -1,7 +1,11 @@
 import dotenv from 'dotenv';
 import { Server } from 'http';
+import { loadSecrets } from './config/secrets';
 
-// Load environment variables FIRST
+// Load secrets from AWS Secrets Manager FIRST (before dotenv)
+await loadSecrets();
+
+// Load environment variables
 dotenv.config();
 
 console.log('🔧 server.ts: Loading modules...');
