@@ -286,6 +286,68 @@ export class RSSFeedController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/rss-feeds/items/:itemId/convert-to-draft
+   * Convert RSS item to draft post
+   */
+  async convertItemToDraft(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { itemId } = req.params;
+      const { platforms, aiEnhance, tone } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      if (!workspaceId || !userId) {
+        sendError(res, 'Workspace and user required', 400);
+        return;
+      }
+
+      // Get the RSS feed item
+      const { RSSFeedItem } = await import('../models/RSSFeedItem');
+      const feedItem = await RSSFeedItem.findOne({
+        _id: itemId,
+        workspaceId,
+      });
+
+      if (!feedItem) {
+        sendNotFound(res, 'RSS feed item not found');
+        return;
+      }
+
+      // Convert to draft
+      const draft = await RSSFeedService.convertItemToDraft(
+        feedItem,
+        workspaceId,
+        userId,
+        {
+          aiEnhance: aiEnhance || false,
+          platforms: platforms || [],
+          tone: tone || 'professional',
+        }
+      );
+
+      logger.info('RSS item converted to draft via API', {
+        itemId,
+        draftId: draft._id,
+        workspaceId,
+        userId,
+        aiEnhance,
+      });
+
+      sendSuccess(res, {
+        draft: draft.toJSON(),
+        message: 'RSS item converted to draft successfully',
+      }, 201);
+    } catch (error: any) {
+      logger.error('Failed to convert RSS item to draft', {
+        error: error.message,
+        itemId: req.params.itemId,
+      });
+
+      next(error);
+    }
+  }
 }
 
 export const rssFeedController = new RSSFeedController();

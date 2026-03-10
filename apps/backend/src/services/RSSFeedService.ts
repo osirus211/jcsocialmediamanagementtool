@@ -403,6 +403,95 @@ export class RSSFeedService {
   }
 
   /**
+   * Convert RSS feed item to draft post with optional AI enhancement
+   */
+  static async convertItemToDraft(
+    feedItem: IRSSFeedItem,
+    workspaceId: string,
+    userId: string,
+    options?: {
+      aiEnhance?: boolean;
+      platforms?: string[];
+      tone?: string;
+    }
+  ): Promise<any> {
+    try {
+      logger.info('Converting RSS item to draft', {
+        itemId: feedItem._id,
+        workspaceId,
+        userId,
+        aiEnhance: options?.aiEnhance,
+      });
+
+      // Get the feed name for attribution
+      const feed = await RSSFeed.findById(feedItem.feedId);
+      const feedName = feed?.name || 'RSS Feed';
+
+      let content = feedItem.title;
+
+      // AI enhancement if requested
+      if (options?.aiEnhance) {
+        try {
+          const { getAIModule } = await import('../ai/ai.module');
+          const aiModule = getAIModule();
+
+          // Use title + description as context for AI generation
+          const context = [feedItem.title, feedItem.description].filter(Boolean).join('\n\n');
+          
+          const result = await aiModule.caption.generateCaption({
+            topic: context,
+            tone: options.tone || 'professional',
+            platform: 'linkedin', // Default platform for content generation
+            length: 'medium',
+            context: `RSS article: ${feedItem.title}`,
+          });
+
+          content = result.caption;
+        } catch (aiError) {
+          logger.warn('AI enhancement failed, using original title', {
+            error: aiError.message,
+            itemId: feedItem._id,
+          });
+          // Fall back to original title if AI fails
+        }
+      }
+
+      // Add source attribution
+      content += `\n\nVia ${feedName}: ${feedItem.link}`;
+
+      // Import PostService to create draft
+      const { PostService } = await import('./PostService');
+      
+      // Create draft post
+      const draftInput = {
+        workspaceId,
+        socialAccountId: '', // Will be set when user selects platforms
+        platform: 'draft', // Special platform for drafts
+        content,
+        scheduledAt: new Date(), // Immediate draft
+        contentType: 'post' as const,
+      };
+
+      const draft = await PostService.prototype.createPost(draftInput);
+
+      logger.info('RSS item converted to draft successfully', {
+        itemId: feedItem._id,
+        draftId: draft._id,
+        workspaceId,
+      });
+
+      return draft;
+    } catch (error: any) {
+      logger.error('Failed to convert RSS item to draft', {
+        error: error.message,
+        itemId: feedItem._id,
+        workspaceId,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Validate feed URL format
    */
   static validateFeedUrl(feedUrl: string): void {

@@ -307,4 +307,56 @@ router.get('/:id/items', (req, res, next) => {
   rssFeedController.getRSSFeedItems(req, res, next);
 });
 
+/**
+ * @openapi
+ * /api/v1/rss-feeds/items/{itemId}/convert-to-draft:
+ *   post:
+ *     summary: Convert RSS item to draft post
+ *     description: Convert an RSS feed item to a draft post with optional AI enhancement
+ *     tags:
+ *       - RSS Feeds
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: RSS feed item ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               platforms:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Target platforms for the draft
+ *               aiEnhance:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Whether to use AI to enhance the content
+ *               tone:
+ *                 type: string
+ *                 enum: [professional, casual, friendly, viral, marketing, humorous, inspirational]
+ *                 default: professional
+ *                 description: Tone for AI enhancement
+ *     responses:
+ *       201:
+ *         description: Draft post created successfully
+ *       400:
+ *         description: Invalid request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: RSS feed item not found
+ */
+router.post('/items/:itemId/convert-to-draft', (req, res, next) => {
+  rssFeedController.convertItemToDraft(req, res, next);
+});
+
 export default router;

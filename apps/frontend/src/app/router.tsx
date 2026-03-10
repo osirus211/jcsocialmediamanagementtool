@@ -31,6 +31,7 @@ import { ActivityPage } from '@/pages/team/ActivityPage';
 import { DraftsPage } from '@/pages/drafts/DraftsPage';
 import { ClientPortalPage } from '@/pages/client-portal/ClientPortalPage';
 import { ClientReviewPage } from '@/pages/client-portal/ClientReviewPage';
+import { RSSPage } from '@/pages/rss/RSSPage';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -122,6 +123,10 @@ const router = createBrowserRouter([
       {
         path: 'repurpose',
         element: <RepurposePage />,
+      },
+      {
+        path: 'rss',
+        element: <RSSPage />,
       },
       {
         path: 'analytics',
