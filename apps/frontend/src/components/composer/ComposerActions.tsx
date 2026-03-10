@@ -1,11 +1,13 @@
 import { PublishMode } from '@/types/composer.types';
 import { Save, Send, X, Loader2, FileText, Link } from 'lucide-react';
+import { AIToggleButton } from './AIToggleButton';
 
 interface ComposerActionsProps {
   onSave: () => void;
   onPublish: () => void;
   onCancel: () => void;
   onTemplates?: () => void;
+  onToggleAI?: () => void;
   publishMode: PublishMode;
   isLoading: boolean;
   isSaving: boolean;
@@ -14,6 +16,7 @@ interface ComposerActionsProps {
   autoShortenLinks?: boolean;
   onToggleAutoShorten?: () => void;
   urlCount?: number;
+  showAIPanel?: boolean;
 }
 
 export function ComposerActions({
@@ -21,6 +24,7 @@ export function ComposerActions({
   onPublish,
   onCancel,
   onTemplates,
+  onToggleAI,
   publishMode,
   isLoading,
   isSaving,
@@ -29,6 +33,7 @@ export function ComposerActions({
   autoShortenLinks = false,
   onToggleAutoShorten,
   urlCount = 0,
+  showAIPanel = false,
 }: ComposerActionsProps) {
   const handleCancel = () => {
     if (hasUnsavedChanges) {
@@ -121,6 +126,14 @@ export function ComposerActions({
             <FileText className="h-4 w-4" aria-hidden="true" />
             <span>Templates</span>
           </button>
+        )}
+
+        {onToggleAI && (
+          <AIToggleButton
+            onClick={onToggleAI}
+            isActive={showAIPanel}
+            disabled={isLoading || isSaving}
+          />
         )}
         
         <button

@@ -16,6 +16,7 @@ import { ToastContainer, ToastMessage } from './ToastContainer';
 import { TemplatesPanel } from './TemplatesPanel';
 import { PostPreviewPanel } from './preview/PostPreviewPanel';
 import { DraftLockBanner } from './DraftLockBanner';
+import { AIAssistantPanel } from './AIAssistantPanel';
 
 interface ComposerContainerProps {
   draftId?: string;
@@ -66,6 +67,7 @@ export function ComposerContainer({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [showAIPanel, setShowAIPanel] = useState(false);
   const [autoShortenLinks, setAutoShortenLinks] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -377,9 +379,12 @@ export function ComposerContainer({
           <div className="lg:hidden border-b border-gray-200">
             <div className="flex">
               <button
-                onClick={() => setShowPreview(false)}
+                onClick={() => {
+                  setShowPreview(false);
+                  setShowAIPanel(false);
+                }}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  !showPreview
+                  !showPreview && !showAIPanel
                     ? 'text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
@@ -387,20 +392,36 @@ export function ComposerContainer({
                 Write
               </button>
               <button
-                onClick={() => setShowPreview(true)}
+                onClick={() => {
+                  setShowPreview(true);
+                  setShowAIPanel(false);
+                }}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  showPreview
+                  showPreview && !showAIPanel
                     ? 'text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Preview
               </button>
+              <button
+                onClick={() => {
+                  setShowPreview(false);
+                  setShowAIPanel(true);
+                }}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  showAIPanel
+                    ? 'text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                AI
+              </button>
             </div>
           </div>
 
           {/* Main Content */}
-          <div className={`p-4 sm:p-6 space-y-4 sm:space-y-6 ${showPreview ? 'hidden lg:block' : ''}`}>
+          <div className={`p-4 sm:p-6 space-y-4 sm:space-y-6 ${showPreview || showAIPanel ? 'hidden lg:block' : ''}`}>
             {/* Draft Collaboration Banner */}
             <DraftLockBanner
               isLocked={collaboration.isLocked}
@@ -488,6 +509,7 @@ export function ComposerContainer({
             onPublish={handlePublish}
             onCancel={handleCancel}
             onTemplates={() => setShowTemplates(true)}
+            onToggleAI={() => setShowAIPanel(!showAIPanel)}
             publishMode={publishMode}
             isLoading={isPublishing}
             isSaving={saveStatus === 'saving'}
@@ -496,13 +518,24 @@ export function ComposerContainer({
             autoShortenLinks={autoShortenLinks}
             onToggleAutoShorten={() => setAutoShortenLinks(!autoShortenLinks)}
             urlCount={urlCount}
+            showAIPanel={showAIPanel}
           />
         </div>
 
         {/* Preview Panel - Desktop: side by side, Mobile: toggled */}
-        <div className={`${showPreview ? 'block' : 'hidden'} lg:block lg:w-[375px]`}>
+        <div className={`${showPreview && !showAIPanel ? 'block' : 'hidden'} lg:block lg:w-[375px]`}>
           <div className="bg-white rounded-lg shadow-lg h-full">
             <PostPreviewPanel />
+          </div>
+        </div>
+
+        {/* AI Panel - Desktop: side by side, Mobile: toggled */}
+        <div className={`${showAIPanel ? 'block' : 'hidden'} lg:block lg:w-[375px]`}>
+          <div className="bg-white rounded-lg shadow-lg h-full">
+            <AIAssistantPanel
+              selectedPlatforms={selectedPlatforms}
+              mainContent={mainContent}
+            />
           </div>
         </div>
       </div>
