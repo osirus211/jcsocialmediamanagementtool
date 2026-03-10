@@ -13,6 +13,10 @@ const platformIcons: Record<SocialPlatform, string> = {
   facebook: 'f',
   instagram: '📷',
   youtube: '▶️',
+  threads: '@',
+  bluesky: '🦋',
+  'google-business': 'G',
+  pinterest: 'P',
 };
 
 const platformNames: Record<SocialPlatform, string> = {
@@ -21,6 +25,10 @@ const platformNames: Record<SocialPlatform, string> = {
   facebook: 'Facebook',
   instagram: 'Instagram',
   youtube: 'YouTube',
+  threads: 'Threads',
+  bluesky: 'Bluesky',
+  'google-business': 'Google Business',
+  pinterest: 'Pinterest',
 };
 
 export function PlatformTabs({

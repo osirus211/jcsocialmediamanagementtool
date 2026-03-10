@@ -14,6 +14,11 @@ const platformNames: Record<SocialPlatform, string> = {
   linkedin: 'LinkedIn',
   facebook: 'Facebook',
   instagram: 'Instagram',
+  youtube: 'YouTube',
+  threads: 'Threads',
+  bluesky: 'Bluesky',
+  'google-business': 'Google Business',
+  pinterest: 'Pinterest',
 };
 
 export function PreviewSection({

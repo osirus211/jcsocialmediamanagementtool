@@ -15,6 +15,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: '@',
   [SocialPlatform.BLUESKY]: '🦋',
   [SocialPlatform.GOOGLE_BUSINESS]: 'G',
+  [SocialPlatform.PINTEREST]: 'P',
 };
 
 const platformColors: Record<SocialPlatform, string> = {
@@ -26,6 +27,7 @@ const platformColors: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: 'bg-black text-white',
   [SocialPlatform.BLUESKY]: 'bg-sky-500 text-white',
   [SocialPlatform.GOOGLE_BUSINESS]: 'bg-blue-700 text-white',
+  [SocialPlatform.PINTEREST]: 'bg-red-600 text-white',
 };
 
 const statusColors: Record<AccountStatus, string> = {

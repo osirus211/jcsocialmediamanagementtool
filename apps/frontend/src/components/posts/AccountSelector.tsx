@@ -16,6 +16,10 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.FACEBOOK]: 'f',
   [SocialPlatform.INSTAGRAM]: '📷',
   [SocialPlatform.YOUTUBE]: '▶️',
+  [SocialPlatform.THREADS]: '@',
+  [SocialPlatform.BLUESKY]: '🦋',
+  [SocialPlatform.GOOGLE_BUSINESS]: 'G',
+  [SocialPlatform.PINTEREST]: 'P',
 };
 
 export function AccountSelector({ 

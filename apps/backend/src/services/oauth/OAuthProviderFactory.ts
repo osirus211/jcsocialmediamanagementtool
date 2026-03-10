@@ -22,6 +22,8 @@ import { InstagramBasicDisplayProvider } from './InstagramBasicDisplayProvider';
 import { GoogleBusinessProvider } from './GoogleBusinessProvider';
 import { ThreadsProvider } from './ThreadsProvider';
 import { BlueskyOAuthProvider } from './BlueskyOAuthProvider';
+import { YouTubeProvider } from './YouTubeProvider';
+import { PinterestOAuthProvider } from '../oauth/PinterestOAuthProvider';
 import { logger } from '../../utils/logger';
 
 export enum ProviderType {
@@ -30,6 +32,8 @@ export enum ProviderType {
   GOOGLE_BUSINESS = 'GOOGLE_BUSINESS',
   THREADS = 'THREADS',
   BLUESKY = 'BLUESKY',
+  YOUTUBE = 'YOUTUBE',
+  PINTEREST = 'PINTEREST',
 }
 
 export class ConfigurationError extends Error {
@@ -174,6 +178,60 @@ export class OAuthProviderFactory {
       logger.info('Bluesky provider initialized');
     } catch (error: any) {
       logger.error('Failed to initialize Bluesky provider', {
+        error: error.message,
+      });
+    }
+
+    // Initialize YouTube Provider
+    try {
+      const youtubeClientId = config.oauth.youtube?.clientId;
+      const youtubeClientSecret = config.oauth.youtube?.clientSecret;
+      const youtubeRedirectUri = config.oauth.youtube?.redirectUri;
+
+      if (!youtubeClientId || !youtubeClientSecret || !youtubeRedirectUri) {
+        logger.warn('YouTube provider not configured', {
+          clientIdSet: !!youtubeClientId,
+          clientSecretSet: !!youtubeClientSecret,
+          redirectUriSet: !!youtubeRedirectUri,
+        });
+      } else {
+        const youtubeProvider = new YouTubeProvider(
+          youtubeClientId,
+          youtubeClientSecret,
+          youtubeRedirectUri
+        );
+        this.providers.set(ProviderType.YOUTUBE, youtubeProvider);
+        logger.info('YouTube provider initialized');
+      }
+    } catch (error: any) {
+      logger.error('Failed to initialize YouTube provider', {
+        error: error.message,
+      });
+    }
+
+    // Initialize Pinterest Provider
+    try {
+      const pinterestClientId = config.oauth.pinterest?.clientId;
+      const pinterestClientSecret = config.oauth.pinterest?.clientSecret;
+      const pinterestRedirectUri = config.oauth.pinterest?.redirectUri;
+
+      if (!pinterestClientId || !pinterestClientSecret || !pinterestRedirectUri) {
+        logger.warn('Pinterest provider not configured', {
+          clientIdSet: !!pinterestClientId,
+          clientSecretSet: !!pinterestClientSecret,
+          redirectUriSet: !!pinterestRedirectUri,
+        });
+      } else {
+        const pinterestProvider = new PinterestOAuthProvider(
+          pinterestClientId,
+          pinterestClientSecret,
+          pinterestRedirectUri
+        );
+        this.providers.set(ProviderType.PINTEREST, pinterestProvider);
+        logger.info('Pinterest provider initialized');
+      }
+    } catch (error: any) {
+      logger.error('Failed to initialize Pinterest provider', {
         error: error.message,
       });
     }

@@ -23,6 +23,7 @@ export enum SocialPlatform {
   BLUESKY = 'bluesky',
   GOOGLE_BUSINESS = 'google-business',
   TIKTOK = 'tiktok',
+  PINTEREST = 'pinterest',
 }
 
 export enum AccountStatus {

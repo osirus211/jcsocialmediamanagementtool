@@ -15,7 +15,7 @@ export enum ComposerStatus {
   ERROR = 'error',
 }
 
-export type SocialPlatform = 'twitter' | 'linkedin' | 'facebook' | 'instagram' | 'threads' | 'bluesky' | 'youtube' | 'google-business';
+export type SocialPlatform = 'twitter' | 'linkedin' | 'facebook' | 'instagram' | 'threads' | 'bluesky' | 'youtube' | 'google-business' | 'pinterest';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -168,6 +168,7 @@ export const PLATFORM_LIMITS: Record<SocialPlatform, number> = {
   bluesky: 300,
   youtube: 5000,
   'google-business': 1500,
+  pinterest: 500,
 };
 
 // File Validation Rules

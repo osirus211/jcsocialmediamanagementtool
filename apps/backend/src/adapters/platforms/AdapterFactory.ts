@@ -13,6 +13,8 @@ import { LinkedInOAuthProvider } from '../../services/oauth/LinkedInOAuthProvide
 import { TikTokProvider } from '../../services/oauth/TikTokProvider';
 import { ThreadsAdapter } from './ThreadsAdapter';
 import { BlueskyAdapter } from './BlueskyAdapter';
+import { YouTubeAdapter } from './YouTubeAdapter';
+import { PinterestAdapter } from './PinterestAdapter';
 import { config } from '../../config';
 
 export class AdapterFactory {
@@ -48,6 +50,12 @@ export class AdapterFactory {
       
       case 'bluesky':
         return new BlueskyAdapter();
+      
+      case 'youtube':
+        return new YouTubeAdapter();
+      
+      case 'pinterest':
+        return new PinterestAdapter();
       
       default:
         throw new Error(`Unsupported platform: ${platform}`);
@@ -108,13 +116,13 @@ export class AdapterFactory {
    * Check if platform is supported
    */
   static isSupportedPlatform(platform: string): platform is SocialPlatform {
-    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky'].includes(platform);
+    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky', 'youtube', 'pinterest'].includes(platform);
   }
 
   /**
    * Get all supported platforms
    */
   static getSupportedPlatforms(): SocialPlatform[] {
-    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky'];
+    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky', 'youtube', 'pinterest'];
   }
 }

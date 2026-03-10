@@ -13,6 +13,8 @@ import { InstagramPreview } from './InstagramPreview';
 import { FacebookPreview } from './FacebookPreview';
 import { ThreadsPreview } from './ThreadsPreview';
 import { BlueskyPreview } from './BlueskyPreview';
+import { YouTubePreview } from './YouTubePreview';
+import { PinterestPreview } from './PinterestPreview';
 
 const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   twitter: '#1DA1F2',
@@ -23,6 +25,7 @@ const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   bluesky: '#0085FF',
   youtube: '#FF0000',
   'google-business': '#4285F4',
+  pinterest: '#E60023',
 };
 
 const PLATFORM_NAMES: Record<SocialPlatform, string> = {
@@ -34,6 +37,7 @@ const PLATFORM_NAMES: Record<SocialPlatform, string> = {
   bluesky: 'Bluesky',
   youtube: 'YouTube',
   'google-business': 'Google Business',
+  pinterest: 'Pinterest',
 };
 
 export function PostPreviewPanel() {
@@ -171,6 +175,22 @@ export function PostPreviewPanel() {
               accountHandle={getAccountInfo('bluesky')?.accountId}
               accountDisplayName={getAccountInfo('bluesky')?.accountName}
               accountAvatar={getAccountInfo('bluesky')?.metadata?.avatarUrl}
+            />
+          )}
+          {activeTab === 'youtube' && (
+            <YouTubePreview
+              content={getContent('youtube')}
+              media={media}
+              channelName={getAccountInfo('youtube')?.accountName}
+              channelAvatar={getAccountInfo('youtube')?.metadata?.avatarUrl}
+            />
+          )}
+          {activeTab === 'pinterest' && (
+            <PinterestPreview
+              content={getContent('pinterest')}
+              media={media}
+              accountName={getAccountInfo('pinterest')?.accountName}
+              accountAvatar={getAccountInfo('pinterest')?.metadata?.avatarUrl}
             />
           )}
         </div>

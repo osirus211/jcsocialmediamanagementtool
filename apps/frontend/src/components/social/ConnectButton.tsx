@@ -17,6 +17,7 @@ const platformLabels: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: 'Threads',
   [SocialPlatform.BLUESKY]: 'Bluesky',
   [SocialPlatform.GOOGLE_BUSINESS]: 'Google Business Profile',
+  [SocialPlatform.PINTEREST]: 'Pinterest',
 };
 
 export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
