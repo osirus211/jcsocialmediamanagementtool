@@ -4,21 +4,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Calendar, Clock, Hash, X, CheckSquare, Square } from 'lucide-react';
+import { Loader2, Calendar, Clock, Hash, X, CheckSquare, Square, Sparkles } from 'lucide-react';
 import { aiService, GenerateCalendarInput, GeneratedPost } from '@/services/ai.service';
 import { PostService, CreatePostInput } from '@/services/post.service';
-import { toast } from 'sonner';
-import { format, addDays } from 'date-fns';
+import { toast } from '@/lib/notifications';
 
 interface CalendarAutoFillModalProps {
   isOpen: boolean;
@@ -31,6 +20,25 @@ interface CalendarAutoFillModalProps {
 }
 
 type Step = 'configure' | 'review' | 'done';
+
+// Helper functions for date formatting
+const formatDateForInput = (date: Date) => {
+  return date.toISOString().split('T')[0];
+};
+
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const formatDisplayDate = (date: Date) => {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const formatDisplayTime = (date: Date) => {
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
 
 export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
   isOpen,
@@ -46,14 +54,14 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
   // Configuration state
   const [startDate, setStartDate] = useState(() => {
     const tomorrow = addDays(new Date(), 1);
-    return format(tomorrow, 'yyyy-MM-dd');
+    return formatDateForInput(tomorrow);
   });
   const [endDate, setEndDate] = useState(() => {
     const nextWeek = addDays(new Date(), 7);
-    return format(nextWeek, 'yyyy-MM-dd');
+    return formatDateForInput(nextWeek);
   });
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set());
-  const [postsPerDay, setPostsPerDay] = useState([1]);
+  const [postsPerDay, setPostsPerDay] = useState(1);
   const [tone, setTone] = useState<string>('casual');
   const [topics, setTopics] = useState('');
 
@@ -70,6 +78,12 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
     }
   }, [isOpen, connectedAccounts]);
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   const handleGenerate = async () => {
     if (selectedPlatforms.size === 0) {
       toast.error('Please select at least one platform');
@@ -82,7 +96,7 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
         startDate,
         endDate,
         platforms: Array.from(selectedPlatforms),
-        postsPerDay: postsPerDay[0],
+        postsPerDay: postsPerDay,
         topics: topics.trim() ? topics.split(',').map(t => t.trim()) : undefined,
         tone: tone as any,
       };
@@ -166,12 +180,6 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
     setGeneratedPosts(updated);
   };
 
-  const updatePostHashtags = (index: number, hashtags: string[]) => {
-    const updated = [...generatedPosts];
-    updated[index] = { ...updated[index], hashtags };
-    setGeneratedPosts(updated);
-  };
-
   const removePost = (index: number) => {
     const updated = generatedPosts.filter((_, i) => i !== index);
     setGeneratedPosts(updated);
@@ -192,93 +200,108 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="startDate">Start Date</Label>
-          <Input
+          <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+            Start Date
+          </label>
+          <input
             id="startDate"
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <div>
-          <Label htmlFor="endDate">End Date</Label>
-          <Input
+          <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+            End Date
+          </label>
+          <input
             id="endDate"
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
       </div>
 
       <div>
-        <Label>Platforms</Label>
-        <div className="grid grid-cols-2 gap-2 mt-2">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Platforms</label>
+        <div className="grid grid-cols-2 gap-2">
           {connectedAccounts.map((account) => (
             <div key={account.id} className="flex items-center space-x-2">
-              <Checkbox
+              <input
+                type="checkbox"
                 id={account.platform}
                 checked={selectedPlatforms.has(account.platform)}
-                onCheckedChange={(checked) => {
+                onChange={(e) => {
                   const newPlatforms = new Set(selectedPlatforms);
-                  if (checked) {
+                  if (e.target.checked) {
                     newPlatforms.add(account.platform);
                   } else {
                     newPlatforms.delete(account.platform);
                   }
                   setSelectedPlatforms(newPlatforms);
                 }}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <Label htmlFor={account.platform} className="capitalize">
+              <label htmlFor={account.platform} className="text-sm text-gray-700 capitalize">
                 {account.platform} (@{account.username})
-              </Label>
+              </label>
             </div>
           ))}
         </div>
       </div>
 
       <div>
-        <Label>Posts per Day: {postsPerDay[0]}</Label>
-        <Slider
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Posts per Day: {postsPerDay}
+        </label>
+        <input
+          type="range"
+          min="1"
+          max="5"
           value={postsPerDay}
-          onValueChange={setPostsPerDay}
-          max={5}
-          min={1}
-          step={1}
-          className="mt-2"
+          onChange={(e) => setPostsPerDay(parseInt(e.target.value))}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
       <div>
-        <Label htmlFor="tone">Tone</Label>
-        <Select value={tone} onValueChange={setTone}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="professional">Professional</SelectItem>
-            <SelectItem value="casual">Casual</SelectItem>
-            <SelectItem value="humorous">Humorous</SelectItem>
-            <SelectItem value="inspirational">Inspirational</SelectItem>
-          </SelectContent>
-        </Select>
+        <label htmlFor="tone" className="block text-sm font-medium text-gray-700 mb-1">
+          Tone
+        </label>
+        <select
+          id="tone"
+          value={tone}
+          onChange={(e) => setTone(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="professional">Professional</option>
+          <option value="casual">Casual</option>
+          <option value="humorous">Humorous</option>
+          <option value="inspirational">Inspirational</option>
+        </select>
       </div>
 
       <div>
-        <Label htmlFor="topics">Topics (optional)</Label>
-        <Textarea
+        <label htmlFor="topics" className="block text-sm font-medium text-gray-700 mb-1">
+          Topics (optional)
+        </label>
+        <textarea
           id="topics"
           placeholder="What topics should we cover? (comma-separated)"
           value={topics}
           onChange={(e) => setTopics(e.target.value)}
-          className="mt-1"
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
 
-      <Button 
+      <button 
         onClick={handleGenerate} 
         disabled={loading || selectedPlatforms.size === 0}
-        className="w-full"
+        className="w-full flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? (
           <>
@@ -286,9 +309,12 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
             ✨ Generating posts...
           </>
         ) : (
-          '✨ Generate Posts'
+          <>
+            <Sparkles className="w-4 h-4 mr-2" />
+            ✨ Generate Posts
+          </>
         )}
-      </Button>
+      </button>
     </div>
   );
 
@@ -296,10 +322,9 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={toggleSelectAll}
+            className="flex items-center px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             {selectedPosts.size === generatedPosts.length ? (
               <CheckSquare className="w-4 h-4 mr-1" />
@@ -307,70 +332,77 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
               <Square className="w-4 h-4 mr-1" />
             )}
             {selectedPosts.size === generatedPosts.length ? 'Deselect All' : 'Select All'}
-          </Button>
-          <span className="text-sm text-muted-foreground">
+          </button>
+          <span className="text-sm text-gray-600">
             {selectedPosts.size} posts selected
           </span>
         </div>
-        <Button onClick={() => setStep('configure')} variant="outline">
+        <button 
+          onClick={() => setStep('configure')} 
+          className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
           Back
-        </Button>
+        </button>
       </div>
 
       <div className="max-h-96 overflow-y-auto space-y-3">
         {generatedPosts.map((post, index) => (
-          <Card key={index} className={`relative ${selectedPosts.has(index) ? 'ring-2 ring-primary' : ''}`}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    checked={selectedPosts.has(index)}
-                    onCheckedChange={() => togglePostSelection(index)}
-                  />
-                  <Badge variant="outline" className="capitalize">
-                    {post.platform}
-                  </Badge>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {format(new Date(post.scheduledAt), 'MMM d')}
-                  </div>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {format(new Date(post.scheduledAt), 'h:mm a')}
-                  </div>
+          <div 
+            key={index} 
+            className={`relative border rounded-lg p-4 ${selectedPosts.has(index) ? 'ring-2 ring-purple-500 border-purple-200' : 'border-gray-200'}`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedPosts.has(index)}
+                  onChange={() => togglePostSelection(index)}
+                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                />
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
+                  {post.platform}
+                </span>
+                <div className="flex items-center text-sm text-gray-500">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  {formatDisplayDate(new Date(post.scheduledAt))}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removePost(index)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center text-sm text-gray-500">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {formatDisplayTime(new Date(post.scheduledAt))}
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
+              <button
+                onClick={() => removePost(index)}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <textarea
                 value={post.content}
                 onChange={(e) => updatePostContent(index, e.target.value)}
-                className="min-h-20"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               />
               <div className="flex items-center space-x-1 flex-wrap">
-                <Hash className="w-3 h-3 text-muted-foreground" />
+                <Hash className="w-3 h-3 text-gray-400" />
                 {post.hashtags.map((hashtag, hashIndex) => (
-                  <Badge key={hashIndex} variant="secondary" className="text-xs">
+                  <span key={hashIndex} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     {hashtag}
-                  </Badge>
+                  </span>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
 
-      <Button 
+      <button 
         onClick={handleSchedulePosts}
         disabled={loading || selectedPosts.size === 0}
-        className="w-full"
+        className="w-full flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {loading ? (
           <>
@@ -380,48 +412,67 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
         ) : (
           `Schedule ${selectedPosts.size} Selected Posts`
         )}
-      </Button>
+      </button>
     </div>
   );
 
   const renderDoneStep = () => (
     <div className="text-center space-y-4">
       <div className="text-6xl">✅</div>
-      <h3 className="text-lg font-semibold">
+      <h3 className="text-lg font-semibold text-gray-900">
         {scheduledCount} posts scheduled!
       </h3>
-      <p className="text-muted-foreground">
+      <p className="text-gray-600">
         Your posts have been added to the calendar and will be published at the scheduled times.
       </p>
       <div className="flex space-x-2">
-        <Button onClick={onClose} className="flex-1">
+        <button 
+          onClick={onClose} 
+          className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
           View in Calendar
-        </Button>
-        <Button onClick={onClose} variant="outline" className="flex-1">
+        </button>
+        <button 
+          onClick={onClose} 
+          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+        >
           Close
-        </Button>
+        </button>
       </div>
     </div>
   );
 
+  if (!isOpen) return null;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-xl font-semibold text-gray-900">
             ✨ Auto-fill Calendar
             {step === 'configure' && ' - Configure'}
             {step === 'review' && ' - Review & Edit'}
             {step === 'done' && ' - Complete'}
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
         
-        <div className="overflow-y-auto">
+        {/* Content */}
+        <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
           {step === 'configure' && renderConfigureStep()}
           {step === 'review' && renderReviewStep()}
           {step === 'done' && renderDoneStep()}
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
