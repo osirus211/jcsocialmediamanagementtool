@@ -151,6 +151,28 @@ export interface EngagementPredictionOutput {
   tips: string[];
 }
 
+export interface GenerateCalendarInput {
+  startDate: string;
+  endDate: string;
+  platforms: string[];
+  postsPerDay?: number;
+  topics?: string[];
+  tone?: 'professional' | 'casual' | 'humorous' | 'inspirational';
+}
+
+export interface GeneratedPost {
+  platform: string;
+  content: string;
+  hashtags: string[];
+  scheduledAt: string;
+  suggestedTime: string;
+}
+
+export interface GenerateCalendarOutput {
+  posts: GeneratedPost[];
+  totalGenerated: number;
+}
+
 class AIService {
   /**
    * Generate caption variations for a given topic
@@ -323,6 +345,14 @@ class AIService {
     };
 
     const response = await apiClient.post('/ai/longform-to-social', requestData);
+    return response.data;
+  }
+
+  /**
+   * Generate calendar posts for auto-fill
+   */
+  async generateCalendarPosts(input: GenerateCalendarInput): Promise<GenerateCalendarOutput> {
+    const response = await apiClient.post('/ai/generate-calendar', input);
     return response.data;
   }
 }

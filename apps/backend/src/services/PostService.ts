@@ -853,6 +853,53 @@ export class PostService {
     };
   }
 
+  /**
+   * Create multiple scheduled posts in bulk
+   */
+  static async bulkCreatePosts(
+    workspaceId: string,
+    userId: string,
+    posts: CreatePostInput[]
+  ): Promise<IScheduledPost[]> {
+    logger.info('Creating bulk scheduled posts', {
+      workspaceId,
+      userId,
+      count: posts.length,
+    });
+
+    // Validate all posts before creating any
+    for (const post of posts) {
+      if (!post.workspaceId || post.workspaceId !== workspaceId) {
+        throw new Error('All posts must belong to the same workspace');
+      }
+    }
+
+    // Create all posts in parallel
+    const postService = new PostService();
+    const createdPosts = await Promise.all(
+      posts.map(async (postInput) => {
+        try {
+          return await postService.createPost(postInput);
+        } catch (error) {
+          logger.error('Failed to create post in bulk operation', {
+            workspaceId,
+            error: error.message,
+            postInput,
+          });
+          throw error;
+        }
+      })
+    );
+
+    logger.info('Bulk post creation completed', {
+      workspaceId,
+      userId,
+      created: createdPosts.length,
+    });
+
+    return createdPosts;
+  }
+
 }
 
 // Export singleton instance

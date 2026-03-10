@@ -10,7 +10,7 @@ import { requireWorkspace } from '../../middleware/tenant';
 import { aiRateLimiter } from '../../middleware/rateLimiter';
 import { checkAILimit } from '../../middleware/planLimit';
 import { validateBody } from '../../middleware/validate';
-import { generateContentSchema, improveContentSchema } from '../../schemas/ai.schemas';
+import { generateContentSchema, improveContentSchema, generateCalendarSchema } from '../../schemas/ai.schemas';
 
 const router = Router();
 
@@ -84,6 +84,11 @@ router.post('/suggest-reply', checkAILimit, AIController.suggestReply);
  * @route   POST /api/v1/ai/analyze-sentiment
  */
 router.post('/analyze-sentiment', AIController.analyzeSentiment);
+
+/**
+ * @route   POST /api/v1/ai/generate-calendar
+ */
+router.post('/generate-calendar', checkAILimit, validateBody(generateCalendarSchema), AIController.generateCalendarPosts);
 
 /**
  * @route   POST /api/v1/ai/moderate-content

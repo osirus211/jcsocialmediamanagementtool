@@ -763,6 +763,53 @@ router.post('/bulk/delete', validateBulkDelete, (req, res, next) => {
 });
 
 /**
+ * @swagger
+ * /api/v1/posts/bulk:
+ *   post:
+ *     summary: Create multiple posts
+ *     tags: [Posts]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               posts:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/CreatePost'
+ *     responses:
+ *       201:
+ *         description: Posts created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     posts:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Post'
+ *                     count:
+ *                       type: number
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/bulk', (req, res, next) => {
+  postController.bulkCreatePosts(req, res, next);
+});
+
+/**
  * @openapi
  * /api/v1/posts/bulk/reschedule:
  *   post:

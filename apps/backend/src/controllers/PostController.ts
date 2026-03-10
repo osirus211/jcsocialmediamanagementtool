@@ -6,7 +6,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
-import { postService } from '../services/PostService';
+import { postService, PostService } from '../services/PostService';
 import { logger } from '../utils/logger';
 import {
   sendSuccess,
@@ -693,6 +693,70 @@ export class PostController {
       logger.error('Failed to get lock status', {
         error: error.message,
         postId: req.params.id,
+      });
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/posts/bulk
+   * Create multiple scheduled posts
+   */
+  async bulkCreatePosts(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        sendValidationError(res, errors.array().map(err => ({
+          field: err.type === 'field' ? (err as any).path : undefined,
+          message: err.msg,
+        })));
+        return;
+      }
+
+      const { posts } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      if (!workspaceId || !userId) {
+        sendError(res, 'Workspace and user required', 400);
+        return;
+      }
+
+      if (!Array.isArray(posts) || posts.length === 0) {
+        sendError(res, 'Posts array is required and cannot be empty', 400);
+        return;
+      }
+
+      // Add workspaceId to each post
+      const postsWithWorkspace = posts.map(post => ({
+        ...post,
+        workspaceId,
+        scheduledAt: new Date(post.scheduledAt),
+      }));
+
+      // Create posts using the static method
+      const createdPosts = await PostService.bulkCreatePosts(
+        workspaceId,
+        userId,
+        postsWithWorkspace
+      );
+
+      logger.info('Bulk posts created via API', {
+        workspaceId,
+        userId,
+        count: createdPosts.length,
+      });
+
+      sendSuccess(res, {
+        posts: createdPosts,
+        count: createdPosts.length,
+      });
+    } catch (error: any) {
+      logger.error('Failed to bulk create posts', {
+        error: error.message,
+        workspaceId: req.workspace?.workspaceId,
+        userId: req.user?.userId,
       });
       next(error);
     }

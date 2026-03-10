@@ -561,6 +561,126 @@ export class AIController {
   }
 
   /**
+   * Generate calendar posts for auto-fill
+   * POST /ai/generate-calendar
+   */
+  static async generateCalendarPosts(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { startDate, endDate, platforms, postsPerDay = 1, topics, tone } = req.body;
+
+      if (!startDate || !endDate || !platforms || !Array.isArray(platforms)) {
+        res.status(400).json({
+          success: false,
+          message: 'Missing required fields: startDate, endDate, platforms (array)',
+        });
+        return;
+      }
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDiff > 30) {
+        res.status(400).json({
+          success: false,
+          message: 'Date range cannot exceed 30 days',
+        });
+        return;
+      }
+
+      const aiModule = getAIModule();
+      const generatedPosts = [];
+
+      // Generate posts for each day and platform
+      for (let day = 0; day <= daysDiff; day++) {
+        const currentDate = new Date(start);
+        currentDate.setDate(start.getDate() + day);
+
+        for (const platform of platforms) {
+          for (let postIndex = 0; postIndex < postsPerDay; postIndex++) {
+            try {
+              // Generate content suggestions
+              const suggestionResult = await aiModule.suggestion.generateSuggestions({
+                platform,
+                type: 'hook',
+              });
+
+              const topic = topics && topics.length > 0 
+                ? topics[Math.floor(Math.random() * topics.length)]
+                : suggestionResult.suggestions[0] || 'Engaging content';
+
+              // Generate caption
+              const captionResult = await aiModule.caption.generateCaption({
+                topic,
+                tone: tone || 'casual',
+                platform,
+                length: 'medium',
+              });
+
+              // Generate hashtags
+              const hashtagResult = await aiModule.hashtag.generateHashtags({
+                caption: captionResult.caption,
+                platform,
+                count: 5,
+              });
+
+              // Calculate optimal posting time (spread across business hours 9am-6pm)
+              const scheduledTime = new Date(currentDate);
+              const baseHour = 9 + Math.floor((postIndex * 9) / postsPerDay); // Spread across 9am-6pm
+              const randomMinutes = Math.floor(Math.random() * 60);
+              scheduledTime.setHours(baseHour, randomMinutes, 0, 0);
+
+              generatedPosts.push({
+                platform,
+                content: captionResult.caption,
+                hashtags: hashtagResult.hashtags,
+                scheduledAt: scheduledTime.toISOString(),
+                suggestedTime: scheduledTime.toISOString(),
+              });
+            } catch (error) {
+              logger.error('Failed to generate post for calendar', {
+                day,
+                platform,
+                postIndex,
+                error: error.message,
+              });
+            }
+          }
+        }
+      }
+
+      // Track AI usage
+      const workspaceId = req.workspace?.workspaceId.toString();
+      if (workspaceId) {
+        // Increment for each AI call made
+        const aiCallsCount = generatedPosts.length * 3; // suggestion + caption + hashtag per post
+        for (let i = 0; i < aiCallsCount; i++) {
+          await usageService.incrementAI(workspaceId);
+        }
+      }
+
+      logger.info('Calendar posts generated', {
+        workspaceId: req.workspace?.workspaceId,
+        userId: req.user?.userId,
+        totalGenerated: generatedPosts.length,
+        dateRange: { startDate, endDate },
+        platforms,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          posts: generatedPosts,
+          totalGenerated: generatedPosts.length,
+        },
+      });
+    } catch (error: any) {
+      logger.error('Generate calendar posts error:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Suggest moderation action
    * POST /ai/moderate-content
    */

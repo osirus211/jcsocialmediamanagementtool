@@ -14,6 +14,15 @@ export interface CreatePostRequest {
   threadPosts?: string[];
 }
 
+export interface CreatePostInput {
+  workspaceId?: string;
+  socialAccountId: string;
+  platform: string;
+  content: string;
+  mediaUrls?: string[];
+  scheduledAt: Date;
+}
+
 export interface Post {
   _id: string;
   content: string;
@@ -26,6 +35,16 @@ export interface Post {
   threadPosts?: string[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export class PostService {
+  /**
+   * Create multiple posts in bulk
+   */
+  static async bulkCreatePosts(posts: CreatePostInput[]): Promise<Post[]> {
+    const response = await apiClient.post('/posts/bulk', { posts });
+    return response.data.posts;
+  }
 }
 
 export const postService = {

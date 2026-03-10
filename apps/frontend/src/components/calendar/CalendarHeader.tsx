@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
-import { Calendar, List, Plus } from 'lucide-react';
+import { Calendar, List, Plus, Sparkles } from 'lucide-react';
+import { CalendarAutoFillModal } from './CalendarAutoFillModal';
 
 type ViewMode = 'month' | 'week';
 
@@ -45,6 +46,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const { members } = useWorkspaceStore();
+  const [showAutoFillModal, setShowAutoFillModal] = useState(false);
 
   const handleMemberToggle = (memberId: string) => {
     if (selectedMemberIds.includes(memberId)) {
@@ -97,14 +99,23 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           </button>
         </div>
 
-        {/* New Post button */}
-        <button
-          onClick={() => navigate('/posts/create')}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Post
-        </button>
+        {/* Action buttons */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowAutoFillModal(true)}
+            className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            ✨ Auto-fill
+          </button>
+          <button
+            onClick={() => navigate('/posts/create')}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Post
+          </button>
+        </div>
       </div>
 
       {/* Bottom row: Member filters and post count */}
@@ -179,6 +190,13 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           Showing <span className="font-medium">{postCount}</span> posts
         </div>
       </div>
+
+      {/* Auto-fill Modal */}
+      <CalendarAutoFillModal
+        isOpen={showAutoFillModal}
+        onClose={() => setShowAutoFillModal(false)}
+        connectedAccounts={[]} // TODO: Pass actual connected accounts
+      />
     </div>
   );
 };
