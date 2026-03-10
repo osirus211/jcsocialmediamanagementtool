@@ -22,6 +22,7 @@ import { LinksPage } from '@/pages/links/Links';
 import { EvergreenPage } from '@/pages/evergreen/EvergreenPage';
 import { BulkImportPage } from '@/pages/bulk/BulkImportPage';
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage';
+import { CustomDashboard } from '@/pages/analytics/CustomDashboard';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -101,6 +102,10 @@ const router = createBrowserRouter([
       {
         path: 'analytics',
         element: <AnalyticsPage />,
+      },
+      {
+        path: 'analytics/dashboard',
+        element: <CustomDashboard />,
       },
       {
         path: 'pricing',

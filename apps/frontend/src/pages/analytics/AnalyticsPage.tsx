@@ -10,6 +10,7 @@ import { HashtagTrendChart } from '@/components/analytics/HashtagTrendChart';
 import { TopPostsTable } from '@/components/analytics/TopPostsTable';
 import { ExportReportButton } from '@/components/analytics/ExportReportButton';
 import { ScheduledReportsPanel } from '@/components/analytics/ScheduledReportsPanel';
+import { Link } from 'react-router-dom';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', icon: '📊' },
@@ -46,7 +47,15 @@ export function AnalyticsPage() {
             Discover your optimal posting times and track engagement performance
           </p>
         </div>
-        <ExportReportButton />
+        <div className="flex items-center gap-3">
+          <Link
+            to="/analytics/dashboard"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Custom Dashboard
+          </Link>
+          <ExportReportButton />
+        </div>
       </div>
 
       {/* Platform Filter */}
