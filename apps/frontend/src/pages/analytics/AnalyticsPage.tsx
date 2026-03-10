@@ -54,6 +54,12 @@ export function AnalyticsPage() {
           >
             Custom Dashboard
           </Link>
+          <Link
+            to="/analytics/competitors"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Competitors
+          </Link>
           <ExportReportButton />
         </div>
       </div>
