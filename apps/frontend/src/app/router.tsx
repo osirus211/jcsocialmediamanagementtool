@@ -21,6 +21,7 @@ import { MediaLibraryPage } from '@/pages/media/MediaLibrary';
 import { LinksPage } from '@/pages/links/Links';
 import { EvergreenPage } from '@/pages/evergreen/EvergreenPage';
 import { BulkImportPage } from '@/pages/bulk/BulkImportPage';
+import { RepurposePage } from '@/pages/repurpose/RepurposePage';
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage';
 import { CustomDashboard } from '@/pages/analytics/CustomDashboard';
 import { CompetitorPage } from '@/pages/analytics/CompetitorPage';
@@ -115,6 +116,10 @@ const router = createBrowserRouter([
       {
         path: 'evergreen',
         element: <EvergreenPage />,
+      },
+      {
+        path: 'repurpose',
+        element: <RepurposePage />,
       },
       {
         path: 'analytics',

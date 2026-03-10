@@ -6,6 +6,44 @@
 import { apiClient } from '@/lib/api-client';
 import { SocialPlatform } from '@/types/composer.types';
 
+// Repurposing Types based on backend interfaces
+export interface RepurposingInput {
+  originalContent: string;
+  originalPlatform?: string;
+  targetPlatforms: string[];
+  preserveHashtags?: boolean;
+  preserveMentions?: boolean;
+}
+
+export interface PlatformVersion {
+  platform: string;
+  content: string;
+  hashtags?: string[];
+  characterCount: number;
+}
+
+export interface RepurposingOutput {
+  platformVersions: PlatformVersion[];
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
+export interface LongformToSocialInput {
+  longFormContent: string;
+  targetPlatform: string;
+  focusPoints?: string;
+  preserveLinks?: boolean;
+  includeHashtags?: boolean;
+}
+
+export interface LongformToSocialOutput {
+  content: string;
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
 // AI Types based on backend interfaces
 export enum ContentTone {
   PROFESSIONAL = 'professional',
@@ -241,6 +279,50 @@ class AIService {
     };
 
     const response = await apiClient.post('/ai/predict-engagement', requestData);
+    return response.data;
+  }
+
+  /**
+   * Repurpose content for multiple platforms
+   */
+  async repurposeContent(input: {
+    originalContent: string;
+    targetPlatforms: string[];
+    originalPlatform?: string;
+    preserveHashtags?: boolean;
+    preserveMentions?: boolean;
+  }): Promise<RepurposingOutput> {
+    const requestData: RepurposingInput = {
+      originalContent: input.originalContent,
+      targetPlatforms: input.targetPlatforms,
+      originalPlatform: input.originalPlatform,
+      preserveHashtags: input.preserveHashtags,
+      preserveMentions: input.preserveMentions,
+    };
+
+    const response = await apiClient.post('/ai/repurpose', requestData);
+    return response.data;
+  }
+
+  /**
+   * Convert long-form content to social media post
+   */
+  async longformToSocial(input: {
+    longFormContent: string;
+    targetPlatform: string;
+    focusPoints?: string;
+    preserveLinks?: boolean;
+    includeHashtags?: boolean;
+  }): Promise<LongformToSocialOutput> {
+    const requestData: LongformToSocialInput = {
+      longFormContent: input.longFormContent,
+      targetPlatform: input.targetPlatform,
+      focusPoints: input.focusPoints,
+      preserveLinks: input.preserveLinks,
+      includeHashtags: input.includeHashtags,
+    };
+
+    const response = await apiClient.post('/ai/longform-to-social', requestData);
     return response.data;
   }
 }

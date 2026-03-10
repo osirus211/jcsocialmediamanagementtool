@@ -4,9 +4,10 @@ import { StatusBadge } from './StatusBadge';
 import { SubmitForApprovalButton } from '@/components/approvals/SubmitForApprovalButton';
 import { usePostStore } from '@/store/post.store';
 import { useState, useEffect } from 'react';
-import { Repeat2 } from 'lucide-react';
+import { Repeat2, RotateCcw } from 'lucide-react';
 import { EvergreenBadge } from '@/components/evergreen/EvergreenBadge';
 import { EvergreenRuleModal } from '@/components/evergreen/EvergreenRuleModal';
+import { RepurposeModal } from '@/components/repurpose/RepurposeModal';
 import { evergreenService, EvergreenRule } from '@/services/evergreen.service';
 import { logger } from '@/lib/logger';
 
@@ -20,6 +21,7 @@ export function PostCard({ post }: PostCardProps) {
   const [isRetrying, setIsRetrying] = useState(false);
   const [evergreenRule, setEvergreenRule] = useState<EvergreenRule | null>(null);
   const [showEvergreenModal, setShowEvergreenModal] = useState(false);
+  const [showRepurposeModal, setShowRepurposeModal] = useState(false);
 
   const account = typeof post.socialAccountId === 'object' 
     ? (post.socialAccountId as SocialAccount) 
@@ -82,6 +84,14 @@ export function PostCard({ post }: PostCardProps) {
 
   const handleEvergreenModalSuccess = () => {
     loadEvergreenRule();
+  };
+
+  const handleRepurpose = () => {
+    setShowRepurposeModal(true);
+  };
+
+  const handleRepurposeModalClose = () => {
+    setShowRepurposeModal(false);
   };
 
   return (
@@ -178,6 +188,15 @@ export function PostCard({ post }: PostCardProps) {
               <span>Make Evergreen</span>
             </button>
           )}
+          {isPublished && (
+            <button
+              onClick={handleRepurpose}
+              className="px-3 py-1.5 text-sm bg-purple-50 text-purple-600 hover:bg-purple-100 rounded flex items-center gap-1.5"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Repurpose</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -187,6 +206,15 @@ export function PostCard({ post }: PostCardProps) {
           existingRule={evergreenRule || undefined}
           onClose={handleEvergreenModalClose}
           onSuccess={handleEvergreenModalSuccess}
+        />
+      )}
+
+      {showRepurposeModal && (
+        <RepurposeModal
+          postId={post._id}
+          content={post.content}
+          platform={account?.platform || 'unknown'}
+          onClose={handleRepurposeModalClose}
         />
       )}
     </>
