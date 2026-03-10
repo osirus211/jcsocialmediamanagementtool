@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { analyticsService, FollowerTrendData } from '@/services/analytics.service';
 import { useWorkspaceStore } from '@/store/workspace.store';
-import { useSocialAccountsStore } from '@/store/social-accounts.store';
+import { useSocialAccountStore } from '@/store/social.store';
 import { logger } from '@/lib/logger';
 
 interface FollowerGrowthChartProps {
@@ -11,7 +11,7 @@ interface FollowerGrowthChartProps {
 
 export function FollowerGrowthChart({ selectedAccountId }: FollowerGrowthChartProps) {
   const { currentWorkspace } = useWorkspaceStore();
-  const { accounts } = useSocialAccountsStore();
+  const { accounts } = useSocialAccountStore();
   const [chartData, setChartData] = useState<FollowerTrendData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function FollowerGrowthChart({ selectedAccountId }: FollowerGrowthChartPr
         setChartData(trends);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load follower trends';
-        logger.error('Follower trends fetch error:', err);
+        logger.error('Follower trends fetch error:', { error: err });
         setError(errorMessage);
       } finally {
         setIsLoading(false);
@@ -84,7 +84,7 @@ export function FollowerGrowthChart({ selectedAccountId }: FollowerGrowthChartPr
             >
               {accounts.map((account) => (
                 <option key={account._id} value={account._id}>
-                  {account.username} ({account.provider})
+                  {account.accountName} ({account.platform})
                 </option>
               ))}
             </select>
@@ -131,10 +131,10 @@ export function FollowerGrowthChart({ selectedAccountId }: FollowerGrowthChartPr
           {selectedAccount && (
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-700">
-                {selectedAccount.username}
+                {selectedAccount.accountName}
               </div>
               <div className="text-sm text-gray-500 capitalize">
-                {selectedAccount.provider}
+                {selectedAccount.platform}
               </div>
             </div>
           )}

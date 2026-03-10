@@ -29,7 +29,7 @@ export function FollowerGrowthSummary({ dateRange = '30d' }: FollowerGrowthSumma
         setGrowthData(data);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load follower growth';
-        logger.error('Follower growth fetch error:', err);
+        logger.error('Follower growth fetch error:', { error: err });
         setError(errorMessage);
       } finally {
         setIsLoading(false);
