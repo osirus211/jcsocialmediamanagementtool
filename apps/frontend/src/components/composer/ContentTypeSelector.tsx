@@ -1,4 +1,5 @@
 import { useComposerStore } from '@/store/composer.store';
+import { useSocialAccountStore } from '@/store/social.store';
 
 type ContentType = 'post' | 'story' | 'reel';
 
@@ -31,11 +32,12 @@ const contentTypes: ContentTypeOption[] = [
 
 export function ContentTypeSelector() {
   const { contentType, setContentType, selectedAccounts } = useComposerStore();
+  const { accounts } = useSocialAccountStore();
 
   // Check if Instagram is in selected platforms
-  const hasInstagram = selectedAccounts.some(
-    (account) => account.platform === 'instagram'
-  );
+  const hasInstagram = accounts
+    .filter((acc) => selectedAccounts.includes(acc._id))
+    .some((acc) => acc.platform.toLowerCase() === 'instagram');
 
   // Only show Story and Reel if Instagram is selected
   const availableTypes = hasInstagram
