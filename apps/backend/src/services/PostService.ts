@@ -20,6 +20,15 @@ export interface CreatePostInput {
   mediaUrls?: string[]; // Deprecated: use mediaIds instead
   mediaIds?: string[]; // New: reference to Media model
   scheduledAt: Date;
+  contentType?: 'post' | 'story' | 'reel';
+  storyOptions?: {
+    expiresAt?: Date;
+    link?: string;
+  };
+  reelOptions?: {
+    audioName?: string;
+    shareToFeed?: boolean;
+  };
 }
 
 export interface UpdatePostInput {
@@ -83,6 +92,9 @@ export class PostService {
       mediaUrls,
       scheduledAt: input.scheduledAt,
       status: PostStatus.SCHEDULED,
+      contentType: input.contentType || 'post',
+      storyOptions: input.storyOptions,
+      reelOptions: input.reelOptions,
     });
 
     // Enqueue delayed job immediately

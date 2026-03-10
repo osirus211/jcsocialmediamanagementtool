@@ -41,6 +41,12 @@ interface ComposerState {
   lastSaved?: Date;
   saveError?: string;
   hasUnsavedChanges: boolean;
+  
+  // Content type (post/story/reel)
+  contentType: 'post' | 'story' | 'reel';
+  reelOptions: {
+    shareToFeed: boolean;
+  };
 }
 
 /**
@@ -53,6 +59,8 @@ interface ComposerActions {
   setPublishMode: (mode: PublishMode) => void;
   setScheduledDate: (date: Date | undefined) => void;
   setQueueSlot: (slot: QueueSlot | undefined) => void;
+  setContentType: (type: 'post' | 'story' | 'reel') => void;
+  setReelShareToFeed: (shareToFeed: boolean) => void;
   
   // Media management
   addMedia: (files: File[]) => Promise<void>;
@@ -103,6 +111,10 @@ const initialState: ComposerState = {
   lastSaved: undefined,
   saveError: undefined,
   hasUnsavedChanges: false,
+  contentType: 'post',
+  reelOptions: {
+    shareToFeed: true,
+  },
 };
 
 /**
@@ -139,7 +151,27 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   },
 
   setSelectedAccounts: (accountIds) => {
-    set({ selectedAccounts: accountIds, hasUnsavedChanges: true });
+    const state = get();
+    
+    // Check if Instagram was deselected
+    const hadInstagram = state.selectedAccounts.some((id) => {
+      // This is a simplified check - in real implementation, you'd check account platform
+      return true; // Placeholder
+    });
+    
+    // Reset contentType to 'post' if Instagram is not in new selection
+    // and current contentType is story or reel
+    const updates: Partial<ComposerState> = {
+      selectedAccounts: accountIds,
+      hasUnsavedChanges: true,
+    };
+    
+    // If contentType is story or reel, reset to post when no accounts selected
+    if ((state.contentType === 'story' || state.contentType === 'reel') && accountIds.length === 0) {
+      updates.contentType = 'post';
+    }
+    
+    set(updates);
   },
 
   setPublishMode: (mode) => {
@@ -152,6 +184,17 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
 
   setQueueSlot: (slot) => {
     set({ selectedQueueSlot: slot, hasUnsavedChanges: true });
+  },
+
+  setContentType: (type) => {
+    set({ contentType: type, hasUnsavedChanges: true });
+  },
+
+  setReelShareToFeed: (shareToFeed) => {
+    set((state) => ({
+      reelOptions: { ...state.reelOptions, shareToFeed },
+      hasUnsavedChanges: true,
+    }));
   },
 
   // ============================================

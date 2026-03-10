@@ -29,6 +29,22 @@ export enum PublishMode {
   QUEUE = 'queue',
 }
 
+export enum ContentType {
+  POST = 'post',
+  STORY = 'story',
+  REEL = 'reel',
+}
+
+export interface StoryOptions {
+  expiresAt?: Date;
+  link?: string;
+}
+
+export interface ReelOptions {
+  audioName?: string;
+  shareToFeed?: boolean;
+}
+
 export interface PlatformContent {
   platform: string;
   text?: string;
@@ -47,6 +63,9 @@ export interface IPost extends Document {
   mediaIds: mongoose.Types.ObjectId[]; // NEW: Reference to Media model
   status: PostStatus;
   publishMode?: PublishMode; // NEW: How post should be published
+  contentType?: ContentType; // NEW: Post type (post/story/reel)
+  storyOptions?: StoryOptions; // NEW: Story-specific options
+  reelOptions?: ReelOptions; // NEW: Reel-specific options
   /**
    * Scheduled publish time (ALWAYS stored in UTC)
    * 
@@ -163,6 +182,25 @@ const PostSchema = new Schema<IPost>(
     publishMode: {
       type: String,
       enum: Object.values(PublishMode),
+    },
+    contentType: {
+      type: String,
+      enum: Object.values(ContentType),
+      default: ContentType.POST,
+    },
+    storyOptions: {
+      type: {
+        expiresAt: { type: Date },
+        link: { type: String },
+      },
+      required: false,
+    },
+    reelOptions: {
+      type: {
+        audioName: { type: String },
+        shareToFeed: { type: Boolean, default: true },
+      },
+      required: false,
     },
     scheduledAt: {
       type: Date,

@@ -27,7 +27,7 @@ const PLATFORM_NAMES: Record<SocialPlatform, string> = {
 };
 
 export function PostPreviewPanel() {
-  const { mainContent, platformContent, media, selectedAccounts } = useComposerStore();
+  const { mainContent, platformContent, media, selectedAccounts, contentType } = useComposerStore();
   const { accounts } = useSocialAccountStore();
 
   // Get unique platforms from selected accounts
@@ -135,6 +135,7 @@ export function PostPreviewPanel() {
               media={media}
               accountUsername={getAccountInfo('instagram')?.accountId}
               accountAvatar={getAccountInfo('instagram')?.metadata?.avatarUrl}
+              contentType={contentType}
             />
           )}
           {activeTab === 'facebook' && (

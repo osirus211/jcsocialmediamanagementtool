@@ -5,6 +5,7 @@ import { composerService } from '@/services/composer.service';
 import { SocialPlatform, PublishMode, PLATFORM_LIMITS } from '@/types/composer.types';
 import { StatusBar } from './StatusBar';
 import { AccountSelector } from '../posts/AccountSelector';
+import { ContentTypeSelector } from './ContentTypeSelector';
 import { ContentSection } from './ContentSection';
 import { MediaUploadSection } from './MediaUploadSection';
 import { PublishModeSelector } from './PublishModeSelector';
@@ -37,6 +38,8 @@ export function ComposerContainer({
     lastSaved,
     saveError,
     hasUnsavedChanges,
+    contentType,
+    reelOptions,
     setContent,
     setSelectedAccounts,
     setPublishMode,
@@ -271,12 +274,18 @@ export function ComposerContainer({
       // Prepare publish request
       const publishRequest: any = {
         publishMode,
+        contentType,
       };
 
       if (publishMode === PublishMode.SCHEDULE && scheduledDate) {
         publishRequest.scheduledAt = scheduledDate.toISOString();
       } else if (publishMode === PublishMode.QUEUE && selectedQueueSlot) {
         publishRequest.queueSlot = selectedQueueSlot.slotId;
+      }
+
+      // Add reel options if content type is reel
+      if (contentType === 'reel') {
+        publishRequest.reelOptions = reelOptions;
       }
 
       // Publish
@@ -377,6 +386,14 @@ export function ComposerContainer({
                 multiSelect
               />
             </section>
+
+            {/* Content Type Selector (Instagram only) */}
+            {selectedPlatforms.includes('instagram') && (
+              <section aria-labelledby="content-type-label">
+                <h2 id="content-type-label" className="sr-only">Content type</h2>
+                <ContentTypeSelector />
+              </section>
+            )}
 
             {/* Content Section */}
             <section aria-labelledby="content-section-label">
