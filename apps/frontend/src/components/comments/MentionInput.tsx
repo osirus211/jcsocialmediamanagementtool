@@ -44,7 +44,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   
-  const { members, fetchMembers } = useWorkspaceStore();
+  const { members, fetchMembers, currentWorkspaceId } = useWorkspaceStore();
 
   // Debounced member search
   useEffect(() => {
@@ -86,8 +86,10 @@ export const MentionInput: React.FC<MentionInputProps> = ({
 
   // Load members on mount
   useEffect(() => {
-    fetchMembers();
-  }, [fetchMembers]);
+    if (currentWorkspaceId) {
+      fetchMembers(currentWorkspaceId);
+    }
+  }, [fetchMembers, currentWorkspaceId]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
