@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { AnalyticsController } from '../../controllers/AnalyticsController';
 import { FollowerAnalyticsService } from '../../services/FollowerAnalyticsService';
+import { HashtagAnalyticsService } from '../../services/HashtagAnalyticsService';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
 import { z } from 'zod';
@@ -138,6 +139,103 @@ router.get('/followers/workspace', async (req, res) => {
     const growth = await FollowerAnalyticsService.getWorkspaceFollowerGrowth(workspaceId, startDate, endDate);
     
     res.json({ success: true, data: growth });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/hashtags
+ * @desc    Get hashtag performance metrics for workspace
+ * @access  Private (requires auth + workspace)
+ * @query   startDate, endDate, limit (optional)
+ */
+router.get('/hashtags', async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+      endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+      limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 20),
+    });
+
+    const { startDate, endDate, limit } = schema.parse(req.query);
+    const workspaceId = req.workspace._id.toString();
+    
+    const hashtags = await HashtagAnalyticsService.getHashtagPerformance(workspaceId, startDate, endDate, limit);
+    
+    res.json({ success: true, data: hashtags });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/hashtags/trends
+ * @desc    Get hashtag trends over time
+ * @access  Private (requires auth + workspace)
+ * @query   hashtag (required), startDate, endDate (optional)
+ */
+router.get('/hashtags/trends', async (req, res) => {
+  try {
+    const schema = z.object({
+      hashtag: z.string().min(1, 'Hashtag is required'),
+      startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+      endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    });
+
+    const { hashtag, startDate, endDate } = schema.parse(req.query);
+    const workspaceId = req.workspace._id.toString();
+    
+    const trends = await HashtagAnalyticsService.getHashtagTrends(workspaceId, hashtag, startDate, endDate);
+    
+    res.json({ success: true, data: trends });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/hashtags/by-platform
+ * @desc    Get top hashtags by platform
+ * @access  Private (requires auth + workspace)
+ * @query   platform (required), limit (optional)
+ */
+router.get('/hashtags/by-platform', async (req, res) => {
+  try {
+    const schema = z.object({
+      platform: z.string().min(1, 'Platform is required'),
+      limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 20),
+    });
+
+    const { platform, limit } = schema.parse(req.query);
+    const workspaceId = req.workspace._id.toString();
+    
+    const hashtags = await HashtagAnalyticsService.getTopHashtagsByPlatform(workspaceId, platform, limit);
+    
+    res.json({ success: true, data: hashtags });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/hashtags/suggestions
+ * @desc    Get hashtag suggestions based on performance
+ * @access  Private (requires auth + workspace)
+ * @query   limit (optional)
+ */
+router.get('/hashtags/suggestions', async (req, res) => {
+  try {
+    const schema = z.object({
+      limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 10),
+    });
+
+    const { limit } = schema.parse(req.query);
+    const workspaceId = req.workspace._id.toString();
+    
+    const suggestions = await HashtagAnalyticsService.getHashtagSuggestions(workspaceId, limit);
+    
+    res.json({ success: true, data: suggestions });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error.message });
   }

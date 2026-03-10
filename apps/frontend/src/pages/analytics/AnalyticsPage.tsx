@@ -4,6 +4,9 @@ import { OptimalTimeSuggestions } from '@/components/analytics/OptimalTimeSugges
 import { EngagementChart } from '@/components/analytics/EngagementChart';
 import { FollowerGrowthSummary } from '@/components/analytics/FollowerGrowthSummary';
 import { FollowerGrowthChart } from '@/components/analytics/FollowerGrowthChart';
+import { HashtagSuggestions } from '@/components/analytics/HashtagSuggestions';
+import { HashtagPerformanceTable } from '@/components/analytics/HashtagPerformanceTable';
+import { HashtagTrendChart } from '@/components/analytics/HashtagTrendChart';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', icon: '📊' },
@@ -18,8 +21,17 @@ const PLATFORMS = [
 
 export function AnalyticsPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
+  const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null);
 
   const platformForAPI = selectedPlatform === 'all' ? undefined : selectedPlatform;
+
+  const handleHashtagClick = (hashtag: string) => {
+    setSelectedHashtag(hashtag);
+  };
+
+  const handleCloseHashtagTrend = () => {
+    setSelectedHashtag(null);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -54,7 +66,34 @@ export function AnalyticsPage() {
       </div>
 
       <div className="space-y-12">
-        {/* Section 1: Follower Growth */}
+        {/* Section 1: Hashtag Performance */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Hashtag Performance</h2>
+            <p className="mt-2 text-gray-600">
+              Discover which hashtags drive the most engagement
+            </p>
+          </div>
+          
+          <div className="space-y-6">
+            <HashtagSuggestions />
+            <HashtagPerformanceTable onHashtagClick={handleHashtagClick} />
+            
+            {/* Hashtag Trend Modal/Panel */}
+            {selectedHashtag && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                  <HashtagTrendChart 
+                    hashtag={selectedHashtag} 
+                    onClose={handleCloseHashtagTrend}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Section 2: Follower Growth */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Follower Growth</h2>
@@ -69,7 +108,7 @@ export function AnalyticsPage() {
           </div>
         </section>
 
-        {/* Section 2: Best Times to Post */}
+        {/* Section 3: Best Times to Post */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Best Times to Post</h2>
@@ -83,7 +122,7 @@ export function AnalyticsPage() {
           </div>
         </section>
 
-        {/* Section 3: AI Suggestions */}
+        {/* Section 4: AI Suggestions */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">AI Suggestions</h2>
@@ -97,7 +136,7 @@ export function AnalyticsPage() {
           </div>
         </section>
 
-        {/* Section 4: Engagement Trends */}
+        {/* Section 5: Engagement Trends */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Engagement Trends</h2>
