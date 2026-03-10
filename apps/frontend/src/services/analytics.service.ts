@@ -3,7 +3,7 @@
  * Frontend service for analytics API calls
  */
 
-import { apiClient } from '@/lib/api';
+import { apiClient } from '@/lib/api-client';
 
 export interface HeatmapData {
   dayOfWeek: number;
@@ -38,7 +38,7 @@ class AnalyticsService {
       `/analytics/best-times?${params.toString()}`
     );
 
-    return response.data.data;
+    return response.data;
   }
 }
 
