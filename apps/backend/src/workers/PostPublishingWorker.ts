@@ -145,11 +145,11 @@ export class PostPublishingWorker {
           duration,
           attemptNumber,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         const duration = Date.now() - startTime;
 
         // Record span exception
-        recordSpanException(error);
+        recordSpanException(error instanceof Error ? error : new Error(String(error)));
 
         // Classify error and determine retry strategy
         const errorInfo = classifyPublishingError(error);
@@ -157,7 +157,7 @@ export class PostPublishingWorker {
         logger.error('Post publishing failed', {
           postId,
           platform,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           errorCategory: errorInfo.category,
           shouldRetry: errorInfo.shouldRetry,
           attemptNumber,

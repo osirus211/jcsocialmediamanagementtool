@@ -76,10 +76,10 @@ export class RSSCollectorWorker {
         // Update feed failure count
         try {
           await this.incrementFeedFailureCount(job.data.feedId);
-        } catch (updateError: any) {
+        } catch (updateError: unknown) {
           logger.error('Failed to update feed failure count', {
             feedId: job.data.feedId,
-            error: updateError.message,
+            error: updateError instanceof Error ? updateError.message : String(updateError),
           });
         }
       }
@@ -209,9 +209,9 @@ export class RSSCollectorWorker {
           retryCount: 1,
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if this is a lock acquisition error
-      if (error.name === 'LockAcquisitionError') {
+      if (error instanceof Error && error.name === 'LockAcquisitionError') {
         logger.info('RSS collection already in progress by another worker', {
           feedId,
           feedUrl,
@@ -227,14 +227,14 @@ export class RSSCollectorWorker {
       logger.error('RSS collection failed', {
         feedId,
         feedUrl,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         duration,
       });
 
       // Update feed with error information
       try {
         await RSSFeed.findByIdAndUpdate(feedId, {
-          lastError: error.message,
+          lastError: error instanceof Error ? error.message : String(error),
           $inc: { failureCount: 1 },
         });
 
@@ -251,10 +251,10 @@ export class RSSCollectorWorker {
             failureCount: feed.failureCount,
           });
         }
-      } catch (updateError: any) {
+      } catch (updateError: unknown) {
         logger.error('Failed to update feed error information', {
           feedId,
-          error: updateError.message,
+          error: updateError instanceof Error ? updateError.message : String(updateError),
         });
       }
 
@@ -284,10 +284,10 @@ export class RSSCollectorWorker {
           failureCount: feed.failureCount,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to increment feed failure count', {
         feedId,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }

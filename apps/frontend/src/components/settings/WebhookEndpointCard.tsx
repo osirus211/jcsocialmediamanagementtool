@@ -103,10 +103,10 @@ export function WebhookEndpointCard({ webhook, onEdit, onDelete, onUpdate }: Web
     try {
       const result = await webhooksService.testEndpoint(webhook._id);
       setTestResult(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setTestResult({
         success: false,
-        error: error.response?.data?.error || 'Test failed',
+        error: error instanceof Error ? error.message : 'Test failed',
       });
     } finally {
       setIsTesting(false);

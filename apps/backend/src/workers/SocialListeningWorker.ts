@@ -164,9 +164,9 @@ export class SocialListeningWorker {
           retryCount: 1,
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if this is a lock acquisition error
-      if (error.name === 'LockAcquisitionError') {
+      if (error instanceof Error && error.name === 'LockAcquisitionError') {
         logger.info('Social listening job already in progress by another worker', {
           jobId: job.id,
           workspaceId,
@@ -185,7 +185,7 @@ export class SocialListeningWorker {
         workspaceId,
         platform,
         jobType,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         duration,
       });
 

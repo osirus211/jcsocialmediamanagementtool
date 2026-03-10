@@ -111,8 +111,8 @@ export function WebhookEndpointForm({ isOpen, onClose, onSuccess, webhook }: Web
         setDescription('');
         setSelectedEvents([]);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save webhook endpoint');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save webhook endpoint');
     } finally {
       setIsSubmitting(false);
     }

@@ -28,7 +28,7 @@ export class NotificationWorker {
         return this.processNotification(job);
       },
       {
-        connection: getRedisClient() as any,
+        connection: getRedisClient(),
         concurrency: 10,
       }
     );
@@ -90,7 +90,7 @@ export class NotificationWorker {
       const latency = (Date.now() - startTime) / 1000;
       recordNotificationSent(eventType);
       recordNotificationLatency(eventType, latency);
-    } catch (error: any) {
+    } catch (error: unknown) {
       recordNotificationFailed(eventType);
       logger.error('Failed to process notification:', error);
       throw error;

@@ -175,13 +175,13 @@ export class TikTokPublisherWorker {
         platformPostId: result.platformPostId,
         duration,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
       const errorInfo = classifyPublishingError(error);
 
       logger.error('TikTok post publishing failed', {
         postId,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         errorCategory: errorInfo.category,
         shouldRetry: errorInfo.shouldRetry,
       });

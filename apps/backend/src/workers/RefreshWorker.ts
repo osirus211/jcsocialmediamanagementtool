@@ -226,7 +226,7 @@ export class RefreshWorker {
         // Otherwise, throw for retry
         throw new Error(`Token refresh failed: ${result.error}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const currentAttempt = job.attemptsMade + 1;
       const maxAttempts = job.opts.attempts || 5;
       const duration = Date.now() - startTime;
@@ -235,7 +235,7 @@ export class RefreshWorker {
         jobId: job.id,
         accountId,
         platform,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         currentAttempt,
         maxAttempts,
         duration,
@@ -253,10 +253,10 @@ export class RefreshWorker {
       if (refreshLock) {
         try {
           await distributedLockService.releaseLock(refreshLock);
-        } catch (lockError: any) {
+        } catch (lockError: unknown) {
           logger.error('Failed to release refresh lock', {
             accountId,
-            error: lockError.message,
+            error: lockError instanceof Error ? lockError.message : String(lockError),
           });
         }
       }

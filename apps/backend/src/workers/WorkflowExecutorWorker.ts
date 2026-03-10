@@ -208,9 +208,9 @@ export class WorkflowExecutorWorker {
           retryCount: 1,
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if this is a lock acquisition error
-      if (error.name === 'LockAcquisitionError') {
+      if (error instanceof Error && error.name === 'LockAcquisitionError') {
         logger.info('Workflow execution already in progress by another worker', {
           workflowId,
           runId,
@@ -237,10 +237,10 @@ export class WorkflowExecutorWorker {
           error: error.message,
           completedAt: new Date(),
         });
-      } catch (updateError: any) {
+      } catch (updateError: unknown) {
         logger.error('Failed to update workflow run status', {
           runId,
-          error: updateError.message,
+          error: updateError instanceof Error ? updateError.message : 'Unknown error',
         });
       }
 

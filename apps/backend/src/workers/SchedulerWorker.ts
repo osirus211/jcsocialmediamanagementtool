@@ -89,7 +89,7 @@ export class SchedulerWorker {
   /**
    * Process scheduler job
    */
-  private async processJob(job: Job<SchedulerJobData>): Promise<any> {
+  private async processJob(job: Job<SchedulerJobData>): Promise<Record<string, unknown>> {
     const startTime = Date.now();
     const { timestamp, runId } = job.data;
 
@@ -118,13 +118,13 @@ export class SchedulerWorker {
         try {
           await this.processPost(post, runId);
           this.metrics.posts_processed_total++;
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.metrics.errors_total++;
           logger.error('Failed to process post', {
             worker: 'scheduler',
             runId,
             postId: post._id,
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
           });
           // Continue with next post
         }
@@ -145,13 +145,13 @@ export class SchedulerWorker {
         postsProcessed: posts.length,
         duration_ms: duration,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.metrics.errors_total++;
       
       logger.error('Scheduler run failed', {
         worker: 'scheduler',
         runId,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         duration_ms: Date.now() - startTime,
       });
 
@@ -162,7 +162,7 @@ export class SchedulerWorker {
   /**
    * Get eligible posts for scheduling
    */
-  private async getEligiblePosts(): Promise<any[]> {
+  private async getEligiblePosts(): Promise<Record<string, unknown>[]> {
     const now = new Date();
 
     const posts = await Post.find({
@@ -181,7 +181,7 @@ export class SchedulerWorker {
    * Process a single post
    * Creates fanout jobs for all platforms
    */
-  private async processPost(post: any, runId: string): Promise<void> {
+  private async processPost(post: Record<string, unknown>, runId: string): Promise<void> {
     const postId = post._id.toString();
 
     logger.info('Processing scheduled post', {
@@ -192,7 +192,7 @@ export class SchedulerWorker {
     });
 
     // MULTI-PLATFORM FANOUT: Determine which accounts to publish to
-    const accountIds = post.socialAccountIds && post.socialAccountIds.length > 0
+    const accountIds = (post.socialAccountIds && Array.isArray(post.socialAccountIds) && post.socialAccountIds.length > 0)
       ? post.socialAccountIds
       : [post.socialAccountId];
 
@@ -208,7 +208,7 @@ export class SchedulerWorker {
         worker: 'scheduler',
         runId,
         postId,
-        accountIds: accountIds.map((id: any) => id.toString()),
+        accountIds: accountIds.map((id: unknown) => String(id)),
       });
       
       // Mark post as failed
@@ -232,11 +232,11 @@ export class SchedulerWorker {
       try {
         await postingQueue.addPost({
           postId,
-          workspaceId: post.workspaceId.toString(),
+          workspaceId: String(post.workspaceId),
           socialAccountId: account._id.toString(),
           platform: account.provider,
-          retryCount: post.retryCount || 0,
-          scheduledAt: post.scheduledAt?.toISOString(),
+          retryCount: typeof post.retryCount === 'number' ? post.retryCount : 0,
+          scheduledAt: post.scheduledAt instanceof Date ? post.scheduledAt.toISOString() : undefined,
         });
 
         this.metrics.jobs_created_total++;
@@ -248,13 +248,13 @@ export class SchedulerWorker {
           platform: account.provider,
           socialAccountId: account._id.toString(),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Failed to create fanout job', {
           worker: 'scheduler',
           runId,
           postId,
           platform: account.provider,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
         // Continue with other platforms
       }

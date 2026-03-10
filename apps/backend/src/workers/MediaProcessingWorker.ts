@@ -107,7 +107,7 @@ export class MediaProcessingWorker {
       const mediaBuffer = await this.fetchMediaFile(fileUrl);
 
       // Process based on media type
-      let processedData: any = {};
+      let processedData: Record<string, unknown> = {};
 
       if (mediaType === 'image' || mediaType === 'gif') {
         processedData = await this.processImage(mediaBuffer);
@@ -149,11 +149,11 @@ export class MediaProcessingWorker {
         mediaType,
         duration,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Media processing failed', {
         mediaId,
         platform,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
 
       // Import MediaService dynamically
@@ -188,10 +188,10 @@ export class MediaProcessingWorker {
       });
 
       return Buffer.from(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to fetch media file', {
         fileUrl,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw new Error(`Failed to fetch media file: ${error.message}`);
     }
@@ -235,9 +235,9 @@ export class MediaProcessingWorker {
           hasAlpha: metadata.hasAlpha,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Image processing failed', {
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -300,9 +300,9 @@ export class MediaProcessingWorker {
           logger.warn('Failed to clean up temporary files', { cleanupError });
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Video processing failed', {
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }

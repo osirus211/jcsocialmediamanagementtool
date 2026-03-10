@@ -100,7 +100,7 @@ export class TokenRefreshWorker {
    */
   private setupErrorHandlers(): void {
     // Capture unhandled errors in worker context
-    process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
       logger.error('Unhandled rejection in token refresh worker', { reason });
       
       captureException(reason instanceof Error ? reason : new Error(String(reason)), {
@@ -143,11 +143,11 @@ export class TokenRefreshWorker {
         await this.refreshAccountToken(account);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Token refresh poll error', error);
       
       // Capture poll-level errors to Sentry
-      captureException(error, {
+      captureException(error instanceof Error ? error : new Error(String(error)), {
         level: 'error',
         tags: {
           worker: 'token-refresh',
@@ -219,9 +219,9 @@ export class TokenRefreshWorker {
           retryCount: 1, // Don't retry - if another worker has it, skip
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Lock acquisition failed - another worker is processing
-      if (error.name === 'LockAcquisitionError') {
+      if (error instanceof Error && error.name === 'LockAcquisitionError') {
         logger.info('Token refresh already in progress by another worker', { 
           accountId,
           provider: account.provider 
@@ -294,12 +294,12 @@ export class TokenRefreshWorker {
           await this.sleep(delay);
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error('Token refresh attempt failed', {
           accountId,
           provider: account.provider,
           attempt: attempt + 1,
-          error: err.message,
+          error: err instanceof Error ? err.message : String(err),
         });
 
         // Capture final failure to Sentry
@@ -315,7 +315,7 @@ export class TokenRefreshWorker {
             }
           );
 
-          captureException(err, {
+          captureException(err instanceof Error ? err : new Error(String(err)), {
             level: 'error',
             tags: {
               worker: 'token-refresh',
@@ -399,7 +399,7 @@ export class TokenRefreshWorker {
         expiresAt: newToken.expiresAt || new Date(Date.now() + 3600 * 1000), // Default 1 hour if not provided
       };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle circuit breaker open error
       if (error instanceof CircuitBreakerOpenError) {
         logger.warn('Circuit breaker is open for account', {
@@ -421,8 +421,8 @@ export class TokenRefreshWorker {
       logger.error('Platform token refresh failed', {
         accountId: account._id.toString(),
         provider: account.provider,
-        error: error.message,
-        statusCode: error.response?.status,
+        error: error instanceof Error ? error.message : String(error),
+        statusCode: error instanceof Error && 'response' in error ? (error as any).response?.status : undefined,
       });
 
       // Classify error using platform-specific error handler
@@ -489,7 +489,7 @@ export class TokenRefreshWorker {
     const encryptedAccessToken = encrypt(accessToken);
     const encryptedRefreshToken = refreshToken ? encrypt(refreshToken) : undefined;
 
-    const update: any = {
+    const update: Record<string, unknown> = {
       $set: {
         accessToken: encryptedAccessToken,
         tokenExpiresAt: expiresAt,
@@ -568,7 +568,7 @@ export class TokenRefreshWorker {
    * @param platform - Social platform name
    * @returns Error classification with type and recommended action
    */
-  private classifyError(error: any, platform: SocialPlatform): ErrorClassification {
+  private classifyError(error: unknown, platform: SocialPlatform): ErrorClassification {
     const handler = this.errorHandlers[platform];
     
     if (!handler) {
@@ -576,7 +576,7 @@ export class TokenRefreshWorker {
       return {
         type: 'transient',
         action: 'retry',
-        message: error.message || 'Unknown error',
+        message: error instanceof Error ? error.message : String(error),
       };
     }
 

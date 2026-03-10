@@ -37,7 +37,7 @@ dotenv.config();
 console.log('✓ dotenv configured');
 
 // Import worker AFTER Redis is connected
-let publishingWorker: any;
+let publishingWorker: unknown;
 
 let isShuttingDown = false;
 
@@ -114,9 +114,11 @@ const startWorker = async () => {
       publishingWorker.start();
       console.log('✓ Worker started');
       logger.info('✅ Publishing worker started successfully');
-    } catch (error: any) {
-      console.error('ERROR starting worker:', error.message);
-      console.error('Stack:', error.stack);
+    } catch (error: unknown) {
+      console.error('ERROR starting worker:', error instanceof Error ? error.message : 'Unknown error');
+      if (error instanceof Error) {
+        console.error('Stack:', error.stack);
+      }
       throw error;
     }
 

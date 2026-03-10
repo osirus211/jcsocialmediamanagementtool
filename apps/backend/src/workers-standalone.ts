@@ -52,10 +52,10 @@ async function startWorkers() {
         console.log('✅ WorkerManager registered with Redis recovery service\n');
         logger.info('✅ WorkerManager registered with Redis recovery service');
       }
-    } catch (error: any) {
-      console.log('⚠️  Failed to register WorkerManager with recovery service:', error.message);
+    } catch (error: unknown) {
+      console.log('⚠️  Failed to register WorkerManager with recovery service:', error instanceof Error ? error.message : 'Unknown error');
       logger.warn('Failed to register WorkerManager with recovery service', {
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
 
@@ -174,9 +174,11 @@ async function startWorkers() {
       monitoring: queueMonitoringService.getStatus(),
     });
 
-  } catch (error: any) {
-    console.error('\n❌ Failed to start workers:', error.message);
-    console.error(error.stack);
+  } catch (error: unknown) {
+    console.error('\n❌ Failed to start workers:', error instanceof Error ? error.message : 'Unknown error');
+    if (error instanceof Error) {
+      console.error(error.stack);
+    }
     process.exit(1);
   }
 }

@@ -6,6 +6,11 @@ interface CompetitorGrowthChartProps {
   competitors: CompetitorAccount[];
 }
 
+interface GrowthDataPoint {
+  date: string;
+  [key: string]: number | string;
+}
+
 const COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
 
 export function CompetitorGrowthChart({ competitors }: CompetitorGrowthChartProps) {
@@ -53,7 +58,7 @@ export function CompetitorGrowthChart({ competitors }: CompetitorGrowthChartProp
 
       // Transform data for chart
       const chartData = dates.map(date => {
-        const dataPoint: any = { date };
+        const dataPoint: GrowthDataPoint = { date };
 
         // Add your account data (placeholder)
         dataPoint['Your Account'] = 5000 + Math.random() * 100; // Placeholder growth

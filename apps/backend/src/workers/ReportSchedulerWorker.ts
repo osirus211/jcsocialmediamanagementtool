@@ -81,8 +81,8 @@ export class ReportSchedulerWorker {
       );
 
       logger.info('ReportSchedulerWorker started successfully');
-    } catch (error: any) {
-      logger.error('Failed to start ReportSchedulerWorker', { error: error.message });
+    } catch (error: unknown) {
+      logger.error('Failed to start ReportSchedulerWorker', { error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
@@ -125,12 +125,12 @@ export class ReportSchedulerWorker {
           reportsProcessed++;
           this.metrics.reports_processed_total++;
           this.metrics.reports_sent_total++;
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.metrics.errors_total++;
           logger.error('Failed to process report', {
             reportId: report._id.toString(),
             reportName: report.name,
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
           });
           // Continue processing other reports even if one fails
         }
@@ -143,10 +143,10 @@ export class ReportSchedulerWorker {
       });
 
       return { reportsProcessed };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.metrics.errors_total++;
       logger.error('Scheduled reports processing failed', {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         duration: `${Date.now() - startTime}ms`,
       });
       throw error;
@@ -156,7 +156,7 @@ export class ReportSchedulerWorker {
   /**
    * Process individual report
    */
-  private async processReport(report: any): Promise<void> {
+  private async processReport(report: Record<string, unknown>): Promise<void> {
     try {
       logger.info('Processing report', {
         reportId: report._id.toString(),
@@ -168,85 +168,103 @@ export class ReportSchedulerWorker {
       // Calculate date range
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - report.dateRange);
+      const dateRange = typeof report.dateRange === 'number' ? report.dateRange : 7;
+      startDate.setDate(startDate.getDate() - dateRange);
 
       // Generate report
       let buffer: Buffer;
-      if (report.format === 'pdf') {
+      const workspaceId = typeof report.workspaceId === 'object' && report.workspaceId && '_id' in report.workspaceId 
+        ? String((report.workspaceId as any)._id) 
+        : String(report.workspaceId);
+      const reportType = String(report.reportType);
+      const format = String(report.format);
+      const platforms = Array.isArray(report.platforms) && report.platforms.length > 0 
+        ? report.platforms.map(p => String(p))
+        : undefined;
+
+      if (format === 'pdf') {
         buffer = await ReportGeneratorService.generatePDF(
-          report.workspaceId._id.toString(),
-          report.reportType,
+          workspaceId,
+          reportType,
           startDate,
           endDate,
-          report.platforms.length > 0 ? report.platforms : undefined
+          platforms
         );
       } else {
         buffer = await ReportGeneratorService.generateCSV(
-          report.workspaceId._id.toString(),
-          report.reportType,
+          workspaceId,
+          reportType,
           startDate,
           endDate,
-          report.platforms.length > 0 ? report.platforms : undefined
+          platforms
         );
       }
 
       // Send email
-      await ReportGeneratorService.sendReportEmail(report, buffer, report.format);
+      await ReportGeneratorService.sendReportEmail(report, buffer, format);
 
       // Update report timestamps
       const now = new Date();
-      report.lastSentAt = now;
+      const reportDoc = report as any; // Cast for property access
+      reportDoc.lastSentAt = now;
       
       // Calculate next send date based on frequency
-      switch (report.frequency) {
+      const frequency = String(report.frequency);
+      switch (frequency) {
         case 'daily':
-          report.nextSendAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          reportDoc.nextSendAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
           break;
         case 'weekly':
-          report.nextSendAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          reportDoc.nextSendAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
           break;
         case 'monthly':
           const nextMonth = new Date(now);
           nextMonth.setMonth(nextMonth.getMonth() + 1);
-          report.nextSendAt = nextMonth;
+          reportDoc.nextSendAt = nextMonth;
           break;
       }
 
-      await report.save();
+      await reportDoc.save();
 
       logger.info('Report processed successfully', {
-        reportId: report._id.toString(),
-        nextSendAt: report.nextSendAt.toISOString(),
+        reportId: String(report._id),
+        nextSendAt: reportDoc.nextSendAt.toISOString(),
       });
 
       // Fire webhook event for report generation
       try {
         const { webhookService, WebhookEventType } = await import('../services/WebhookService');
+        const reportWorkspaceId = typeof report.workspaceId === 'object' && report.workspaceId && '_id' in report.workspaceId 
+          ? String((report.workspaceId as any)._id) 
+          : String(report.workspaceId);
+        const recipients = Array.isArray(report.recipients) ? report.recipients : [];
+        const reportPlatforms = Array.isArray(report.platforms) ? report.platforms.map(p => String(p)) : [];
+
         await webhookService.sendWebhook({
-          workspaceId: report.workspaceId._id.toString(),
+          workspaceId: reportWorkspaceId,
           event: WebhookEventType.REPORT_GENERATED,
           payload: {
-            reportId: report._id.toString(),
-            reportName: report.name,
-            reportType: report.reportType,
-            format: report.format,
-            recipientCount: report.recipients.length,
-            dateRange: report.dateRange,
-            platforms: report.platforms,
+            reportId: String(report._id),
+            reportName: String(report.name),
+            reportType: String(report.reportType),
+            format: format,
+            recipientCount: recipients.length,
+            dateRange: dateRange,
+            platforms: reportPlatforms,
             generatedAt: now,
-            nextSendAt: report.nextSendAt,
+            nextSendAt: reportDoc.nextSendAt,
           },
         });
-      } catch (webhookError: any) {
+      } catch (webhookError: unknown) {
         logger.warn('Failed to send REPORT_GENERATED webhook (non-blocking)', {
-          reportId: report._id.toString(),
-          error: webhookError.message,
+          reportId: String(report._id),
+          error: webhookError instanceof Error ? webhookError.message : String(webhookError),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to process individual report', {
-        reportId: report._id.toString(),
-        error: error.message,
+        reportId: String(report._id),
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
