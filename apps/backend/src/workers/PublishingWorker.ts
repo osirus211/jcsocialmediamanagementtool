@@ -1080,6 +1080,28 @@ export class PublishingWorker {
         status: 'success',
       });
 
+      // Fire webhook event for successful publish
+      try {
+        const { webhookService, WebhookEventType } = await import('../services/WebhookService');
+        await webhookService.sendWebhook({
+          workspaceId: post.workspaceId.toString(),
+          event: WebhookEventType.POST_PUBLISHED,
+          payload: {
+            postId: postId.toString(),
+            platform: account.provider,
+            publishedAt: updated.publishedAt || new Date(),
+            url: result.platformPostId ? `https://${account.provider}.com/post/${result.platformPostId}` : undefined,
+            platformPostId: result.platformPostId,
+            content: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+          },
+        });
+      } catch (webhookError: any) {
+        logger.warn('Failed to send POST_PUBLISHED webhook (non-blocking)', {
+          postId,
+          error: webhookError.message,
+        });
+      }
+
       // Emit post.published event for workflow automation
       try {
         const { EventDispatcherService } = await import('../services/EventDispatcherService');
@@ -1295,6 +1317,28 @@ export class PublishingWorker {
             status: 'failed_final',
             error_classification: errorClassification,
           });
+
+          // Fire webhook event for failed publish
+          try {
+            const { webhookService, WebhookEventType } = await import('../services/WebhookService');
+            await webhookService.sendWebhook({
+              workspaceId: post.workspaceId.toString(),
+              event: WebhookEventType.POST_FAILED,
+              payload: {
+                postId: postId.toString(),
+                platform: platform || 'unknown',
+                error: error.message,
+                retryCount: (post?.retryCount || 0),
+                failedAt: new Date(),
+                content: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+              },
+            });
+          } catch (webhookError: any) {
+            logger.warn('Failed to send POST_FAILED webhook (non-blocking)', {
+              postId,
+              error: webhookError.message,
+            });
+          }
 
           // PHASE 6.3: Explicit dead letter queue event
           logger.error('Job moved to dead letter queue', {

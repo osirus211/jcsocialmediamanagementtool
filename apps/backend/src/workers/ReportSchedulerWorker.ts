@@ -218,6 +218,31 @@ export class ReportSchedulerWorker {
         reportId: report._id.toString(),
         nextSendAt: report.nextSendAt.toISOString(),
       });
+
+      // Fire webhook event for report generation
+      try {
+        const { webhookService, WebhookEventType } = await import('../services/WebhookService');
+        await webhookService.sendWebhook({
+          workspaceId: report.workspaceId._id.toString(),
+          event: WebhookEventType.REPORT_GENERATED,
+          payload: {
+            reportId: report._id.toString(),
+            reportName: report.name,
+            reportType: report.reportType,
+            format: report.format,
+            recipientCount: report.recipients.length,
+            dateRange: report.dateRange,
+            platforms: report.platforms,
+            generatedAt: now,
+            nextSendAt: report.nextSendAt,
+          },
+        });
+      } catch (webhookError: any) {
+        logger.warn('Failed to send REPORT_GENERATED webhook (non-blocking)', {
+          reportId: report._id.toString(),
+          error: webhookError.message,
+        });
+      }
     } catch (error: any) {
       logger.error('Failed to process individual report', {
         reportId: report._id.toString(),

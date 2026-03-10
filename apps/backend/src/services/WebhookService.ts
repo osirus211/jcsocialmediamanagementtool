@@ -9,6 +9,16 @@ import axios from 'axios';
 import { logger } from '../utils/logger';
 import { Webhook } from '../models/Webhook';
 
+export enum WebhookEventType {
+  POST_PUBLISHED = 'post.published',
+  POST_FAILED = 'post.failed',
+  ANALYTICS_UPDATED = 'analytics.updated',
+  FOLLOWER_MILESTONE = 'follower.milestone',
+  ENGAGEMENT_SPIKE = 'engagement.spike',
+  REPORT_GENERATED = 'report.generated',
+  COMPETITOR_UPDATED = 'competitor.updated',
+}
+
 export interface WebhookEvent {
   event: string;
   workspaceId: string;

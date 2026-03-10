@@ -164,6 +164,34 @@ export class CompetitorAnalyticsService {
         followerCount: metrics.followerCount,
       });
 
+      // Fire webhook event for competitor metrics update
+      try {
+        const { webhookService, WebhookEventType } = await import('./WebhookService');
+        await webhookService.sendWebhook({
+          workspaceId,
+          event: WebhookEventType.COMPETITOR_UPDATED,
+          payload: {
+            competitorId,
+            platform,
+            metrics: {
+              followerCount: metrics.followerCount,
+              followingCount: metrics.followingCount,
+              postCount: metrics.postCount,
+              engagementRate: metrics.engagementRate,
+              avgLikes: metrics.avgLikes,
+              avgComments: metrics.avgComments,
+              avgShares: metrics.avgShares,
+            },
+            collectedAt: snapshot.collectedAt,
+          },
+        });
+      } catch (webhookError: any) {
+        logger.warn('Failed to send COMPETITOR_UPDATED webhook (non-blocking)', {
+          competitorId,
+          error: webhookError.message,
+        });
+      }
+
       return snapshot;
     } catch (error: any) {
       logger.error('Record competitor metrics error:', error);

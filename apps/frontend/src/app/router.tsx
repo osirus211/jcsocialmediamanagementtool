@@ -24,6 +24,7 @@ import { BulkImportPage } from '@/pages/bulk/BulkImportPage';
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage';
 import { CustomDashboard } from '@/pages/analytics/CustomDashboard';
 import { CompetitorPage } from '@/pages/analytics/CompetitorPage';
+import { WebhooksPage } from '@/pages/settings/WebhooksPage';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -111,6 +112,10 @@ const router = createBrowserRouter([
       {
         path: 'analytics/competitors',
         element: <CompetitorPage />,
+      },
+      {
+        path: 'settings/webhooks',
+        element: <WebhooksPage />,
       },
       {
         path: 'pricing',
