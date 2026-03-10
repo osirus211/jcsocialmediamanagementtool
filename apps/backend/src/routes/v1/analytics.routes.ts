@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { AnalyticsController } from '../../controllers/AnalyticsController';
 import { FollowerAnalyticsService } from '../../services/FollowerAnalyticsService';
 import { HashtagAnalyticsService } from '../../services/HashtagAnalyticsService';
+import { PostROIService } from '../../services/PostROIService';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
 import { z } from 'zod';
@@ -236,6 +237,82 @@ router.get('/hashtags/suggestions', async (req, res) => {
     const suggestions = await HashtagAnalyticsService.getHashtagSuggestions(workspaceId, limit);
     
     res.json({ success: true, data: suggestions });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/post/:postId/performance
+ * @desc    Get comprehensive post performance summary
+ * @access  Private (requires auth + workspace)
+ */
+router.get('/post/:postId/performance', async (req, res) => {
+  try {
+    const schema = z.object({
+      postId: z.string().min(1, 'Post ID is required'),
+    });
+
+    const { postId } = schema.parse(req.params);
+    const workspaceId = req.workspace._id.toString();
+    
+    const performance = await PostROIService.getPostPerformanceSummary(postId, workspaceId);
+    
+    res.json({ success: true, data: performance });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   PATCH /api/v1/analytics/post/:postId/roi
+ * @desc    Update post ROI data
+ * @access  Private (requires auth + workspace)
+ * @body    { adSpend?, estimatedRevenue? }
+ */
+router.patch('/post/:postId/roi', async (req, res) => {
+  try {
+    const paramsSchema = z.object({
+      postId: z.string().min(1, 'Post ID is required'),
+    });
+
+    const bodySchema = z.object({
+      adSpend: z.number().min(0).optional(),
+      estimatedRevenue: z.number().min(0).optional(),
+    });
+
+    const { postId } = paramsSchema.parse(req.params);
+    const { adSpend, estimatedRevenue } = bodySchema.parse(req.body);
+    
+    await PostROIService.updateROI(postId, adSpend, estimatedRevenue);
+    
+    res.json({ success: true, message: 'ROI data updated successfully' });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/posts/top
+ * @desc    Get top performing posts
+ * @access  Private (requires auth + workspace)
+ * @query   sortBy? (engagement|ctr|roi), limit?, startDate?, endDate?
+ */
+router.get('/posts/top', async (req, res) => {
+  try {
+    const schema = z.object({
+      sortBy: z.enum(['engagement', 'ctr', 'roi']).optional().default('engagement'),
+      limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 20),
+      startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+      endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    });
+
+    const { sortBy, limit, startDate, endDate } = schema.parse(req.query);
+    const workspaceId = req.workspace._id.toString();
+    
+    const posts = await PostROIService.getTopPerformingPosts(workspaceId, startDate, endDate, sortBy, limit);
+    
+    res.json({ success: true, data: posts });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error.message });
   }

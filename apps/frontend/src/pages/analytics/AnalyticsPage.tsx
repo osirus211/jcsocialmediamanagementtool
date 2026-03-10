@@ -7,6 +7,7 @@ import { FollowerGrowthChart } from '@/components/analytics/FollowerGrowthChart'
 import { HashtagSuggestions } from '@/components/analytics/HashtagSuggestions';
 import { HashtagPerformanceTable } from '@/components/analytics/HashtagPerformanceTable';
 import { HashtagTrendChart } from '@/components/analytics/HashtagTrendChart';
+import { TopPostsTable } from '@/components/analytics/TopPostsTable';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', icon: '📊' },
@@ -148,6 +149,18 @@ export function AnalyticsPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <EngagementChart selectedPlatform={platformForAPI} />
           </div>
+        </section>
+
+        {/* Section 6: Post Performance */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Post Performance</h2>
+            <p className="mt-2 text-gray-600">
+              Analyze individual post performance and ROI
+            </p>
+          </div>
+          
+          <TopPostsTable />
         </section>
       </div>
     </div>

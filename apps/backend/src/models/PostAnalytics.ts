@@ -27,6 +27,13 @@ export interface IPostAnalytics extends Document {
   engagementRate: number; // (likes + comments + shares) / impressions * 100
   clickThroughRate?: number; // clicks / impressions * 100
   
+  // ROI and attribution metrics
+  linkClicks: number; // clicks from short links attributed to this post
+  costPerClick?: number; // calculated: adSpend / linkClicks
+  adSpend?: number; // manual input, cost of promoting this post
+  estimatedRevenue?: number; // manual input or calculated from conversions
+  roi?: number; // calculated: ((estimatedRevenue - adSpend) / adSpend) * 100
+  
   // Collection metadata
   collectedAt: Date;
   collectionAttempt: number; // 1st, 2nd, 3rd collection
@@ -109,6 +116,24 @@ const PostAnalyticsSchema = new Schema<IPostAnalytics>(
       default: 0,
     },
     
+    // ROI and attribution metrics
+    linkClicks: {
+      type: Number,
+      default: 0,
+    },
+    costPerClick: {
+      type: Number,
+    },
+    adSpend: {
+      type: Number,
+    },
+    estimatedRevenue: {
+      type: Number,
+    },
+    roi: {
+      type: Number,
+    },
+    
     // Collection metadata
     collectedAt: {
       type: Date,
@@ -147,6 +172,20 @@ PostAnalyticsSchema.pre('save', function (next) {
       this.clickThroughRate = (this.clicks / this.impressions) * 100;
     }
   }
+  
+  // Calculate ROI metrics if data is available
+  if (this.adSpend && this.adSpend > 0) {
+    // Calculate cost per click
+    if (this.linkClicks > 0) {
+      this.costPerClick = this.adSpend / this.linkClicks;
+    }
+    
+    // Calculate ROI if revenue is available
+    if (this.estimatedRevenue !== undefined) {
+      this.roi = ((this.estimatedRevenue - this.adSpend) / this.adSpend) * 100;
+    }
+  }
+  
   next();
 });
 
