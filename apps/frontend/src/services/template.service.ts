@@ -44,21 +44,21 @@ class TemplateService {
       this.baseUrl,
       input
     );
-    return response.data.data;
+    return response.data;
   }
 
   async getTemplates(): Promise<PostTemplate[]> {
     const response = await apiClient.get<{ success: boolean; data: PostTemplate[] }>(
       this.baseUrl
     );
-    return response.data.data;
+    return response.data;
   }
 
   async getTemplate(id: string): Promise<PostTemplate> {
     const response = await apiClient.get<{ success: boolean; data: PostTemplate }>(
       `${this.baseUrl}/${id}`
     );
-    return response.data.data;
+    return response.data;
   }
 
   async updateTemplate(id: string, input: UpdateTemplateInput): Promise<PostTemplate> {
@@ -66,7 +66,7 @@ class TemplateService {
       `${this.baseUrl}/${id}`,
       input
     );
-    return response.data.data;
+    return response.data;
   }
 
   async deleteTemplate(id: string): Promise<void> {
@@ -77,7 +77,7 @@ class TemplateService {
     const response = await apiClient.post<{ success: boolean; data: PostTemplate }>(
       `${this.baseUrl}/${id}/apply`
     );
-    return response.data.data;
+    return response.data;
   }
 }
 

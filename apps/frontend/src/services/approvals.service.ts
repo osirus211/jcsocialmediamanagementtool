@@ -4,7 +4,7 @@
  * Handles post approval workflow API calls
  */
 
-import { apiClient } from './api.client';
+import { apiClient } from '../lib/api-client';
 
 export interface ApprovalQueueItem {
   postId: string;

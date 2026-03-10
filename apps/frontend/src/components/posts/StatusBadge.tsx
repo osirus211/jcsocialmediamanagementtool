@@ -43,6 +43,21 @@ const statusConfig: Record<
     color: 'bg-gray-100 text-gray-600',
     icon: '🚫',
   },
+  [PostStatus.PENDING_APPROVAL]: {
+    label: 'Pending Approval',
+    color: 'bg-yellow-100 text-yellow-800',
+    icon: '⏰',
+  },
+  [PostStatus.APPROVED]: {
+    label: 'Approved',
+    color: 'bg-green-100 text-green-800',
+    icon: '✅',
+  },
+  [PostStatus.REJECTED]: {
+    label: 'Rejected',
+    color: 'bg-red-100 text-red-800',
+    icon: '❌',
+  },
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {

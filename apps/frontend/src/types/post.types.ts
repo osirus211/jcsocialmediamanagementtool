@@ -8,6 +8,9 @@ export enum PostStatus {
   PUBLISHED = 'published',
   FAILED = 'failed',
   CANCELLED = 'cancelled',
+  PENDING_APPROVAL = 'pending_approval',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
 }
 
 export interface Post {
@@ -31,6 +34,13 @@ export interface Post {
   createdBy: string | any; // Can be populated
   createdAt: string;
   updatedAt: string;
+  // Approval workflow fields
+  submittedForApprovalAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface CreatePostInput {

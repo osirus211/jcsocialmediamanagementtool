@@ -4,7 +4,7 @@
  * Handles team activity feed API calls
  */
 
-import { apiClient } from './api.client';
+import { apiClient } from '../lib/api-client';
 
 export interface ActivityItem {
   _id: string;

@@ -5,11 +5,11 @@
  */
 
 import React, { useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+// import { formatDistanceToNow } from 'date-fns';
+// import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ApprovalQueueItem as ApprovalItem } from '../../services/approvals.service';
 import { approvalsService } from '../../services/approvals.service';
-import { toast } from 'react-hot-toast';
+// import { toast } from 'react-hot-toast';
 
 interface ApprovalQueueItemProps {
   item: ApprovalItem;
@@ -33,10 +33,10 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
     try {
       await approvalsService.approvePost(item.postId);
       setStatus('approved');
-      toast.success('Post approved successfully');
+      console.log('Post approved successfully');
       onApprove?.(item.postId);
     } catch (error) {
-      toast.error('Failed to approve post');
+      console.error('Failed to approve post');
     } finally {
       setIsApproving(false);
     }
@@ -44,7 +44,7 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
 
   const handleReject = async () => {
     if (!rejectionReason.trim()) {
-      toast.error('Rejection reason is required');
+      console.error('Rejection reason is required');
       return;
     }
 
@@ -53,10 +53,10 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
       await approvalsService.rejectPost(item.postId, rejectionReason);
       setStatus('rejected');
       setShowRejectForm(false);
-      toast.success('Post rejected');
+      console.log('Post rejected');
       onReject?.(item.postId);
     } catch (error) {
-      toast.error('Failed to reject post');
+      console.error('Failed to reject post');
     } finally {
       setIsRejecting(false);
     }
@@ -135,7 +135,7 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
               Scheduled for {new Date(item.scheduledAt).toLocaleString()}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Submitted {formatDistanceToNow(new Date(item.submittedForApprovalAt))} ago
+              Submitted {new Date(item.submittedForApprovalAt).toLocaleDateString()} ago
             </p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <CheckIcon className="w-4 h-4 mr-1" />
+                    <span className="mr-1">✓</span>
                     Approve
                   </>
                 )}
@@ -161,7 +161,7 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
                 onClick={() => setShowRejectForm(true)}
                 className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
-                <XMarkIcon className="w-4 h-4 mr-1" />
+                <span className="mr-1">✗</span>
                 Reject
               </button>
             </>

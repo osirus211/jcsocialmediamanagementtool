@@ -5,10 +5,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { CheckIcon } from '@heroicons/react/24/outline';
+// import { CheckIcon } from '@heroicons/react/24/outline';
 import { ApprovalQueueItem } from './ApprovalQueueItem';
 import { approvalsService, ApprovalQueueItem as ApprovalItem } from '../../services/approvals.service';
-import { toast } from 'react-hot-toast';
+// import { toast } from 'react-hot-toast';
 
 type FilterTab = 'all' | 'awaiting' | 'approved' | 'rejected';
 
@@ -26,7 +26,7 @@ export const ApprovalQueuePanel: React.FC = () => {
       const data = await approvalsService.getPendingApprovals();
       setItems(data);
     } catch (error) {
-      toast.error('Failed to load approvals');
+      console.error('Failed to load approvals');
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export const ApprovalQueuePanel: React.FC = () => {
     );
 
     if (pendingItems.length === 0) {
-      toast.error('No posts to approve');
+      console.error('No posts to approve');
       return;
     }
 
@@ -69,10 +69,10 @@ export const ApprovalQueuePanel: React.FC = () => {
       setApprovedToday(prev => [...prev, ...pendingItems.map(item => item.postId)]);
       setItems(prev => prev.filter(item => !pendingItems.some(pending => pending.postId === item.postId)));
       
-      toast.success(`Approved ${pendingItems.length} posts`);
+      console.log(`Approved ${pendingItems.length} posts`);
       setShowBulkConfirm(false);
     } catch (error) {
-      toast.error('Failed to approve some posts');
+      console.error('Failed to approve some posts');
     } finally {
       setIsBulkApproving(false);
     }
@@ -161,7 +161,7 @@ export const ApprovalQueuePanel: React.FC = () => {
                 onClick={() => setShowBulkConfirm(true)}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
-                <CheckIcon className="w-4 h-4 mr-2" />
+                <span className="mr-2">✓</span>
                 Approve All
               </button>
               

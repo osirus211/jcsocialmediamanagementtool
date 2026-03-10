@@ -5,11 +5,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ClockIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+// import { ClockIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ApprovalQueuePanel } from '../../components/approvals/ApprovalQueuePanel';
 import { ApprovalQueueItem } from '../../components/approvals/ApprovalQueueItem';
 import { approvalsService, ApprovalQueueItem as ApprovalItem } from '../../services/approvals.service';
-import { toast } from 'react-hot-toast';
+// import { toast } from 'react-hot-toast';
 
 export const ApprovalsPage: React.FC = () => {
   const [stats, setStats] = useState({
@@ -26,7 +26,7 @@ export const ApprovalsPage: React.FC = () => {
       const count = await approvalsService.getApprovalCount();
       setStats(prev => ({ ...prev, pending: count }));
     } catch (error) {
-      toast.error('Failed to load approval stats');
+      console.error('Failed to load approval stats');
     } finally {
       setLoadingStats(false);
     }
@@ -37,7 +37,7 @@ export const ApprovalsPage: React.FC = () => {
       const posts = await approvalsService.getMyPendingPosts();
       setMyPosts(posts);
     } catch (error) {
-      toast.error('Failed to load your posts');
+      console.error('Failed to load your posts');
     } finally {
       setLoadingMyPosts(false);
     }
@@ -93,21 +93,21 @@ export const ApprovalsPage: React.FC = () => {
         <StatCard
           title="Pending Approval"
           value={stats.pending}
-          icon={<ClockIcon className="w-6 h-6 text-yellow-600" />}
+          icon={<span className="text-yellow-600">⏰</span>}
           color="bg-yellow-100 dark:bg-yellow-900"
           loading={loadingStats}
         />
         <StatCard
           title="Approved Today"
           value={stats.approvedToday}
-          icon={<CheckIcon className="w-6 h-6 text-green-600" />}
+          icon={<span className="text-green-600">✅</span>}
           color="bg-green-100 dark:bg-green-900"
           loading={loadingStats}
         />
         <StatCard
           title="Rejected Today"
           value={stats.rejectedToday}
-          icon={<XMarkIcon className="w-6 h-6 text-red-600" />}
+          icon={<span className="text-red-600">❌</span>}
           color="bg-red-100 dark:bg-red-900"
           loading={loadingStats}
         />
