@@ -107,6 +107,7 @@ export const VideoTrimmer: React.FC<VideoTrimmerProps> = ({
         type: 'video',
         size: result.size,
         duration: result.duration,
+        mimeType: result.mimeType,
         uploadStatus: 'completed',
       };
 
