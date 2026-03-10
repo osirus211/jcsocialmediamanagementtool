@@ -21,7 +21,7 @@ import { MediaLibraryPage } from '@/pages/media/MediaLibrary';
 import { LinksPage } from '@/pages/links/Links';
 import { EvergreenPage } from '@/pages/evergreen/EvergreenPage';
 import { BulkImportPage } from '@/pages/bulk/BulkImportPage';
-import { SimpleAnalyticsPage } from '@/pages/analytics/SimpleAnalytics';
+import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -100,7 +100,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'analytics',
-        element: <SimpleAnalyticsPage />,
+        element: <AnalyticsPage />,
       },
       {
         path: 'pricing',

@@ -145,6 +145,93 @@ export class AnalyticsController {
   }
 
   /**
+   * Get optimal posting times heatmap and AI suggestions
+   * GET /analytics/best-times
+   */
+  static async getBestTimes(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const { platform } = req.query;
+
+      // Import services
+      const { PostAnalytics } = await import('../models/PostAnalytics');
+      const { PostingTimePredictionService } = await import('../ai/services/posting-time-prediction.service');
+      const mongoose = await import('mongoose');
+
+      // Build aggregation pipeline for heatmap data
+      const matchStage: any = { 
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        engagementRate: { $gt: 0 } // Only posts with engagement data
+      };
+      
+      if (platform) {
+        matchStage.platform = platform;
+      }
+
+      // Get heatmap data - group by day of week and hour
+      const heatmapData = await PostAnalytics.aggregate([
+        { $match: matchStage },
+        {
+          $addFields: {
+            dayOfWeek: { $dayOfWeek: '$recordedAt' }, // 1=Sunday, 7=Saturday
+            hour: { $hour: '$recordedAt' }
+          }
+        },
+        {
+          $group: {
+            _id: { dayOfWeek: '$dayOfWeek', hour: '$hour' },
+            avgEngagement: { $avg: '$engagementRate' },
+            postCount: { $sum: 1 },
+            totalImpressions: { $sum: '$impressions' },
+            totalEngagement: { $sum: { $add: ['$likes', '$comments', '$shares', '$clicks'] } }
+          }
+        },
+        {
+          $project: {
+            dayOfWeek: { $subtract: ['$_id.dayOfWeek', 1] }, // Convert to 0=Sunday, 6=Saturday
+            hour: '$_id.hour',
+            avgEngagement: { $round: ['$avgEngagement', 2] },
+            postCount: 1,
+            _id: 0
+          }
+        },
+        { $sort: { dayOfWeek: 1, hour: 1 } }
+      ]);
+
+      // Get AI suggestions using existing service
+      let suggestions = [];
+      try {
+        const aiResult = await PostingTimePredictionService.predictBestTimes({
+          workspaceId,
+          platform: platform as string,
+          timezone: 'UTC' // Default timezone
+        });
+        
+        suggestions = aiResult.topTimeSlots.map(slot => ({
+          platform: platform || 'all',
+          dayOfWeek: slot.dayOfWeek,
+          hour: slot.hour,
+          score: Math.round(slot.score),
+          reason: `${slot.avgEngagementRate.toFixed(1)}% avg engagement rate`
+        }));
+      } catch (aiError) {
+        logger.warn('AI suggestions failed, using empty array', { error: aiError });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          heatmap: heatmapData,
+          suggestions: suggestions.slice(0, 5) // Top 5 suggestions
+        }
+      });
+    } catch (error: any) {
+      logger.error('Get best times error:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Generate mock analytics for a post (development/testing)
    * POST /analytics/mock/:postId
    */

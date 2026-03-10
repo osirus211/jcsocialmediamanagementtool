@@ -54,6 +54,14 @@ router.get('/posts', AnalyticsController.getTopPosts);
 router.get('/post/:postId', AnalyticsController.getPostAnalytics);
 
 /**
+ * @route   GET /api/v1/analytics/best-times
+ * @desc    Get optimal posting times heatmap and AI suggestions
+ * @access  Private (requires auth + workspace)
+ * @query   platform (optional), workspaceId (required)
+ */
+router.get('/best-times', AnalyticsController.getBestTimes);
+
+/**
  * @route   POST /api/v1/analytics/mock/:postId
  * @desc    Generate mock analytics for a post (development)
  * @access  Private (requires auth + workspace)
