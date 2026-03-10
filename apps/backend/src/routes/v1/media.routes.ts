@@ -5,10 +5,12 @@
  */
 
 import { Router } from 'express';
+import { body, param } from 'express-validator';
 import { uploadController } from '../../controllers/UploadController';
 import { mediaFolderController } from '../../controllers/MediaFolderController';
 import { authenticate } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
+import { validate } from '../../middleware/validate';
 
 const router = Router();
 
@@ -43,5 +45,27 @@ router.get('/:id', uploadController.getMedia.bind(uploadController));
 
 // Delete media
 router.delete('/:id', uploadController.deleteMedia.bind(uploadController));
+
+// Video processing endpoints
+router.post(
+  '/:id/trim',
+  [
+    param('id').isMongoId().withMessage('Invalid media ID'),
+    body('startTime').isNumeric().withMessage('startTime must be a number'),
+    body('endTime').isNumeric().withMessage('endTime must be a number'),
+    validate,
+  ],
+  uploadController.trimVideo.bind(uploadController)
+);
+
+router.post(
+  '/:id/thumbnail',
+  [
+    param('id').isMongoId().withMessage('Invalid media ID'),
+    body('timeOffset').optional().isNumeric().withMessage('timeOffset must be a number'),
+    validate,
+  ],
+  uploadController.generateVideoThumbnail.bind(uploadController)
+);
 
 export default router;

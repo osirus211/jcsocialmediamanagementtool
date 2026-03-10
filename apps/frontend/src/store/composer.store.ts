@@ -65,6 +65,8 @@ interface ComposerActions {
   // Media management
   addMedia: (files: File[]) => Promise<void>;
   removeMedia: (mediaId: string) => void;
+  updateMedia: (mediaId: string, updates: Partial<MediaFile>) => void;
+  replaceMedia: (oldMediaId: string, newMedia: MediaFile) => void;
   updateMediaProgress: (mediaId: string, progress: number) => void;
   updateMediaStatus: (mediaId: string, status: MediaFile['uploadStatus'], errorMessage?: string) => void;
   
@@ -323,6 +325,24 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   removeMedia: (mediaId) => {
     set((state) => ({
       media: state.media.filter((m) => m.id !== mediaId),
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  updateMedia: (mediaId, updates) => {
+    set((state) => ({
+      media: state.media.map((m) =>
+        m.id === mediaId ? { ...m, ...updates } : m
+      ),
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  replaceMedia: (oldMediaId, newMedia) => {
+    set((state) => ({
+      media: state.media.map((m) =>
+        m.id === oldMediaId ? newMedia : m
+      ),
       hasUnsavedChanges: true,
     }));
   },

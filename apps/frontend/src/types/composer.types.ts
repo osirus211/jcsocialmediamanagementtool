@@ -39,6 +39,7 @@ export interface MediaFile {
   uploadStatus: UploadStatus;
   errorMessage?: string;
   thumbnailUrl?: string;
+  duration?: number; // Video duration in seconds
 }
 
 export interface Media {

@@ -245,23 +245,61 @@ export class MediaProcessingWorker {
 
   private async processVideo(buffer: Buffer): Promise<any> {
     try {
-      // Placeholder for video processing
-      // In production, use ffmpeg or similar to extract metadata
+      const fs = require('fs').promises;
+      const path = require('path');
+      const { extractVideoMetadata, generateThumbnail } = require('../utils/ffmpeg');
       
-      logger.info('Video processing (placeholder)', {
-        size: buffer.length,
-      });
-
-      return {
-        duration: undefined, // Would extract with ffmpeg
-        width: undefined,
-        height: undefined,
-        thumbnailUrl: undefined, // Would generate with ffmpeg
-        metadata: {
+      // Create temporary file for video processing
+      const tempDir = path.join(process.cwd(), 'temp');
+      await fs.mkdir(tempDir, { recursive: true });
+      
+      const tempVideoPath = path.join(tempDir, `video_${Date.now()}.mp4`);
+      const tempThumbnailPath = path.join(tempDir, `thumb_${Date.now()}.jpg`);
+      
+      try {
+        // Write buffer to temporary file
+        await fs.writeFile(tempVideoPath, buffer);
+        
+        // Extract video metadata
+        const metadata = await extractVideoMetadata(tempVideoPath);
+        
+        // Generate thumbnail at 1 second
+        await generateThumbnail(tempVideoPath, tempThumbnailPath, 1);
+        
+        // Read thumbnail buffer for upload
+        const thumbnailBuffer = await fs.readFile(tempThumbnailPath);
+        
+        // TODO: Upload thumbnail to S3/storage and get URL
+        // For now, we'll return undefined and let the upload happen later
+        const thumbnailUrl = undefined; // Would upload thumbnail to S3 here
+        
+        logger.info('Video processing completed', {
           size: buffer.length,
-          processed: true,
-        },
-      };
+          duration: metadata.duration,
+          width: metadata.width,
+          height: metadata.height,
+        });
+
+        return {
+          duration: metadata.duration,
+          width: metadata.width,
+          height: metadata.height,
+          thumbnailUrl,
+          metadata: {
+            size: buffer.length,
+            fps: metadata.fps,
+            processed: true,
+          },
+        };
+      } finally {
+        // Clean up temporary files
+        try {
+          await fs.unlink(tempVideoPath);
+          await fs.unlink(tempThumbnailPath);
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up temporary files', { cleanupError });
+        }
+      }
     } catch (error: any) {
       logger.error('Video processing failed', {
         error: error.message,

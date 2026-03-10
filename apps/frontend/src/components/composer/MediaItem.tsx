@@ -1,16 +1,45 @@
 import { MediaFile } from '@/types/composer.types';
-import { X, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, Scissors, Image } from 'lucide-react';
+import { useState } from 'react';
+import { VideoTrimmer } from '../media/VideoTrimmer';
+import { VideoThumbnailSelector } from '../media/VideoThumbnailSelector';
 
 interface MediaItemProps {
   media: MediaFile;
+  selectedPlatforms?: string[];
   onRemove: (mediaId: string) => void;
   onRetry?: (mediaId: string) => void;
+  onMediaUpdate?: (updatedMedia: MediaFile) => void;
+  onMediaReplace?: (oldMediaId: string, newMedia: MediaFile) => void;
 }
 
-export function MediaItem({ media, onRemove, onRetry }: MediaItemProps) {
+export function MediaItem({ 
+  media, 
+  selectedPlatforms = [],
+  onRemove, 
+  onRetry,
+  onMediaUpdate,
+  onMediaReplace
+}: MediaItemProps) {
+  const [showTrimmer, setShowTrimmer] = useState(false);
+  const [showThumbnailSelector, setShowThumbnailSelector] = useState(false);
+  
   const isUploading = media.uploadStatus === 'uploading';
   const isError = media.uploadStatus === 'error';
   const isCompleted = media.uploadStatus === 'completed';
+  const isVideo = media.type === 'video';
+
+  const handleVideoTrimmed = (newMedia: MediaFile) => {
+    if (onMediaReplace) {
+      onMediaReplace(media.id, newMedia);
+    }
+  };
+
+  const handleThumbnailGenerated = (updatedMedia: MediaFile) => {
+    if (onMediaUpdate) {
+      onMediaUpdate(updatedMedia);
+    }
+  };
 
   return (
     <div className="relative group aspect-square bg-gray-100 rounded-lg overflow-hidden">
@@ -80,6 +109,45 @@ export function MediaItem({ media, onRemove, onRetry }: MediaItemProps) {
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <p className="text-white text-xs truncate">{media.filename}</p>
       </div>
+
+      {/* Video Controls */}
+      {isVideo && isCompleted && (
+        <div className="absolute bottom-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => setShowTrimmer(true)}
+            className="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+            title="Trim video"
+          >
+            <Scissors className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => setShowThumbnailSelector(true)}
+            className="p-1.5 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
+            title="Generate thumbnail"
+          >
+            <Image className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Video Trimmer Modal */}
+      {showTrimmer && (
+        <VideoTrimmer
+          media={media}
+          selectedPlatforms={selectedPlatforms}
+          onVideoTrimmed={handleVideoTrimmed}
+          onClose={() => setShowTrimmer(false)}
+        />
+      )}
+
+      {/* Video Thumbnail Selector Modal */}
+      {showThumbnailSelector && (
+        <VideoThumbnailSelector
+          media={media}
+          onThumbnailGenerated={handleThumbnailGenerated}
+          onClose={() => setShowThumbnailSelector(false)}
+        />
+      )}
     </div>
   );
 }

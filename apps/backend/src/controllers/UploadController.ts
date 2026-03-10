@@ -15,7 +15,9 @@ import { mediaService } from '../services/MediaService';
 import { MediaType } from '../models/Media';
 import { logger } from '../utils/logger';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
+import { trimVideo, generateThumbnail } from '../utils/ffmpeg';
 import path from 'path';
+import { promises as fs } from 'fs';
 
 export class UploadController {
   /**
@@ -309,6 +311,223 @@ export class UploadController {
         success: true,
         data: stats,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Trim video
+   * 
+   * POST /media/:id/trim
+   * 
+   * Body:
+   * - startTime: number (seconds)
+   * - endTime: number (seconds)
+   */
+  async trimVideo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { startTime, endTime } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId;
+
+      if (!workspaceId) {
+        throw new UnauthorizedError('Workspace context required');
+      }
+
+      if (!userId) {
+        throw new UnauthorizedError('User authentication required');
+      }
+
+      if (typeof startTime !== 'number' || typeof endTime !== 'number') {
+        throw new BadRequestError('startTime and endTime must be numbers');
+      }
+
+      if (startTime >= endTime) {
+        throw new BadRequestError('startTime must be less than endTime');
+      }
+
+      if (startTime < 0) {
+        throw new BadRequestError('startTime cannot be negative');
+      }
+
+      // Get original media
+      const originalMedia = await mediaService.getMediaById(id, workspaceId);
+      if (!originalMedia) {
+        throw new NotFoundError('Media not found');
+      }
+
+      if (originalMedia.mediaType !== MediaType.VIDEO) {
+        throw new BadRequestError('Media must be a video');
+      }
+
+      // Download original video
+      const originalVideoBuffer = await mediaStorageService.downloadFile(
+        originalMedia.storageKey,
+        originalMedia.storageProvider
+      );
+
+      // Create temporary files
+      const tempDir = path.join(process.cwd(), 'temp');
+      await fs.mkdir(tempDir, { recursive: true });
+      
+      const tempInputPath = path.join(tempDir, `input_${Date.now()}.mp4`);
+      const tempOutputPath = path.join(tempDir, `output_${Date.now()}.mp4`);
+
+      try {
+        // Write original video to temp file
+        await fs.writeFile(tempInputPath, originalVideoBuffer);
+
+        // Trim video
+        await trimVideo(tempInputPath, tempOutputPath, startTime, endTime);
+
+        // Read trimmed video
+        const trimmedVideoBuffer = await fs.readFile(tempOutputPath);
+
+        // Generate new filename
+        const originalName = path.parse(originalMedia.originalFilename);
+        const newFilename = `${originalName.name}_trimmed_${startTime}s-${endTime}s${originalName.ext}`;
+
+        // Upload trimmed video
+        const uploadData = await mediaStorageService.uploadFile(
+          trimmedVideoBuffer,
+          workspaceId,
+          newFilename,
+          originalMedia.mimeType
+        );
+
+        // Create new media record
+        const newMedia = await mediaService.createMedia({
+          workspaceId,
+          userId,
+          filename: newFilename,
+          originalFilename: newFilename,
+          mimeType: originalMedia.mimeType,
+          mediaType: MediaType.VIDEO,
+          size: trimmedVideoBuffer.length,
+          storageKey: uploadData.storageKey,
+          storageProvider: uploadData.storageProvider,
+        });
+
+        // Mark upload as completed
+        const completedMedia = await mediaService.markUploadCompleted(newMedia._id.toString());
+
+        logger.info('Video trimmed successfully', {
+          originalMediaId: id,
+          newMediaId: newMedia._id.toString(),
+          startTime,
+          endTime,
+          workspaceId,
+        });
+
+        res.status(201).json({
+          success: true,
+          data: completedMedia?.toJSON() || newMedia.toJSON(),
+        });
+      } finally {
+        // Clean up temporary files
+        try {
+          await fs.unlink(tempInputPath);
+          await fs.unlink(tempOutputPath);
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up temporary files', { cleanupError });
+        }
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Generate thumbnail for video
+   * 
+   * POST /media/:id/thumbnail
+   * 
+   * Body:
+   * - timeOffset: number (seconds, optional, defaults to 1)
+   */
+  async generateVideoThumbnail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { timeOffset = 1 } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+
+      if (!workspaceId) {
+        throw new UnauthorizedError('Workspace context required');
+      }
+
+      if (typeof timeOffset !== 'number' || timeOffset < 0) {
+        throw new BadRequestError('timeOffset must be a non-negative number');
+      }
+
+      // Get media
+      const media = await mediaService.getMediaById(id, workspaceId);
+      if (!media) {
+        throw new NotFoundError('Media not found');
+      }
+
+      if (media.mediaType !== MediaType.VIDEO) {
+        throw new BadRequestError('Media must be a video');
+      }
+
+      // Download video
+      const videoBuffer = await mediaStorageService.downloadFile(
+        media.storageKey,
+        media.storageProvider
+      );
+
+      // Create temporary files
+      const tempDir = path.join(process.cwd(), 'temp');
+      await fs.mkdir(tempDir, { recursive: true });
+      
+      const tempVideoPath = path.join(tempDir, `video_${Date.now()}.mp4`);
+      const tempThumbnailPath = path.join(tempDir, `thumb_${Date.now()}.jpg`);
+
+      try {
+        // Write video to temp file
+        await fs.writeFile(tempVideoPath, videoBuffer);
+
+        // Generate thumbnail
+        await generateThumbnail(tempVideoPath, tempThumbnailPath, timeOffset);
+
+        // Read thumbnail
+        const thumbnailBuffer = await fs.readFile(tempThumbnailPath);
+
+        // Upload thumbnail
+        const thumbnailFilename = `${path.parse(media.originalFilename).name}_thumb.jpg`;
+        const uploadData = await mediaStorageService.uploadFile(
+          thumbnailBuffer,
+          workspaceId,
+          thumbnailFilename,
+          'image/jpeg'
+        );
+
+        // Update media with thumbnail URL
+        const updatedMedia = await mediaService.updateMedia(id, {
+          thumbnailUrl: uploadData.publicUrl,
+        });
+
+        logger.info('Video thumbnail generated', {
+          mediaId: id,
+          timeOffset,
+          thumbnailUrl: uploadData.publicUrl,
+          workspaceId,
+        });
+
+        res.status(200).json({
+          success: true,
+          data: updatedMedia?.toJSON(),
+        });
+      } finally {
+        // Clean up temporary files
+        try {
+          await fs.unlink(tempVideoPath);
+          await fs.unlink(tempThumbnailPath);
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up temporary files', { cleanupError });
+        }
+      }
     } catch (error) {
       next(error);
     }

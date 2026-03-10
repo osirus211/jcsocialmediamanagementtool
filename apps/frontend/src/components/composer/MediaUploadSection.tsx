@@ -5,15 +5,21 @@ import { Upload, Image, Video } from 'lucide-react';
 
 interface MediaUploadSectionProps {
   media: MediaFile[];
+  selectedPlatforms?: string[];
   onUpload: (files: File[]) => void;
   onRemove: (mediaId: string) => void;
+  onMediaUpdate?: (mediaId: string, updates: Partial<MediaFile>) => void;
+  onMediaReplace?: (oldMediaId: string, newMedia: MediaFile) => void;
   maxFiles?: number;
 }
 
 export function MediaUploadSection({
   media,
+  selectedPlatforms = [],
   onUpload,
   onRemove,
+  onMediaUpdate,
+  onMediaReplace,
   maxFiles = 10,
 }: MediaUploadSectionProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -61,6 +67,12 @@ export function MediaUploadSection({
     ...FILE_VALIDATION.image.types,
     ...FILE_VALIDATION.video.types,
   ].join(',');
+
+  const handleMediaUpdate = (updatedMedia: MediaFile) => {
+    if (onMediaUpdate) {
+      onMediaUpdate(updatedMedia.id, updatedMedia);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -126,7 +138,10 @@ export function MediaUploadSection({
             <MediaItem
               key={item.id}
               media={item}
+              selectedPlatforms={selectedPlatforms}
               onRemove={onRemove}
+              onMediaUpdate={handleMediaUpdate}
+              onMediaReplace={onMediaReplace}
             />
           ))}
         </div>

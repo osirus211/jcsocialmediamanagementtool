@@ -47,6 +47,8 @@ export function ComposerContainer({
     setQueueSlot,
     addMedia,
     removeMedia,
+    updateMedia,
+    replaceMedia,
     saveDraft,
     setDraftId,
     setIsNewDraft,
@@ -411,8 +413,11 @@ export function ComposerContainer({
               <h2 id="media-section-label" className="sr-only">Media attachments</h2>
               <MediaUploadSection
                 media={media}
+                selectedPlatforms={selectedPlatforms}
                 onUpload={addMedia}
                 onRemove={removeMedia}
+                onMediaUpdate={updateMedia}
+                onMediaReplace={replaceMedia}
               />
             </section>
 
