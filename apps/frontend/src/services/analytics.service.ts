@@ -25,6 +25,24 @@ export interface BestTimesResponse {
   suggestions: TimingSuggestion[];
 }
 
+export interface FollowerGrowthData {
+  accountId: string;
+  platform: string;
+  currentFollowers: number;
+  previousFollowers: number;
+  growth: number;
+  growthPercentage: number;
+  period: {
+    startDate: Date;
+    endDate: Date;
+  };
+}
+
+export interface FollowerTrendData {
+  date: string;
+  followerCount: number;
+}
+
 class AnalyticsService {
   /**
    * Get optimal posting times heatmap and AI suggestions
@@ -36,6 +54,54 @@ class AnalyticsService {
 
     const response = await apiClient.get<{ success: boolean; data: BestTimesResponse }>(
       `/analytics/best-times?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get follower growth for an account
+   */
+  async getFollowerGrowth(accountId: string, startDate?: Date, endDate?: Date): Promise<FollowerGrowthData | null> {
+    const params = new URLSearchParams();
+    params.append('accountId', accountId);
+    if (startDate) params.append('startDate', startDate.toISOString());
+    if (endDate) params.append('endDate', endDate.toISOString());
+
+    const response = await apiClient.get<{ success: boolean; data: FollowerGrowthData | null }>(
+      `/analytics/followers/growth?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get follower trends over time for an account
+   */
+  async getFollowerTrends(accountId: string, startDate: Date, endDate: Date, interval?: 'day' | 'week' | 'month'): Promise<FollowerTrendData[]> {
+    const params = new URLSearchParams();
+    params.append('accountId', accountId);
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    if (interval) params.append('interval', interval);
+
+    const response = await apiClient.get<{ success: boolean; data: FollowerTrendData[] }>(
+      `/analytics/followers/trends?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get follower growth for all accounts in workspace
+   */
+  async getWorkspaceFollowerGrowth(startDate?: Date, endDate?: Date): Promise<FollowerGrowthData[]> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate.toISOString());
+    if (endDate) params.append('endDate', endDate.toISOString());
+
+    const response = await apiClient.get<{ success: boolean; data: FollowerGrowthData[] }>(
+      `/analytics/followers/workspace?${params.toString()}`
     );
 
     return response.data;

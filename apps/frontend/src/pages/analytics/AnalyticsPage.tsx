@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { BestTimeHeatmap } from '@/components/analytics/BestTimeHeatmap';
 import { OptimalTimeSuggestions } from '@/components/analytics/OptimalTimeSuggestions';
 import { EngagementChart } from '@/components/analytics/EngagementChart';
+import { FollowerGrowthSummary } from '@/components/analytics/FollowerGrowthSummary';
+import { FollowerGrowthChart } from '@/components/analytics/FollowerGrowthChart';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', icon: '📊' },
@@ -52,7 +54,22 @@ export function AnalyticsPage() {
       </div>
 
       <div className="space-y-12">
-        {/* Section 1: Best Times to Post */}
+        {/* Section 1: Follower Growth */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Follower Growth</h2>
+            <p className="mt-2 text-gray-600">
+              Track your follower growth across all platforms
+            </p>
+          </div>
+          
+          <div className="space-y-6">
+            <FollowerGrowthSummary dateRange="30d" />
+            <FollowerGrowthChart />
+          </div>
+        </section>
+
+        {/* Section 2: Best Times to Post */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Best Times to Post</h2>
@@ -66,7 +83,7 @@ export function AnalyticsPage() {
           </div>
         </section>
 
-        {/* Section 2: AI Suggestions */}
+        {/* Section 3: AI Suggestions */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">AI Suggestions</h2>
@@ -80,7 +97,7 @@ export function AnalyticsPage() {
           </div>
         </section>
 
-        {/* Section 3: Engagement Trends */}
+        {/* Section 4: Engagement Trends */}
         <section>
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Engagement Trends</h2>

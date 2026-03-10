@@ -5,8 +5,10 @@
 
 import { Router } from 'express';
 import { AnalyticsController } from '../../controllers/AnalyticsController';
+import { FollowerAnalyticsService } from '../../services/FollowerAnalyticsService';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -67,5 +69,78 @@ router.get('/best-times', AnalyticsController.getBestTimes);
  * @access  Private (requires auth + workspace)
  */
 router.post('/mock/:postId', AnalyticsController.generateMockAnalytics);
+
+/**
+ * @route   GET /api/v1/analytics/followers/growth
+ * @desc    Get follower growth for an account
+ * @access  Private (requires auth + workspace)
+ * @query   accountId (required), startDate, endDate (optional)
+ */
+router.get('/followers/growth', async (req, res) => {
+  try {
+    const schema = z.object({
+      accountId: z.string().min(1, 'Account ID is required'),
+      startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+      endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    });
+
+    const { accountId, startDate, endDate } = schema.parse(req.query);
+    
+    const growth = await FollowerAnalyticsService.getFollowerGrowth(accountId, startDate, endDate);
+    
+    res.json({ success: true, data: growth });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/followers/trends
+ * @desc    Get follower trends over time for an account
+ * @access  Private (requires auth + workspace)
+ * @query   accountId (required), startDate, endDate (required), interval (optional)
+ */
+router.get('/followers/trends', async (req, res) => {
+  try {
+    const schema = z.object({
+      accountId: z.string().min(1, 'Account ID is required'),
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+      interval: z.enum(['day', 'week', 'month']).optional().default('day'),
+    });
+
+    const { accountId, startDate, endDate, interval } = schema.parse(req.query);
+    
+    const trends = await FollowerAnalyticsService.getFollowerTrends(accountId, startDate, endDate, interval);
+    
+    res.json({ success: true, data: trends });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/followers/workspace
+ * @desc    Get follower growth for all accounts in workspace
+ * @access  Private (requires auth + workspace)
+ * @query   startDate, endDate (optional)
+ */
+router.get('/followers/workspace', async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+      endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    });
+
+    const { startDate, endDate } = schema.parse(req.query);
+    const workspaceId = req.workspace._id.toString();
+    
+    const growth = await FollowerAnalyticsService.getWorkspaceFollowerGrowth(workspaceId, startDate, endDate);
+    
+    res.json({ success: true, data: growth });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
 
 export default router;
