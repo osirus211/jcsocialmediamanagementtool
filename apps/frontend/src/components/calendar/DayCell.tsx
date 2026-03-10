@@ -1,6 +1,7 @@
 import { memo, useState, useEffect } from 'react';
 import { Post } from '@/types/post.types';
 import { StatusBadge } from '@/components/posts/StatusBadge';
+import { MemberAvatarStack } from './MemberAvatarStack';
 import { postCommentsService } from '@/services/post-comments.service';
 
 interface DayCellProps {
@@ -100,7 +101,7 @@ export const DayCell = memo(function DayCell({
 
   return (
     <div
-      className={`aspect-square border rounded-lg p-2 transition-colors ${
+      className={`aspect-square border rounded-lg p-2 transition-colors flex flex-col ${
         isToday
           ? 'bg-blue-50 border-blue-300'
           : hasPosts
@@ -120,7 +121,7 @@ export const DayCell = memo(function DayCell({
       </div>
 
       {/* Posts list */}
-      <div className="space-y-1 overflow-hidden">
+      <div className="space-y-1 overflow-hidden flex-1">
         {visiblePosts.map((post) => (
           <PostItem
             key={post._id}
@@ -137,6 +138,9 @@ export const DayCell = memo(function DayCell({
           </div>
         )}
       </div>
+
+      {/* Member avatar stack - only show if multiple members have posts */}
+      <MemberAvatarStack posts={posts} />
     </div>
   );
 });

@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Post } from '@/types/post.types';
 import { DayCell } from './DayCell';
 
@@ -167,6 +167,3 @@ export function MonthGrid({
     </div>
   );
 }
-
-// Add missing import
-import { useState } from 'react';

@@ -78,7 +78,7 @@ export class PostController {
         return;
       }
 
-      const { workspaceId, status, platform, socialAccountId, page, limit } = req.query;
+      const { workspaceId, status, platform, socialAccountId, createdBy, page, limit } = req.query;
 
       // Get posts
       const result = await postService.getPosts({
@@ -86,6 +86,7 @@ export class PostController {
         status: status as any,
         platform: platform as any,
         socialAccountId: socialAccountId as string,
+        createdBy: createdBy as string,
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
       });

@@ -198,6 +198,11 @@ export const validateGetPosts: ValidationChain[] = [
     .isMongoId()
     .withMessage('Invalid social account ID'),
 
+  query('createdBy')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid user ID for createdBy filter'),
+
   query('page')
     .optional()
     .isInt({ min: 1 })

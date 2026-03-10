@@ -43,6 +43,7 @@ export interface GetPostsQuery {
   status?: PostStatus;
   platform?: SocialPlatform;
   socialAccountId?: string;
+  createdBy?: string;
   page?: number;
   limit?: number;
 }
@@ -198,6 +199,10 @@ export class PostService {
 
     if (query.socialAccountId) {
       filter.socialAccountId = new mongoose.Types.ObjectId(query.socialAccountId);
+    }
+
+    if (query.createdBy) {
+      filter.createdBy = new mongoose.Types.ObjectId(query.createdBy);
     }
 
     // Execute query

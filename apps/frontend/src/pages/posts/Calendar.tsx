@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useCalendarData } from '@/hooks/useCalendarData';
+import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { WeekView } from '@/components/calendar/WeekView';
 import { Post } from '@/types/post.types';
-import { AlertCircle, Calendar as CalendarIcon, List } from 'lucide-react';
+import { AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { logger } from '@/lib/logger';
 
 type ViewMode = 'month' | 'week';
@@ -34,7 +35,7 @@ type ViewMode = 'month' | 'week';
  */
 export const CalendarPage = () => {
   const navigate = useNavigate();
-  const { currentWorkspace } = useWorkspaceStore();
+  const { currentWorkspace, currentWorkspaceId, fetchMembers } = useWorkspaceStore();
   
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -48,9 +49,12 @@ export const CalendarPage = () => {
 
   const {
     posts,
+    allPosts,
+    selectedMemberIds,
     isLoading,
     error,
     fetchPostsByRange,
+    filterByMembers,
     reschedulePost,
     clearError,
   } = useCalendarData();
@@ -94,6 +98,15 @@ export const CalendarPage = () => {
       fetchPostsByRange(dateRange);
     }
   }, [currentWorkspace, dateRange, fetchPostsByRange]);
+
+  /**
+   * Fetch workspace members on mount
+   */
+  useEffect(() => {
+    if (currentWorkspaceId) {
+      fetchMembers(currentWorkspaceId);
+    }
+  }, [currentWorkspaceId, fetchMembers]);
 
   /**
    * Navigation handlers
@@ -175,27 +188,21 @@ export const CalendarPage = () => {
   }
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex flex-col h-full">
+      <div className="max-w-7xl mx-auto w-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="px-6 py-4 border-b border-gray-200">
           <div>
             <h1 className="text-3xl font-bold">Calendar</h1>
             <p className="text-gray-600 mt-1">
               View and manage scheduled posts for {currentWorkspace.name}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/posts/create')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Create Post
-          </button>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center gap-2 text-red-800">
               <AlertCircle className="w-5 h-5" />
               <span>{error}</span>
@@ -209,81 +216,56 @@ export const CalendarPage = () => {
           </div>
         )}
 
-        <div className="bg-white border rounded-lg p-6">
-          {/* Controls */}
-          <div className="flex items-center justify-between mb-6">
-            {/* View mode toggle */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setViewMode('month')}
-                className={`px-3 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                  viewMode === 'month'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <CalendarIcon className="w-4 h-4" />
-                Month
-              </button>
-              <button
-                onClick={() => setViewMode('week')}
-                className={`px-3 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                  viewMode === 'week'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                Week
-              </button>
-            </div>
+        {/* Calendar Header with filters */}
+        <CalendarHeader
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          selectedMemberIds={selectedMemberIds}
+          onFilterByMembers={filterByMembers}
+          postCount={posts.length}
+        />
 
-            {/* Navigation */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={viewMode === 'month' ? previousMonth : previousWeek}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                ← Previous
-              </button>
-              
-              <button
-                onClick={goToToday}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Today
-              </button>
-              
-              <h2 className="text-xl font-semibold min-w-[200px] text-center">
-                {viewMode === 'month'
-                  ? currentMonth.toLocaleDateString('en-US', {
-                      month: 'long',
-                      year: 'numeric',
-                    })
-                  : `${currentWeek.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })} - ${new Date(
-                      currentWeek.getTime() + 6 * 24 * 60 * 60 * 1000
-                    ).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}`}
-              </h2>
-              
-              <button
-                onClick={viewMode === 'month' ? nextMonth : nextWeek}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Next →
-              </button>
-            </div>
-
-            {/* Post count */}
-            <div className="text-sm text-gray-600">
-              {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-            </div>
+        <div className="flex-1 p-6">
+          {/* Navigation */}
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <button
+              onClick={viewMode === 'month' ? previousMonth : previousWeek}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              ← Previous
+            </button>
+            
+            <button
+              onClick={goToToday}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Today
+            </button>
+            
+            <h2 className="text-xl font-semibold min-w-[200px] text-center">
+              {viewMode === 'month'
+                ? currentMonth.toLocaleDateString('en-US', {
+                    month: 'long',
+                    year: 'numeric',
+                  })
+                : `${currentWeek.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })} - ${new Date(
+                    currentWeek.getTime() + 6 * 24 * 60 * 60 * 1000
+                  ).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}`}
+            </h2>
+            
+            <button
+              onClick={viewMode === 'month' ? nextMonth : nextWeek}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Next →
+            </button>
           </div>
 
           {/* Loading state */}

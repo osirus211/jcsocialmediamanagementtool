@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { Post, PostStatus, PostsResponse } from '@/types/post.types';
 
@@ -27,6 +27,7 @@ interface DateRange {
  * Manages calendar data fetching with:
  * - Lazy loading by date range
  * - Caching by range
+ * - Member filtering (client-side)
  * - Optimistic updates
  * - Rollback on failure
  * 
@@ -37,7 +38,8 @@ interface DateRange {
  * - Efficient re-renders
  */
 export function useCalendarData() {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -46,6 +48,27 @@ export function useCalendarData() {
   
   // Track current range to prevent duplicate fetches
   const currentRangeRef = useRef<string | null>(null);
+
+  /**
+   * Filter posts by selected members (client-side)
+   */
+  const filteredPosts = useMemo(() => {
+    if (selectedMemberIds.length === 0) {
+      return allPosts; // Show all if no filter
+    }
+    
+    return allPosts.filter(post => {
+      const createdBy = typeof post.createdBy === 'string' ? post.createdBy : post.createdBy?._id;
+      return createdBy && selectedMemberIds.includes(createdBy);
+    });
+  }, [allPosts, selectedMemberIds]);
+
+  /**
+   * Update member filter
+   */
+  const filterByMembers = useCallback((memberIds: string[]) => {
+    setSelectedMemberIds(memberIds);
+  }, []);
 
   /**
    * Generate cache key from date range
@@ -84,7 +107,7 @@ export function useCalendarData() {
     // Use cache if available
     if (isCached(from, to)) {
       const cached = cacheRef.current[key];
-      setPosts(cached.posts);
+      setAllPosts(cached.posts);
       return;
     }
     
@@ -114,7 +137,7 @@ export function useCalendarData() {
       };
       
       // Update state
-      setPosts(fetchedPosts);
+      setAllPosts(fetchedPosts);
     } catch (err: any) {
       console.error('Fetch calendar posts error:', err);
       setError(err.response?.data?.message || 'Failed to load posts');
@@ -145,7 +168,7 @@ export function useCalendarData() {
    * Used for drag-drop reschedule
    */
   const optimisticUpdate = useCallback((postId: string, updates: Partial<Post>) => {
-    setPosts((prevPosts) =>
+    setAllPosts((prevPosts) =>
       prevPosts.map((post) =>
         post._id === postId ? { ...post, ...updates } : post
       )
@@ -157,7 +180,7 @@ export function useCalendarData() {
    * Used when API call fails
    */
   const rollback = useCallback((postId: string, originalPost: Post) => {
-    setPosts((prevPosts) =>
+    setAllPosts((prevPosts) =>
       prevPosts.map((post) =>
         post._id === postId ? originalPost : post
       )
@@ -172,7 +195,7 @@ export function useCalendarData() {
     newScheduledAt: string
   ): Promise<boolean> => {
     // Find original post
-    const originalPost = posts.find((p) => p._id === postId);
+    const originalPost = allPosts.find((p) => p._id === postId);
     if (!originalPost) {
       return false;
     }
@@ -213,7 +236,7 @@ export function useCalendarData() {
       setError(err.response?.data?.message || 'Failed to reschedule post');
       return false;
     }
-  }, [posts, optimisticUpdate, rollback]);
+  }, [allPosts, optimisticUpdate, rollback]);
 
   /**
    * Clear error
@@ -223,10 +246,18 @@ export function useCalendarData() {
   }, []);
 
   return {
-    posts,
+    // Filtered data
+    posts: filteredPosts,
+    allPosts,
+    selectedMemberIds,
+    
+    // State
     isLoading,
     error,
+    
+    // Actions
     fetchPostsByRange,
+    filterByMembers,
     refetch,
     reschedulePost,
     clearError,
