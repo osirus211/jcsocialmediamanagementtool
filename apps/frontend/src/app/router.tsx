@@ -20,6 +20,7 @@ import { FailedPostsPage } from '@/pages/posts/FailedPosts';
 import { MediaLibraryPage } from '@/pages/media/MediaLibrary';
 import { LinksPage } from '@/pages/links/Links';
 import { EvergreenPage } from '@/pages/evergreen/EvergreenPage';
+import { BulkImportPage } from '@/pages/bulk/BulkImportPage';
 import { SimpleAnalyticsPage } from '@/pages/analytics/SimpleAnalytics';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
@@ -80,6 +81,10 @@ const router = createBrowserRouter([
       {
         path: 'posts/failed',
         element: <FailedPostsPage />,
+      },
+      {
+        path: 'bulk-import',
+        element: <BulkImportPage />,
       },
       {
         path: 'media',
