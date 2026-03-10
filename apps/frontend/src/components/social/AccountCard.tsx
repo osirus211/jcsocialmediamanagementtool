@@ -13,6 +13,8 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.INSTAGRAM]: '📷',
   [SocialPlatform.YOUTUBE]: '▶️',
   [SocialPlatform.THREADS]: '@',
+  [SocialPlatform.BLUESKY]: '🦋',
+  [SocialPlatform.GOOGLE_BUSINESS]: 'G',
 };
 
 const platformColors: Record<SocialPlatform, string> = {
@@ -22,6 +24,8 @@ const platformColors: Record<SocialPlatform, string> = {
   [SocialPlatform.INSTAGRAM]: 'bg-gradient-to-br from-purple-600 to-pink-500 text-white',
   [SocialPlatform.YOUTUBE]: 'bg-red-600 text-white',
   [SocialPlatform.THREADS]: 'bg-black text-white',
+  [SocialPlatform.BLUESKY]: 'bg-sky-500 text-white',
+  [SocialPlatform.GOOGLE_BUSINESS]: 'bg-blue-700 text-white',
 };
 
 const statusColors: Record<AccountStatus, string> = {

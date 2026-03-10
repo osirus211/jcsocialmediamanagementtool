@@ -18,6 +18,7 @@
     "migrate:all-to-v2": "tsx scripts/migrate-all-to-v2.ts"
   },
   "dependencies": {
+    "@atproto/api": "^0.19.3",
     "@aws-sdk/client-secrets-manager": "^3.1004.0",
     "@opentelemetry/auto-instrumentations-node": "^0.70.1",
     "@opentelemetry/exporter-jaeger": "^2.6.0",

@@ -11,6 +11,8 @@ import { InstagramBusinessProvider } from '../../services/oauth/InstagramBusines
 import { TwitterOAuthProvider } from '../../services/oauth/TwitterOAuthProvider';
 import { LinkedInOAuthProvider } from '../../services/oauth/LinkedInOAuthProvider';
 import { TikTokProvider } from '../../services/oauth/TikTokProvider';
+import { ThreadsAdapter } from './ThreadsAdapter';
+import { BlueskyAdapter } from './BlueskyAdapter';
 import { config } from '../../config';
 
 export class AdapterFactory {
@@ -40,6 +42,12 @@ export class AdapterFactory {
       
       case 'tiktok':
         return new TikTokProvider(clientId, clientSecret, redirectUri);
+      
+      case 'threads':
+        return new ThreadsAdapter(clientId, clientSecret);
+      
+      case 'bluesky':
+        return new BlueskyAdapter();
       
       default:
         throw new Error(`Unsupported platform: ${platform}`);
@@ -100,13 +108,13 @@ export class AdapterFactory {
    * Check if platform is supported
    */
   static isSupportedPlatform(platform: string): platform is SocialPlatform {
-    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok'].includes(platform);
+    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky'].includes(platform);
   }
 
   /**
    * Get all supported platforms
    */
   static getSupportedPlatforms(): SocialPlatform[] {
-    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok'];
+    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky'];
   }
 }

@@ -20,12 +20,16 @@ import { config } from '../../config';
 import { InstagramBusinessProvider } from './InstagramBusinessProvider';
 import { InstagramBasicDisplayProvider } from './InstagramBasicDisplayProvider';
 import { GoogleBusinessProvider } from './GoogleBusinessProvider';
+import { ThreadsProvider } from './ThreadsProvider';
+import { BlueskyOAuthProvider } from './BlueskyOAuthProvider';
 import { logger } from '../../utils/logger';
 
 export enum ProviderType {
   INSTAGRAM_BUSINESS = 'INSTAGRAM_BUSINESS',
   INSTAGRAM_BASIC = 'INSTAGRAM_BASIC',
   GOOGLE_BUSINESS = 'GOOGLE_BUSINESS',
+  THREADS = 'THREADS',
+  BLUESKY = 'BLUESKY',
 }
 
 export class ConfigurationError extends Error {
@@ -132,6 +136,44 @@ export class OAuthProviderFactory {
       }
     } catch (error: any) {
       logger.error('Failed to initialize Google Business Profile provider', {
+        error: error.message,
+      });
+    }
+
+    // Initialize Threads Provider
+    try {
+      const threadsClientId = config.oauth.threads?.clientId;
+      const threadsClientSecret = config.oauth.threads?.clientSecret;
+      const threadsRedirectUri = config.oauth.threads?.redirectUri;
+
+      if (!threadsClientId || !threadsClientSecret || !threadsRedirectUri) {
+        logger.warn('Threads provider not configured', {
+          clientIdSet: !!threadsClientId,
+          clientSecretSet: !!threadsClientSecret,
+          redirectUriSet: !!threadsRedirectUri,
+        });
+      } else {
+        const threadsProvider = new ThreadsProvider(
+          threadsClientId,
+          threadsClientSecret,
+          threadsRedirectUri
+        );
+        this.providers.set(ProviderType.THREADS, threadsProvider);
+        logger.info('Threads provider initialized');
+      }
+    } catch (error: any) {
+      logger.error('Failed to initialize Threads provider', {
+        error: error.message,
+      });
+    }
+
+    // Initialize Bluesky Provider
+    try {
+      const blueskyProvider = new BlueskyOAuthProvider();
+      this.providers.set(ProviderType.BLUESKY, blueskyProvider);
+      logger.info('Bluesky provider initialized');
+    } catch (error: any) {
+      logger.error('Failed to initialize Bluesky provider', {
         error: error.message,
       });
     }

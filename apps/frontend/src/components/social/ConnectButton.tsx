@@ -15,6 +15,7 @@ const platformLabels: Record<SocialPlatform, string> = {
   [SocialPlatform.INSTAGRAM]: 'Instagram',
   [SocialPlatform.YOUTUBE]: 'YouTube',
   [SocialPlatform.THREADS]: 'Threads',
+  [SocialPlatform.BLUESKY]: 'Bluesky',
   [SocialPlatform.GOOGLE_BUSINESS]: 'Google Business Profile',
 };
 

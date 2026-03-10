@@ -11,12 +11,18 @@ import { TwitterPreview } from './TwitterPreview';
 import { LinkedInPreview } from './LinkedInPreview';
 import { InstagramPreview } from './InstagramPreview';
 import { FacebookPreview } from './FacebookPreview';
+import { ThreadsPreview } from './ThreadsPreview';
+import { BlueskyPreview } from './BlueskyPreview';
 
 const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   twitter: '#1DA1F2',
   linkedin: '#0A66C2',
   instagram: 'linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)',
   facebook: '#1877F2',
+  threads: '#000000',
+  bluesky: '#0085FF',
+  youtube: '#FF0000',
+  'google-business': '#4285F4',
 };
 
 const PLATFORM_NAMES: Record<SocialPlatform, string> = {
@@ -24,6 +30,10 @@ const PLATFORM_NAMES: Record<SocialPlatform, string> = {
   linkedin: 'LinkedIn',
   instagram: 'Instagram',
   facebook: 'Facebook',
+  threads: 'Threads',
+  bluesky: 'Bluesky',
+  youtube: 'YouTube',
+  'google-business': 'Google Business',
 };
 
 export function PostPreviewPanel() {
@@ -144,6 +154,23 @@ export function PostPreviewPanel() {
               media={media}
               accountName={getAccountInfo('facebook')?.accountName}
               accountAvatar={getAccountInfo('facebook')?.metadata?.avatarUrl}
+            />
+          )}
+          {activeTab === 'threads' && (
+            <ThreadsPreview
+              content={getContent('threads')}
+              media={media}
+              accountUsername={getAccountInfo('threads')?.accountName}
+              accountAvatar={getAccountInfo('threads')?.metadata?.avatarUrl}
+            />
+          )}
+          {activeTab === 'bluesky' && (
+            <BlueskyPreview
+              content={getContent('bluesky')}
+              media={media}
+              accountHandle={getAccountInfo('bluesky')?.accountId}
+              accountDisplayName={getAccountInfo('bluesky')?.accountName}
+              accountAvatar={getAccountInfo('bluesky')?.metadata?.avatarUrl}
             />
           )}
         </div>
