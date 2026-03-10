@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import { WorkspaceMember, WorkspaceRole } from '@/types/workspace.types';
 import { SocialAccount } from '@/types/social.types';
 import { AccountPermissionRow } from './AccountPermissionRow';
 import { accountPermissionsService, EffectivePermissions, SetPermissionRequest } from '@/services/account-permissions.service';
-import { useSocialAccountStore } from '@/store/socialAccount.store';
-import { toast } from 'react-hot-toast';
+import { useSocialAccountStore } from '@/store/social.store';
+import { toast } from '@/lib/notifications';
 
 interface MemberPermissionsPanelProps {
   member: WorkspaceMember;
@@ -134,7 +133,7 @@ export const MemberPermissionsPanel: React.FC<MemberPermissionsPanelProps> = ({
         return 'bg-purple-100 text-purple-800';
       case WorkspaceRole.ADMIN:
         return 'bg-blue-100 text-blue-800';
-      case WorkspaceRole.EDITOR:
+      case WorkspaceRole.MEMBER:
         return 'bg-green-100 text-green-800';
       case WorkspaceRole.VIEWER:
         return 'bg-gray-100 text-gray-800';
@@ -177,7 +176,9 @@ export const MemberPermissionsPanel: React.FC<MemberPermissionsPanelProps> = ({
               onClick={onClose}
               className="rounded-md p-2 hover:bg-gray-100"
             >
-              <XMarkIcon className="h-6 w-6" />
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
 

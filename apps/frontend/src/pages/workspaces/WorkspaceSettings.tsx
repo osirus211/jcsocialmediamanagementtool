@@ -390,7 +390,7 @@ export const WorkspaceSettingsPage = () => {
                         )}
 
                         {/* Manage Permissions Button */}
-                        {isAdmin && (member.role === WorkspaceRole.EDITOR || member.role === WorkspaceRole.VIEWER) && (
+                        {isAdmin && (member.role === WorkspaceRole.MEMBER || member.role === WorkspaceRole.VIEWER) && (
                           <button
                             onClick={() => setSelectedMemberForPermissions(member)}
                             className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"

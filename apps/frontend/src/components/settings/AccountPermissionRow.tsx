@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Switch } from '@headlessui/react';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { SocialAccount } from '@/types/social.types';
 import { accountPermissionsService, SetPermissionRequest } from '@/services/account-permissions.service';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/lib/notifications';
+import { Toggle } from '@/components/ui/Toggle';
 
 interface AccountPermissionRowProps {
   account: SocialAccount;
@@ -103,24 +102,24 @@ export const AccountPermissionRow: React.FC<AccountPermissionRowProps> = ({
       <div className="flex items-center space-x-3">
         <div className="flex-shrink-0">
           <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-            {account.profilePicture ? (
+            {account.metadata?.avatarUrl ? (
               <img
-                src={account.profilePicture}
+                src={account.metadata.avatarUrl}
                 alt={account.accountName}
                 className="w-10 h-10 rounded-full"
               />
             ) : (
-              <span className="text-lg">{getPlatformIcon(account.provider)}</span>
+              <span className="text-lg">{getPlatformIcon(account.platform)}</span>
             )}
           </div>
         </div>
         <div>
           <div className="flex items-center space-x-2">
             <span className="font-medium text-gray-900">{account.accountName}</span>
-            <span className="text-sm text-gray-500 capitalize">({account.provider})</span>
+            <span className="text-sm text-gray-500 capitalize">({account.platform})</span>
           </div>
           <div className="text-sm text-gray-500">
-            {account.followerCount ? `${account.followerCount.toLocaleString()} followers` : ''}
+            {account.metadata?.followerCount ? `${account.metadata.followerCount.toLocaleString()} followers` : ''}
           </div>
         </div>
       </div>
@@ -130,23 +129,12 @@ export const AccountPermissionRow: React.FC<AccountPermissionRowProps> = ({
         {/* Can Post */}
         <div className="flex items-center space-x-2">
           <label className="text-sm text-gray-700">Can Post</label>
-          <div className="relative">
-            <Switch
+          <div className="relative group">
+            <Toggle
               checked={localPermissions.canPost}
               onChange={(value) => handleToggle('canPost', value)}
               disabled={isOwnerOrAdmin || saving}
-              className={`${
-                localPermissions.canPost ? 'bg-blue-600' : 'bg-gray-200'
-              } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                isOwnerOrAdmin || saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-              }`}
-            >
-              <span
-                className={`${
-                  localPermissions.canPost ? 'translate-x-6' : 'translate-x-1'
-                } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-              />
-            </Switch>
+            />
             {isOwnerOrAdmin && (
               <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 Full access
@@ -158,43 +146,21 @@ export const AccountPermissionRow: React.FC<AccountPermissionRowProps> = ({
         {/* Can View Analytics */}
         <div className="flex items-center space-x-2">
           <label className="text-sm text-gray-700">Analytics</label>
-          <Switch
+          <Toggle
             checked={localPermissions.canViewAnalytics}
             onChange={(value) => handleToggle('canViewAnalytics', value)}
             disabled={isOwnerOrAdmin || saving}
-            className={`${
-              localPermissions.canViewAnalytics ? 'bg-blue-600' : 'bg-gray-200'
-            } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              isOwnerOrAdmin || saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-            }`}
-          >
-            <span
-              className={`${
-                localPermissions.canViewAnalytics ? 'translate-x-6' : 'translate-x-1'
-              } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-            />
-          </Switch>
+          />
         </div>
 
         {/* Can Manage */}
         <div className="flex items-center space-x-2">
           <label className="text-sm text-gray-700">Manage</label>
-          <Switch
+          <Toggle
             checked={localPermissions.canManage}
             onChange={(value) => handleToggle('canManage', value)}
             disabled={isOwnerOrAdmin || saving}
-            className={`${
-              localPermissions.canManage ? 'bg-blue-600' : 'bg-gray-200'
-            } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              isOwnerOrAdmin || saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-            }`}
-          >
-            <span
-              className={`${
-                localPermissions.canManage ? 'translate-x-6' : 'translate-x-1'
-              } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-            />
-          </Switch>
+          />
         </div>
 
         {/* Reset to Default */}
@@ -219,7 +185,9 @@ export const AccountPermissionRow: React.FC<AccountPermissionRowProps> = ({
         {/* Info Icon for Owner/Admin */}
         {isOwnerOrAdmin && (
           <div className="group relative">
-            <InformationCircleIcon className="h-5 w-5 text-gray-400" />
+            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             <div className="absolute -top-8 right-0 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
               Owners and admins have full access
             </div>

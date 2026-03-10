@@ -1,4 +1,4 @@
-import { apiClient } from './api.service';
+import { apiClient } from '../lib/api-client';
 
 export interface AccountPermission {
   _id: string;
