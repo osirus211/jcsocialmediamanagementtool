@@ -3,6 +3,7 @@ import { useComposerStore } from '@/store/composer.store';
 import { useSocialAccountStore } from '@/store/social.store';
 import { composerService } from '@/services/composer.service';
 import { SocialPlatform, PublishMode, PLATFORM_LIMITS } from '@/types/composer.types';
+import { useDraftCollaboration } from '@/hooks/useDraftCollaboration';
 import { StatusBar } from './StatusBar';
 import { AccountSelector } from '../posts/AccountSelector';
 import { ContentTypeSelector } from './ContentTypeSelector';
@@ -14,6 +15,7 @@ import { AlertBanner } from './AlertBanner';
 import { ToastContainer, ToastMessage } from './ToastContainer';
 import { TemplatesPanel } from './TemplatesPanel';
 import { PostPreviewPanel } from './preview/PostPreviewPanel';
+import { DraftLockBanner } from './DraftLockBanner';
 
 interface ComposerContainerProps {
   draftId?: string;
@@ -66,6 +68,17 @@ export function ComposerContainer({
   const [showPreview, setShowPreview] = useState(true);
   const [autoShortenLinks, setAutoShortenLinks] = useState(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Draft collaboration
+  const collaboration = useDraftCollaboration({
+    postId: useComposerStore.getState().draftId,
+    onConflict: () => {
+      addToast('warning', 'Draft was modified by another user. Please refresh to see latest changes.');
+    },
+    onLockStolen: () => {
+      addToast('warning', 'Another user has taken over editing this draft.');
+    },
+  });
 
   // Get unique platforms from selected accounts
   const selectedPlatforms = Array.from(
@@ -127,18 +140,27 @@ export function ComposerContainer({
     };
   }, [hasUnsavedChanges, saveDraft, addToast]);
 
-  // Auto-save with debounce
+  // Auto-save with debounce (integrate with collaboration)
   useEffect(() => {
-    if (hasUnsavedChanges && mainContent.trim()) {
-      // Clear existing timer
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
+    if (hasUnsavedChanges && mainContent.trim() && !collaboration.conflictDetected) {
+      // Use collaboration auto-save if available, otherwise fallback to regular save
+      if (collaboration.autoSave) {
+        collaboration.autoSave(mainContent, Object.entries(platformContent).map(([platform, text]) => ({
+          platform,
+          text,
+          enabled: true,
+        })));
+      } else {
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
 
-      // Set new timer for 3 seconds
-      autoSaveTimerRef.current = setTimeout(() => {
-        saveDraft();
-      }, 3000);
+        // Set new timer for 3 seconds
+        autoSaveTimerRef.current = setTimeout(() => {
+          saveDraft();
+        }, 3000);
+      }
     }
 
     return () => {
@@ -146,7 +168,7 @@ export function ComposerContainer({
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [hasUnsavedChanges, mainContent, platformContent, selectedAccounts, media]);
+  }, [hasUnsavedChanges, mainContent, platformContent, selectedAccounts, media, collaboration]);
 
   const loadDraft = async (id: string) => {
     try {
@@ -379,6 +401,18 @@ export function ComposerContainer({
 
           {/* Main Content */}
           <div className={`p-4 sm:p-6 space-y-4 sm:space-y-6 ${showPreview ? 'hidden lg:block' : ''}`}>
+            {/* Draft Collaboration Banner */}
+            <DraftLockBanner
+              isLocked={collaboration.isLocked}
+              lockedBy={collaboration.lockedBy}
+              lockExpiresAt={collaboration.lockExpiresAt}
+              isSaving={collaboration.isSaving}
+              lastSaved={collaboration.lastSaved}
+              conflictDetected={collaboration.conflictDetected}
+              onTakeover={collaboration.takeover}
+              onRefresh={() => window.location.reload()}
+            />
+
             {/* Account Selection */}
             <section aria-labelledby="account-selection-label">
               <h2 id="account-selection-label" className="sr-only">Select social media accounts</h2>

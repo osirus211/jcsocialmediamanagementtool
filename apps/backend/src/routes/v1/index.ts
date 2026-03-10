@@ -11,7 +11,6 @@ import adminRoutes from '../admin.routes';
 import composerRoutes from './composer.routes';
 import metricsRoutes from './metrics.routes';
 import googleBusinessRoutes from './googleBusinessRoutes';
-import draftsRoutes from './drafts.routes';
 import postsRoutes from './posts.routes';
 import mediaRoutes from './media.routes';
 import platformRoutes from './platform.routes';
@@ -32,6 +31,7 @@ import reportsRoutes from './reports.routes'; // Phase-3: Scheduled reports
 import webhooksOutboundRoutes from './webhooks-outbound.routes'; // Outbound webhooks
 import approvalsRoutes from './approvals.routes'; // Phase-4: Post approval workflow
 import activityRoutes from './activity.routes'; // Phase-4: Team activity feed
+import draftsRoutes from './drafts.routes'; // Phase-4: Collaborative draft editing
 
 const router = Router();
 
@@ -65,6 +65,7 @@ router.get('/', (_req, res) => {
       webhooksOutbound: '/api/v1/webhooks/outbound',
       approvals: '/api/v1/approvals',
       activity: '/api/v1/activity',
+      drafts: '/api/v1/drafts',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -82,7 +83,6 @@ router.use('/auth', authRoutes);
 router.use('/workspaces', workspaceRoutes);
 router.use('/posts', postsRoutes); // New comprehensive posts API
 router.use('/post', postRoutes); // Legacy post API
-router.use('/drafts', draftsRoutes); // Draft posts API
 router.use('/templates', templatesRoutes); // Phase-2: Post templates
 router.use('/queue-slots', queueSlotsRoutes); // Phase-2: Queue slots
 router.use('/links', linksRoutes); // Phase-2: Link shortening
@@ -104,6 +104,7 @@ router.use('/reports', reportsRoutes); // Phase-3: Scheduled reports
 router.use('/webhooks/outbound', webhooksOutboundRoutes); // Outbound webhooks
 router.use('/approvals', approvalsRoutes); // Phase-4: Post approval workflow
 router.use('/activity', activityRoutes); // Phase-4: Team activity feed
+router.use('/drafts', draftsRoutes); // Phase-4: Collaborative draft editing
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

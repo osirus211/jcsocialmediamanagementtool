@@ -115,12 +115,20 @@ export interface IPost extends Document {
   updatedAt: Date;
   version: number; // For optimistic locking
 
+  // Draft collaboration fields
+  lockedBy?: mongoose.Types.ObjectId;
+  lockedAt?: Date;
+  lockExpiresAt?: Date;
+  lastEditedBy?: mongoose.Types.ObjectId;
+  lastEditedAt?: Date;
+
   // Methods
   canBeEdited(): boolean;
   canBeDeleted(): boolean;
   canBeScheduled(): boolean;
   canBePublished(): boolean;
   isEligibleForQueue(): boolean;
+  isEditLocked(): boolean;
 }
 
 const PostSchema = new Schema<IPost>(
@@ -240,6 +248,24 @@ const PostSchema = new Schema<IPost>(
       default: 1,
       required: true,
     },
+    lockedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    lockedAt: {
+      type: Date,
+    },
+    lockExpiresAt: {
+      type: Date,
+      index: true,
+    },
+    lastEditedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    lastEditedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -302,6 +328,13 @@ PostSchema.methods.isEligibleForQueue = function (): boolean {
   }
   
   return this.scheduledAt <= new Date();
+};
+
+/**
+ * Check if post is edit locked by another user
+ */
+PostSchema.methods.isEditLocked = function (): boolean {
+  return !!(this.lockExpiresAt && this.lockExpiresAt > new Date() && this.lockedBy);
 };
 
 /**
