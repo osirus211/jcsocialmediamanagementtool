@@ -1,6 +1,7 @@
 import { Post, PostStatus } from '@/types/post.types';
 import { SocialAccount } from '@/types/social.types';
 import { StatusBadge } from './StatusBadge';
+import { SubmitForApprovalButton } from '@/components/approvals/SubmitForApprovalButton';
 import { usePostStore } from '@/store/post.store';
 import { useState, useEffect } from 'react';
 import { Repeat2 } from 'lucide-react';
@@ -137,7 +138,19 @@ export function PostCard({ post }: PostCardProps) {
           )}
         </div>
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex gap-2 flex-wrap">
+          {/* Submit for Approval Button */}
+          {(post.status === PostStatus.DRAFT || 
+            post.status === PostStatus.PENDING_APPROVAL || 
+            post.status === PostStatus.APPROVED || 
+            post.status === PostStatus.REJECTED) && (
+            <SubmitForApprovalButton
+              postId={post._id}
+              status={post.status}
+              rejectionReason={post.rejectionReason}
+            />
+          )}
+          
           {post.status === PostStatus.FAILED && (
             <button
               onClick={handleRetry}

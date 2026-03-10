@@ -25,6 +25,8 @@ import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage';
 import { CustomDashboard } from '@/pages/analytics/CustomDashboard';
 import { CompetitorPage } from '@/pages/analytics/CompetitorPage';
 import { WebhooksPage } from '@/pages/settings/WebhooksPage';
+import { ApprovalsPage } from '@/pages/approvals/ApprovalsPage';
+import { ActivityPage } from '@/pages/team/ActivityPage';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -84,6 +86,14 @@ const router = createBrowserRouter([
       {
         path: 'posts/failed',
         element: <FailedPostsPage />,
+      },
+      {
+        path: 'approvals',
+        element: <ApprovalsPage />,
+      },
+      {
+        path: 'team/activity',
+        element: <ActivityPage />,
       },
       {
         path: 'bulk-import',

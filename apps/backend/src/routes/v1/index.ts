@@ -30,6 +30,8 @@ import rssFeedsRoutes from './rss-feeds.routes'; // Phase-5: RSS feeds
 import evergreenRoutes from './evergreen.routes'; // Phase-5: Evergreen content
 import reportsRoutes from './reports.routes'; // Phase-3: Scheduled reports
 import webhooksOutboundRoutes from './webhooks-outbound.routes'; // Outbound webhooks
+import approvalsRoutes from './approvals.routes'; // Phase-4: Post approval workflow
+import activityRoutes from './activity.routes'; // Phase-4: Team activity feed
 
 const router = Router();
 
@@ -61,6 +63,8 @@ router.get('/', (_req, res) => {
       evergreenRules: '/api/v1/evergreen-rules',
       reports: '/api/v1/reports',
       webhooksOutbound: '/api/v1/webhooks/outbound',
+      approvals: '/api/v1/approvals',
+      activity: '/api/v1/activity',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -98,6 +102,8 @@ router.use('/rss-feeds', rssFeedsRoutes); // Phase-5: RSS feeds
 router.use('/evergreen-rules', evergreenRoutes); // Phase-5: Evergreen content
 router.use('/reports', reportsRoutes); // Phase-3: Scheduled reports
 router.use('/webhooks/outbound', webhooksOutboundRoutes); // Outbound webhooks
+router.use('/approvals', approvalsRoutes); // Phase-4: Post approval workflow
+router.use('/activity', activityRoutes); // Phase-4: Team activity feed
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

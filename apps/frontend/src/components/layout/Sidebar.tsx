@@ -1,6 +1,26 @@
+import React, { useState, useEffect } from 'react';
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher';
+import { approvalsService } from '@/services/approvals.service';
 
 export const Sidebar = () => {
+  const [approvalCount, setApprovalCount] = useState(0);
+
+  const fetchApprovalCount = async () => {
+    try {
+      const count = await approvalsService.getApprovalCount();
+      setApprovalCount(count);
+    } catch (error) {
+      // Silently fail - don't show errors for background polling
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovalCount();
+    
+    // Poll every 60 seconds
+    const interval = setInterval(fetchApprovalCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
   return (
     <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
       <div className="h-full flex flex-col">
@@ -44,6 +64,37 @@ export const Sidebar = () => {
               >
                 <span>📝</span>
                 <span>Posts</span>
+              </a>
+            </li>
+            {/* Team Section */}
+            <li className="pt-4">
+              <div className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
+                Team
+              </div>
+            </li>
+            <li>
+              <a
+                href="/team/activity"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <span>📋</span>
+                <span>Activity</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="/approvals"
+                className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <div className="flex items-center gap-3">
+                  <span>✅</span>
+                  <span>Approvals</span>
+                </div>
+                {approvalCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                    {approvalCount}
+                  </span>
+                )}
               </a>
             </li>
             <li>
