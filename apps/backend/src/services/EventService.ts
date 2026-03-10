@@ -48,6 +48,10 @@ export enum SystemEvent {
   
   // Analytics events
   ANALYTICS_READY = 'analytics_ready',
+  
+  // Comment events
+  COMMENT_ADDED = 'comment_added',
+  MENTION_IN_COMMENT = 'mention_in_comment',
 }
 
 export interface EventPayload {

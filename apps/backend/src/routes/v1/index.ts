@@ -33,6 +33,7 @@ import approvalsRoutes from './approvals.routes'; // Phase-4: Post approval work
 import activityRoutes from './activity.routes'; // Phase-4: Team activity feed
 import draftsRoutes from './drafts.routes'; // Phase-4: Collaborative draft editing
 import accountPermissionsRoutes from './account-permissions.routes'; // Phase-4: Granular permissions
+import postCommentsRoutes from './post-comments.routes'; // Phase-4: In-line post comments
 
 const router = Router();
 
@@ -68,6 +69,7 @@ router.get('/', (_req, res) => {
       activity: '/api/v1/activity',
       drafts: '/api/v1/drafts',
       accountPermissions: '/api/v1/account-permissions',
+      postComments: '/api/v1/posts/:postId/comments',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -108,6 +110,7 @@ router.use('/approvals', approvalsRoutes); // Phase-4: Post approval workflow
 router.use('/activity', activityRoutes); // Phase-4: Team activity feed
 router.use('/drafts', draftsRoutes); // Phase-4: Collaborative draft editing
 router.use('/account-permissions', accountPermissionsRoutes); // Phase-4: Granular permissions
+router.use('/posts', postCommentsRoutes); // Phase-4: In-line post comments
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

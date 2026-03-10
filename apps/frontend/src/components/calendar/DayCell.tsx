@@ -1,6 +1,7 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Post } from '@/types/post.types';
 import { StatusBadge } from '@/components/posts/StatusBadge';
+import { postCommentsService } from '@/services/post-comments.service';
 
 interface DayCellProps {
   day: number | null;
@@ -12,6 +13,55 @@ interface DayCellProps {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (dateKey: string, e: React.DragEvent) => void;
 }
+
+/**
+ * PostItem Component for calendar day cells
+ */
+const PostItem = memo(function PostItem({ 
+  post, 
+  onPostClick, 
+  onDragStart 
+}: { 
+  post: Post; 
+  onPostClick: (post: Post) => void; 
+  onDragStart: (post: Post, e: React.DragEvent) => void; 
+}) {
+  const [commentCount, setCommentCount] = useState(0);
+
+  useEffect(() => {
+    const loadCommentCount = async () => {
+      try {
+        const comments = await postCommentsService.getComments(post._id);
+        const totalCount = comments.reduce((count, comment) => {
+          return count + 1 + (comment.replies?.length || 0);
+        }, 0);
+        setCommentCount(totalCount);
+      } catch (error) {
+        // Silently fail
+      }
+    };
+
+    loadCommentCount();
+  }, [post._id]);
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(post, e)}
+      onClick={() => onPostClick(post)}
+      className="text-xs truncate cursor-pointer hover:bg-white rounded px-1 py-0.5 border border-transparent hover:border-gray-300 transition-all"
+      title={post.content}
+    >
+      <div className="flex items-center gap-1">
+        <StatusBadge status={post.status} />
+        <span className="truncate flex-1">{post.content}</span>
+        {commentCount > 0 && (
+          <span className="text-blue-600 font-medium">💬{commentCount}</span>
+        )}
+      </div>
+    </div>
+  );
+});
 
 /**
  * DayCell Component
@@ -72,19 +122,12 @@ export const DayCell = memo(function DayCell({
       {/* Posts list */}
       <div className="space-y-1 overflow-hidden">
         {visiblePosts.map((post) => (
-          <div
+          <PostItem
             key={post._id}
-            draggable
-            onDragStart={(e) => onDragStart(post, e)}
-            onClick={() => onPostClick(post)}
-            className="text-xs truncate cursor-pointer hover:bg-white rounded px-1 py-0.5 border border-transparent hover:border-gray-300 transition-all"
-            title={post.content}
-          >
-            <div className="flex items-center gap-1">
-              <StatusBadge status={post.status} />
-              <span className="truncate flex-1">{post.content}</span>
-            </div>
-          </div>
+            post={post}
+            onPostClick={onPostClick}
+            onDragStart={onDragStart}
+          />
         ))}
 
         {/* Show count of hidden posts */}

@@ -2,6 +2,8 @@ import { Post, PostStatus } from '@/types/post.types';
 import { SocialAccount } from '@/types/social.types';
 import { StatusBadge } from './StatusBadge';
 import { SubmitForApprovalButton } from '@/components/approvals/SubmitForApprovalButton';
+import { CommentButton } from '@/components/comments/CommentButton';
+import { CommentThread } from '@/components/comments/CommentThread';
 import { usePostStore } from '@/store/post.store';
 import { useState, useEffect } from 'react';
 import { Repeat2, RotateCcw } from 'lucide-react';
@@ -22,6 +24,7 @@ export function PostCard({ post }: PostCardProps) {
   const [evergreenRule, setEvergreenRule] = useState<EvergreenRule | null>(null);
   const [showEvergreenModal, setShowEvergreenModal] = useState(false);
   const [showRepurposeModal, setShowRepurposeModal] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   const account = typeof post.socialAccountId === 'object' 
     ? (post.socialAccountId as SocialAccount) 
@@ -149,6 +152,13 @@ export function PostCard({ post }: PostCardProps) {
         </div>
 
         <div className="mt-4 flex gap-2 flex-wrap">
+          {/* Comment Button */}
+          <CommentButton
+            postId={post._id}
+            isActive={showComments}
+            onClick={() => setShowComments(!showComments)}
+          />
+          
           {/* Submit for Approval Button */}
           {(post.status === PostStatus.DRAFT || 
             post.status === PostStatus.PENDING_APPROVAL || 
@@ -199,6 +209,9 @@ export function PostCard({ post }: PostCardProps) {
           )}
         </div>
       </div>
+
+      {/* Comment Thread */}
+      <CommentThread postId={post._id} isVisible={showComments} />
 
       {showEvergreenModal && (
         <EvergreenRuleModal

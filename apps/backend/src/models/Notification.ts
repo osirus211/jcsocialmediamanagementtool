@@ -48,6 +48,10 @@ export enum NotificationType {
   
   // System notifications
   SYSTEM_ANNOUNCEMENT = 'system_announcement',
+  
+  // Comment notifications
+  COMMENT_ADDED = 'comment_added',
+  MENTION_IN_COMMENT = 'mention_in_comment',
 }
 
 export enum NotificationPriority {
