@@ -8,6 +8,8 @@ import { HashtagSuggestions } from '@/components/analytics/HashtagSuggestions';
 import { HashtagPerformanceTable } from '@/components/analytics/HashtagPerformanceTable';
 import { HashtagTrendChart } from '@/components/analytics/HashtagTrendChart';
 import { TopPostsTable } from '@/components/analytics/TopPostsTable';
+import { ExportReportButton } from '@/components/analytics/ExportReportButton';
+import { ScheduledReportsPanel } from '@/components/analytics/ScheduledReportsPanel';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', icon: '📊' },
@@ -37,11 +39,14 @@ export function AnalyticsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-        <p className="mt-2 text-gray-600">
-          Discover your optimal posting times and track engagement performance
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
+          <p className="mt-2 text-gray-600">
+            Discover your optimal posting times and track engagement performance
+          </p>
+        </div>
+        <ExportReportButton />
       </div>
 
       {/* Platform Filter */}
@@ -161,6 +166,18 @@ export function AnalyticsPage() {
           </div>
           
           <TopPostsTable />
+        </section>
+
+        {/* Section 7: Scheduled Reports */}
+        <section>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Scheduled Reports</h2>
+            <p className="mt-2 text-gray-600">
+              Set up automated analytics reports delivered to your inbox
+            </p>
+          </div>
+          
+          <ScheduledReportsPanel />
         </section>
       </div>
     </div>

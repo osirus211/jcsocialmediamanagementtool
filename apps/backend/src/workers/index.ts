@@ -7,6 +7,7 @@
 
 import { WorkerManager, IWorker } from '../services/WorkerManager';
 import { workerConfigs, getConfigSummary } from '../config/workers.config';
+import { config } from '../config';
 import { logger } from '../utils/logger';
 
 /**
@@ -71,6 +72,7 @@ import { AnalyticsCollectorWorker } from './AnalyticsCollectorWorker';
 import { ConnectionHealthCheckWorker } from './ConnectionHealthCheckWorker';
 import { AccountHealthCheckWorker } from './AccountHealthCheckWorker';
 import { BackupVerificationWorker } from './BackupVerificationWorker';
+import { ReportSchedulerWorker } from './ReportSchedulerWorker';
 
 // Import LEGACY workers (never enabled, but imported for reference)
 import { PublishingWorker } from './PublishingWorker';
@@ -197,6 +199,12 @@ export function initializeWorkers(): WorkerManager {
       'backup-verification-worker'
     ),
     workerConfigs['backup-verification-worker']
+  );
+
+  manager.registerWorker(
+    'report-scheduler-worker',
+    new WorkerAdapter(new ReportSchedulerWorker(), 'report-scheduler-worker'),
+    { enabled: true, priority: 'medium' }
   );
 
   // ============================================================================

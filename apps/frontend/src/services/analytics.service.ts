@@ -280,6 +280,27 @@ class AnalyticsService {
 
     return response.data;
   }
+
+  /**
+   * Download report file
+   */
+  async downloadReport(reportType: string, format: string, startDate: string, endDate: string): Promise<void> {
+    const params = new URLSearchParams({
+      reportType,
+      format,
+      startDate,
+      endDate,
+    });
+
+    // Trigger file download
+    const url = `/api/v1/reports/download?${params}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `analytics-${reportType}-${startDate}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }
 
 export const analyticsService = new AnalyticsService();
