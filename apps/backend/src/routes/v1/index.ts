@@ -32,6 +32,7 @@ import webhooksOutboundRoutes from './webhooks-outbound.routes'; // Outbound web
 import approvalsRoutes from './approvals.routes'; // Phase-4: Post approval workflow
 import activityRoutes from './activity.routes'; // Phase-4: Team activity feed
 import draftsRoutes from './drafts.routes'; // Phase-4: Collaborative draft editing
+import accountPermissionsRoutes from './account-permissions.routes'; // Phase-4: Granular permissions
 
 const router = Router();
 
@@ -66,6 +67,7 @@ router.get('/', (_req, res) => {
       approvals: '/api/v1/approvals',
       activity: '/api/v1/activity',
       drafts: '/api/v1/drafts',
+      accountPermissions: '/api/v1/account-permissions',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -105,6 +107,7 @@ router.use('/webhooks/outbound', webhooksOutboundRoutes); // Outbound webhooks
 router.use('/approvals', approvalsRoutes); // Phase-4: Post approval workflow
 router.use('/activity', activityRoutes); // Phase-4: Team activity feed
 router.use('/drafts', draftsRoutes); // Phase-4: Collaborative draft editing
+router.use('/account-permissions', accountPermissionsRoutes); // Phase-4: Granular permissions
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

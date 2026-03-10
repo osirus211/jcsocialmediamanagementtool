@@ -768,6 +768,86 @@ export class PostService {
     };
   }
 
+  /**
+   * Lock a post to prevent editing
+   */
+  async lockPost(postId: string, userId: string, reason?: string): Promise<{ message: string }> {
+    const post = await Post.findById(postId);
+    
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    // Set permanent lock (no expiration)
+    post.lockedBy = userId as any;
+    post.lockedAt = new Date();
+    post.lockExpiresAt = undefined; // Permanent lock
+    post.lockedReason = reason;
+
+    await post.save();
+
+    logger.info('Post locked', {
+      postId,
+      userId,
+      reason,
+    });
+
+    return { message: 'Post locked successfully' };
+  }
+
+  /**
+   * Unlock a post
+   */
+  async unlockPost(postId: string): Promise<{ message: string }> {
+    const post = await Post.findById(postId);
+    
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    // Clear lock fields
+    post.lockedBy = undefined;
+    post.lockedAt = undefined;
+    post.lockExpiresAt = undefined;
+    post.lockedReason = undefined;
+
+    await post.save();
+
+    logger.info('Post unlocked', {
+      postId,
+    });
+
+    return { message: 'Post unlocked successfully' };
+  }
+
+  /**
+   * Get post lock status
+   */
+  async getLockStatus(postId: string): Promise<{
+    isLocked: boolean;
+    lockedBy?: { name: string; avatar?: string };
+    lockedAt?: Date;
+    lockedReason?: string;
+  }> {
+    const post = await Post.findById(postId).populate('lockedBy', 'name avatar');
+    
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    const isLocked = post.isEditLocked();
+    
+    return {
+      isLocked,
+      lockedBy: post.lockedBy ? {
+        name: (post.lockedBy as any).name,
+        avatar: (post.lockedBy as any).avatar,
+      } : undefined,
+      lockedAt: post.lockedAt,
+      lockedReason: post.lockedReason,
+    };
+  }
+
 }
 
 // Export singleton instance

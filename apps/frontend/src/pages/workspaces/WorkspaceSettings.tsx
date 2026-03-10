@@ -4,6 +4,8 @@ import { useWorkspaceStore } from '@/store/workspace.store';
 import { useAuthStore } from '@/store/auth.store';
 import { WorkspaceRole, WorkspaceMember } from '@/types/workspace.types';
 import { QueueSlotSettings } from '@/components/settings/QueueSlotSettings';
+import { MemberPermissionsPanel } from '@/components/settings/MemberPermissionsPanel';
+import { PermissionsSummaryBadge } from '@/components/settings/PermissionsSummaryBadge';
 
 /**
  * Workspace Settings Page
@@ -40,6 +42,7 @@ export const WorkspaceSettingsPage = () => {
   const [slug, setSlug] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<WorkspaceMember | null>(null);
 
   const workspace = workspaces.find((w) => w._id === workspaceId) || currentWorkspace;
 
@@ -366,6 +369,9 @@ export const WorkspaceSettingsPage = () => {
                       </div>
 
                       <div className="flex items-center gap-3">
+                        {/* Permissions Summary Badge */}
+                        <PermissionsSummaryBadge member={member} />
+
                         {/* Role Selector */}
                         {isAdmin && member.role !== WorkspaceRole.OWNER && !isCurrentUser ? (
                           <select
@@ -381,6 +387,16 @@ export const WorkspaceSettingsPage = () => {
                           <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm capitalize">
                             {member.role}
                           </span>
+                        )}
+
+                        {/* Manage Permissions Button */}
+                        {isAdmin && (member.role === WorkspaceRole.EDITOR || member.role === WorkspaceRole.VIEWER) && (
+                          <button
+                            onClick={() => setSelectedMemberForPermissions(member)}
+                            className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                          >
+                            Manage Permissions
+                          </button>
                         )}
 
                         {/* Remove Button */}
@@ -411,6 +427,15 @@ export const WorkspaceSettingsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Member Permissions Panel */}
+      {selectedMemberForPermissions && (
+        <MemberPermissionsPanel
+          member={selectedMemberForPermissions}
+          isOpen={!!selectedMemberForPermissions}
+          onClose={() => setSelectedMemberForPermissions(null)}
+        />
+      )}
     </div>
   );
 };

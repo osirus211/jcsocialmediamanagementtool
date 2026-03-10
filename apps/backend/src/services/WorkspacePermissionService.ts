@@ -15,6 +15,7 @@ export enum Permission {
   DELETE_OWN_POST = 'delete_own_post',
   APPROVE_POST = 'approve_post',
   PUBLISH_POST = 'publish_post',
+  LOCK_POST = 'lock_post',
   
   // Team permissions
   MANAGE_TEAM = 'manage_team',
@@ -51,6 +52,7 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     Permission.DELETE_OWN_POST,
     Permission.APPROVE_POST,
     Permission.PUBLISH_POST,
+    Permission.LOCK_POST,
     Permission.MANAGE_TEAM,
     Permission.INVITE_MEMBER,
     Permission.REMOVE_MEMBER,
@@ -75,6 +77,7 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     Permission.DELETE_OWN_POST,
     Permission.APPROVE_POST,
     Permission.PUBLISH_POST,
+    Permission.LOCK_POST,
     Permission.MANAGE_TEAM,
     Permission.INVITE_MEMBER,
     Permission.REMOVE_MEMBER,
@@ -235,6 +238,7 @@ export class WorkspacePermissionService {
       [Permission.DELETE_OWN_POST]: 'Delete own posts',
       [Permission.APPROVE_POST]: 'Approve posts for publishing',
       [Permission.PUBLISH_POST]: 'Publish posts to social media',
+      [Permission.LOCK_POST]: 'Lock posts to prevent editing',
       [Permission.MANAGE_TEAM]: 'Manage team members',
       [Permission.INVITE_MEMBER]: 'Invite new members',
       [Permission.REMOVE_MEMBER]: 'Remove team members',

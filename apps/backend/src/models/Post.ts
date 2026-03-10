@@ -119,6 +119,7 @@ export interface IPost extends Document {
   lockedBy?: mongoose.Types.ObjectId;
   lockedAt?: Date;
   lockExpiresAt?: Date;
+  lockedReason?: string;
   lastEditedBy?: mongoose.Types.ObjectId;
   lastEditedAt?: Date;
 
@@ -259,6 +260,9 @@ const PostSchema = new Schema<IPost>(
       type: Date,
       index: true,
     },
+    lockedReason: {
+      type: String,
+    },
     lastEditedBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -334,6 +338,11 @@ PostSchema.methods.isEligibleForQueue = function (): boolean {
  * Check if post is edit locked by another user
  */
 PostSchema.methods.isEditLocked = function (): boolean {
+  // Permanent lock: lockedBy exists and lockExpiresAt is null
+  if (this.lockedBy && !this.lockExpiresAt) {
+    return true;
+  }
+  // Temporary lock: lockExpiresAt exists and hasn't expired
   return !!(this.lockExpiresAt && this.lockExpiresAt > new Date() && this.lockedBy);
 };
 

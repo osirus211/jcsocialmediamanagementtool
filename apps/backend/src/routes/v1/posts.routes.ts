@@ -994,4 +994,126 @@ router.get('/bulk-upload', (req, res, next) => {
   bulkUploadController.listUploadJobs(req, res, next);
 });
 
+/**
+ * @openapi
+ * /api/v1/posts/{id}/lock:
+ *   post:
+ *     summary: Lock post on calendar
+ *     description: Lock a post to prevent editing or rescheduling (ADMIN/OWNER only)
+ *     tags:
+ *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Post ID
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Optional reason for locking
+ *                 example: "Content under review"
+ *     responses:
+ *       200:
+ *         description: Post locked successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Post not found
+ */
+router.post('/:id/lock', [...validatePostId, ...validateWorkspaceId], (req, res, next) => {
+  postController.lockPost(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/v1/posts/{id}/lock:
+ *   delete:
+ *     summary: Unlock post
+ *     description: Remove lock from a post (ADMIN/OWNER only)
+ *     tags:
+ *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Post ID
+ *     responses:
+ *       200:
+ *         description: Post unlocked successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Insufficient permissions
+ *       404:
+ *         description: Post not found
+ */
+router.delete('/:id/lock', [...validatePostId, ...validateWorkspaceId], (req, res, next) => {
+  postController.unlockPost(req, res, next);
+});
+
+/**
+ * @openapi
+ * /api/v1/posts/{id}/lock:
+ *   get:
+ *     summary: Get post lock status
+ *     description: Get lock status and information for a post
+ *     tags:
+ *       - Posts
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Post ID
+ *     responses:
+ *       200:
+ *         description: Lock status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isLocked:
+ *                   type: boolean
+ *                 lockedBy:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     avatar:
+ *                       type: string
+ *                 lockedAt:
+ *                   type: string
+ *                   format: date-time
+ *                 lockedReason:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Post not found
+ */
+router.get('/:id/lock', [...validatePostId, ...validateWorkspaceId], (req, res, next) => {
+  postController.getLockStatus(req, res, next);
+});
+
 export default router;

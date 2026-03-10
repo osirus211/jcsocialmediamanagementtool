@@ -612,6 +612,90 @@ export class PostController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/posts/:id/lock
+   * Lock a post to prevent editing
+   */
+  async lockPost(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId || !userRole) {
+        return sendError(res, 'User information not found', 401);
+      }
+
+      // Check LOCK_POST permission
+      const { workspacePermissionService, Permission } = await import('../services/WorkspacePermissionService');
+      if (!workspacePermissionService.hasPermission(userRole, Permission.LOCK_POST)) {
+        return sendError(res, 'Insufficient permissions to lock posts', 403);
+      }
+
+      const result = await postService.lockPost(id, userId, reason);
+      sendSuccess(res, result);
+    } catch (error: any) {
+      logger.error('Failed to lock post', {
+        error: error.message,
+        postId: req.params.id,
+        userId: req.user?.id,
+      });
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/posts/:id/lock
+   * Unlock a post
+   */
+  async unlockPost(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+
+      if (!userId || !userRole) {
+        return sendError(res, 'User information not found', 401);
+      }
+
+      // Check LOCK_POST permission
+      const { workspacePermissionService, Permission } = await import('../services/WorkspacePermissionService');
+      if (!workspacePermissionService.hasPermission(userRole, Permission.LOCK_POST)) {
+        return sendError(res, 'Insufficient permissions to unlock posts', 403);
+      }
+
+      const result = await postService.unlockPost(id);
+      sendSuccess(res, result);
+    } catch (error: any) {
+      logger.error('Failed to unlock post', {
+        error: error.message,
+        postId: req.params.id,
+        userId: req.user?.id,
+      });
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/posts/:id/lock
+   * Get post lock status
+   */
+  async getLockStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+
+      const result = await postService.getLockStatus(id);
+      sendSuccess(res, result);
+    } catch (error: any) {
+      logger.error('Failed to get lock status', {
+        error: error.message,
+        postId: req.params.id,
+      });
+      next(error);
+    }
+  }
 }
 
 // Export singleton instance

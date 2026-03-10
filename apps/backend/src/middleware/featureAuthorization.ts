@@ -16,6 +16,7 @@ import { Request, Response, NextFunction } from 'express';
 import { SocialAccount } from '../models/SocialAccount';
 import { Post } from '../models/Post';
 import { featureAuthorizationService, Feature, FeatureLimitationError } from '../services/FeatureAuthorizationService';
+import { AccountPermissionService } from '../services/AccountPermissionService';
 import { logger } from '../utils/logger';
 import { UnauthorizedError, BadRequestError } from '../utils/errors';
 
@@ -118,3 +119,79 @@ export function requireFeature(feature: Feature) {
   };
 }
 
+
+/**
+ * Middleware: Check account permission for specific action
+ * 
+ * Expects:
+ * - req.user.userId (from JWT)
+ * - req.workspace.workspaceId (from workspace middleware)
+ * - req.params.socialAccountId OR req.body.socialAccountId
+ * 
+ * @param action - The action to check ('post', 'analytics', 'manage')
+ * @returns Express middleware function
+ */
+export function checkAccountPermission(action: 'post' | 'analytics' | 'manage') {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      const workspaceId = req.workspace?.workspaceId?.toString();
+
+      if (!userId) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      if (!workspaceId) {
+        throw new BadRequestError('Workspace context required');
+      }
+
+      // Extract socialAccountId from params or body
+      const socialAccountId = req.params.socialAccountId || req.body.socialAccountId;
+
+      if (!socialAccountId) {
+        throw new BadRequestError('Social account ID required');
+      }
+
+      // Check permission
+      const hasPermission = await AccountPermissionService.canUserAccessAccount(
+        workspaceId,
+        userId,
+        socialAccountId,
+        action
+      );
+
+      if (!hasPermission) {
+        logger.warn('Account permission denied', {
+          userId,
+          workspaceId,
+          socialAccountId,
+          action,
+        });
+
+        res.status(403).json({
+          success: false,
+          error: 'ACCOUNT_ACCESS_DENIED',
+          message: `You don't have permission to ${action} on this account`,
+          details: {
+            userId,
+            workspaceId,
+            socialAccountId,
+            requiredAction: action,
+          },
+        });
+        return;
+      }
+
+      logger.debug('Account permission granted', {
+        userId,
+        workspaceId,
+        socialAccountId,
+        action,
+      });
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
