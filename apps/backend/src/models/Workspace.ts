@@ -27,6 +27,18 @@ export interface IWorkspace extends Document {
     language: string;
   };
   
+  // Client Portal (white-label)
+  clientPortal: {
+    enabled: boolean;
+    brandName?: string;
+    logoUrl?: string;
+    primaryColor?: string;
+    customDomain?: string;
+    welcomeMessage?: string;
+    requirePassword: boolean;
+    portalPassword?: string;
+  };
+  
   // Limits based on plan
   limits: {
     maxMembers: number;
@@ -91,6 +103,42 @@ const WorkspaceSchema = new Schema<IWorkspace>(
       language: {
         type: String,
         default: 'en',
+      },
+    },
+    
+    // Client Portal
+    clientPortal: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      brandName: {
+        type: String,
+        maxlength: 100,
+      },
+      logoUrl: {
+        type: String,
+        maxlength: 500,
+      },
+      primaryColor: {
+        type: String,
+        default: '#6366f1',
+        match: /^#[0-9A-Fa-f]{6}$/,
+      },
+      customDomain: {
+        type: String,
+        maxlength: 100,
+      },
+      welcomeMessage: {
+        type: String,
+        maxlength: 500,
+      },
+      requirePassword: {
+        type: Boolean,
+        default: false,
+      },
+      portalPassword: {
+        type: String,
       },
     },
     

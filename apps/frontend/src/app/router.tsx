@@ -29,6 +29,8 @@ import { WebhooksPage } from '@/pages/settings/WebhooksPage';
 import { ApprovalsPage } from '@/pages/approvals/ApprovalsPage';
 import { ActivityPage } from '@/pages/team/ActivityPage';
 import { DraftsPage } from '@/pages/drafts/DraftsPage';
+import { ClientPortalPage } from '@/pages/client-portal/ClientPortalPage';
+import { ClientReviewPage } from '@/pages/client-portal/ClientReviewPage';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -153,7 +155,16 @@ const router = createBrowserRouter([
         path: 'billing/cancel',
         element: <BillingCancelPage />,
       },
+      {
+        path: 'client-portal',
+        element: <ClientPortalPage />,
+      },
     ],
+  },
+  // Public client review page (no authentication required)
+  {
+    path: '/review/:token',
+    element: <ClientReviewPage />,
   },
   {
     path: '/auth',
