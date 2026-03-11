@@ -48,6 +48,14 @@ export interface Media {
   type: 'IMAGE' | 'VIDEO';
   url: string;
   thumbnailUrl?: string;
+  thumbnails?: {
+    small?: string;
+    medium?: string;
+    large?: string;
+  };
+  compressionRatio?: number;
+  isProcessed?: boolean;
+  processingError?: string;
   filename: string;
   size: number;
   mimeType: string;

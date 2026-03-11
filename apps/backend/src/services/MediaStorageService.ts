@@ -271,6 +271,52 @@ export class MediaStorageService {
   isConfigured(): boolean {
     return this.s3Client !== null;
   }
+
+  /**
+   * Upload buffer directly to storage
+   * 
+   * @param storageKey - Storage key where to upload
+   * @param buffer - Buffer to upload
+   * @param mimeType - MIME type of the content
+   */
+  async uploadBuffer(storageKey: string, buffer: Buffer, mimeType: string): Promise<void> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized. AWS credentials are required.');
+    }
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.storageConfig.bucket,
+        Key: storageKey,
+        Body: buffer,
+        ContentType: mimeType,
+      });
+
+      await this.s3Client.send(command);
+
+      logger.debug('Buffer uploaded to storage', {
+        storageKey,
+        size: buffer.length,
+        mimeType,
+      });
+    } catch (error: any) {
+      logger.error('Failed to upload buffer to storage', {
+        storageKey,
+        error: error.message,
+      });
+      throw new Error(`Failed to upload buffer: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get public URL for storage key
+   * 
+   * @param storageKey - Storage key
+   * @returns Public URL
+   */
+  getPublicUrl(storageKey: string): string {
+    return this.buildCdnUrl(storageKey);
+  }
 }
 
 // Export singleton instance

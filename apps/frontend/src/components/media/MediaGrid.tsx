@@ -102,7 +102,7 @@ export function MediaGrid({
             >
               {/* Thumbnail */}
               <img
-                src={item.thumbnailUrl || item.url}
+                src={item.thumbnails?.medium || item.thumbnailUrl || item.url}
                 alt={item.filename}
                 loading="lazy"
                 className="w-full h-full object-cover"

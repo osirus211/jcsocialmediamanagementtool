@@ -4,6 +4,7 @@ import { MediaItem } from './MediaItem';
 import { DesignImportPanel } from '../media/DesignImportPanel';
 import { StockPhotoPanel } from '../media/StockPhotoPanel';
 import { Upload, Image, Video, Palette, Search } from 'lucide-react';
+import { compressImageFile, isImageFile } from '@/utils/imageCompression';
 
 interface MediaUploadSectionProps {
   media: MediaFile[];
@@ -27,6 +28,7 @@ const MediaUploadSection = memo(function MediaUploadSection({
   const [isDragging, setIsDragging] = useState(false);
   const [showDesignImport, setShowDesignImport] = useState(false);
   const [showStockPhotos, setShowStockPhotos] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const acceptedTypes = useMemo(() => [
@@ -43,14 +45,43 @@ const MediaUploadSection = memo(function MediaUploadSection({
     setIsDragging(false);
   }, []);
 
-  const handleFiles = useCallback((files: File[]) => {
+  const handleFiles = useCallback(async (files: File[]) => {
     // Check max files limit
     if (media.length + files.length > maxFiles) {
       alert(`You can only upload up to ${maxFiles} files`);
       return;
     }
 
-    onUpload(files);
+    setIsCompressing(true);
+    
+    try {
+      // Process files with compression for images
+      const processedFiles: File[] = [];
+      
+      for (const file of files) {
+        if (isImageFile(file)) {
+          try {
+            // Compress image files
+            const compressedFile = await compressImageFile(file, 2048, 0.85);
+            processedFiles.push(compressedFile);
+          } catch (error) {
+            console.warn('Failed to compress image, using original:', error);
+            processedFiles.push(file);
+          }
+        } else {
+          // Keep non-image files as-is
+          processedFiles.push(file);
+        }
+      }
+
+      onUpload(processedFiles);
+    } catch (error) {
+      console.error('Error processing files:', error);
+      // Fallback to original files if processing fails
+      onUpload(files);
+    } finally {
+      setIsCompressing(false);
+    }
   }, [media.length, maxFiles, onUpload]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -72,26 +103,58 @@ const MediaUploadSection = memo(function MediaUploadSection({
     fileInputRef.current?.click();
   }, []);
 
-  const handleDesignImport = useCallback((file: File) => {
+  const handleDesignImport = useCallback(async (file: File) => {
     // Check max files limit
     if (media.length + 1 > maxFiles) {
       alert(`You can only upload up to ${maxFiles} files`);
       return;
     }
 
-    onUpload([file]);
-    setShowDesignImport(false);
+    setIsCompressing(true);
+    
+    try {
+      let processedFile = file;
+      
+      if (isImageFile(file)) {
+        try {
+          processedFile = await compressImageFile(file, 2048, 0.85);
+        } catch (error) {
+          console.warn('Failed to compress imported image, using original:', error);
+        }
+      }
+
+      onUpload([processedFile]);
+      setShowDesignImport(false);
+    } finally {
+      setIsCompressing(false);
+    }
   }, [media.length, maxFiles, onUpload]);
 
-  const handleStockPhotoImport = useCallback((file: File) => {
+  const handleStockPhotoImport = useCallback(async (file: File) => {
     // Check max files limit
     if (media.length + 1 > maxFiles) {
       alert(`You can only upload up to ${maxFiles} files`);
       return;
     }
 
-    onUpload([file]);
-    setShowStockPhotos(false);
+    setIsCompressing(true);
+    
+    try {
+      let processedFile = file;
+      
+      if (isImageFile(file)) {
+        try {
+          processedFile = await compressImageFile(file, 2048, 0.85);
+        } catch (error) {
+          console.warn('Failed to compress stock photo, using original:', error);
+        }
+      }
+
+      onUpload([processedFile]);
+      setShowStockPhotos(false);
+    } finally {
+      setIsCompressing(false);
+    }
   }, [media.length, maxFiles, onUpload]);
 
   const handleMediaUpdate = useCallback((updatedMedia: MediaFile) => {
@@ -133,13 +196,24 @@ const MediaUploadSection = memo(function MediaUploadSection({
 
         <Upload className="h-12 w-12 mx-auto text-gray-400 mb-3" />
         
-        <p className="text-gray-700 font-medium mb-1">
-          Drop files here or click to browse
-        </p>
-        
-        <p className="text-sm text-gray-500 mb-3">
-          Upload images or videos
-        </p>
+        {isCompressing ? (
+          <div className="space-y-2">
+            <p className="text-blue-600 font-medium">
+              Optimizing images...
+            </p>
+            <div className="w-8 h-8 mx-auto border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : (
+          <>
+            <p className="text-gray-700 font-medium mb-1">
+              Drop files here or click to browse
+            </p>
+            
+            <p className="text-sm text-gray-500 mb-3">
+              Upload images or videos
+            </p>
+          </>
+        )}
 
         <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
           <div className="flex items-center gap-1">

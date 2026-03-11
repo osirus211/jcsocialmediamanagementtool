@@ -281,6 +281,48 @@ export class MediaUploadService {
         // Update workspace storage usage
         await this.updateWorkspaceStorageUsage(input.workspaceId);
 
+        // Enqueue processing jobs for images
+        if (media.mediaType === 'image' || media.mediaType === 'gif') {
+          try {
+            const { MediaProcessingQueue } = await import('../queue/MediaProcessingQueue');
+            const { ImageCompressionService } = await import('./ImageCompressionService');
+            
+            const processingQueue = new MediaProcessingQueue();
+            
+            // Only process if it's an image file
+            if (ImageCompressionService.isImage(media.mimeType)) {
+              // Enqueue compression job
+              await processingQueue.addJob('compress-image', {
+                mediaId: media._id.toString(),
+                platform: 'storage', // Internal processing
+                mediaType: media.mediaType,
+                fileUrl: media.storageKey,
+                workspaceId: input.workspaceId,
+              });
+
+              // Enqueue thumbnail generation job
+              await processingQueue.addJob('generate-thumbnails', {
+                mediaId: media._id.toString(),
+                platform: 'storage', // Internal processing
+                mediaType: media.mediaType,
+                fileUrl: media.storageKey,
+                workspaceId: input.workspaceId,
+              });
+
+              logger.info('Enqueued image processing jobs', {
+                mediaId: media._id.toString(),
+                jobs: ['compress-image', 'generate-thumbnails'],
+              });
+            }
+          } catch (queueError: any) {
+            // Don't fail upload if queue fails
+            logger.warn('Failed to enqueue processing jobs', {
+              mediaId: media._id.toString(),
+              error: queueError.message,
+            });
+          }
+        }
+
         logger.info('Upload confirmed', {
           mediaId: media._id.toString(),
           workspaceId: input.workspaceId,

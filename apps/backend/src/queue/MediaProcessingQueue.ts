@@ -87,6 +87,23 @@ export class MediaProcessingQueue {
     });
   }
 
+  /**
+   * Add a specific job type to the queue
+   */
+  async addJob(jobType: string, data: MediaProcessingJobData): Promise<void> {
+    await this.queue.add(jobType, data, {
+      jobId: `${jobType}:${data.mediaId}`,
+    });
+
+    logger.info('Media processing job added', {
+      queue: QUEUE_NAME,
+      jobType,
+      mediaId: data.mediaId,
+      platform: data.platform,
+      mediaType: data.mediaType,
+    });
+  }
+
   getQueue(): Queue<MediaProcessingJobData> {
     return this.queue;
   }

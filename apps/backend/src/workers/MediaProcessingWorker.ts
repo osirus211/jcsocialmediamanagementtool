@@ -88,11 +88,26 @@ export class MediaProcessingWorker {
 
   private async process(job: Job<MediaProcessingJobData>): Promise<void> {
     const { mediaId, platform, mediaType, fileUrl, workspaceId } = job.data;
+    const jobType = job.name; // Get job type from job name
     const startTime = Date.now();
 
     try {
       // Import MediaService dynamically to avoid circular dependencies
       const { mediaService } = await import('../services/MediaService');
+
+      // Handle different job types
+      switch (jobType) {
+        case 'compress-image':
+          await this.processCompressImage(job);
+          return;
+        case 'generate-thumbnails':
+          await this.processGenerateThumbnails(job);
+          return;
+        case 'process-media':
+        default:
+          // Original processing logic
+          break;
+      }
 
       // Mark processing as started
       await mediaService.markProcessingStarted(mediaId);
@@ -304,6 +319,117 @@ export class MediaProcessingWorker {
       logger.error('Video processing failed', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Process image compression job
+   */
+  private async processCompressImage(job: Job<MediaProcessingJobData>): Promise<void> {
+    const { mediaId } = job.data;
+    
+    try {
+      const { mediaService } = await import('../services/MediaService');
+      const { MediaStorageService } = await import('../services/MediaStorageService');
+      const { ImageCompressionService } = await import('../services/ImageCompressionService');
+
+      // Get media record
+      const media = await mediaService.getMediaById(mediaId, job.data.workspaceId);
+      if (!media) {
+        throw new Error(`Media not found: ${mediaId}`);
+      }
+
+      // Download original file
+      const storageService = MediaStorageService.getInstance();
+      const originalBuffer = await this.fetchMediaFile(media.storageKey);
+      const originalSize = originalBuffer.length;
+
+      // Compress image
+      const compressionResult = await ImageCompressionService.compressImage(originalBuffer, {
+        maxWidth: 2048,
+        maxHeight: 2048,
+        quality: 80,
+        format: 'webp',
+      });
+
+      // Upload compressed version (overwrite original)
+      await storageService.uploadBuffer(media.storageKey, compressionResult.buffer, 'image/webp');
+
+      // Calculate compression ratio
+      const compressionRatio = originalSize / compressionResult.size;
+
+      // Update media record
+      await mediaService.markProcessingCompleted(mediaId, {
+        width: compressionResult.width,
+        height: compressionResult.height,
+        metadata: {
+          ...media.metadata,
+          compressionRatio,
+          originalSize,
+          compressedSize: compressionResult.size,
+        },
+      });
+
+      logger.info('Image compression completed', {
+        mediaId,
+        originalSize,
+        compressedSize: compressionResult.size,
+        compressionRatio: Math.round(compressionRatio * 100) / 100,
+      });
+    } catch (error) {
+      logger.error('Image compression failed', { mediaId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Process thumbnail generation job
+   */
+  private async processGenerateThumbnails(job: Job<MediaProcessingJobData>): Promise<void> {
+    const { mediaId } = job.data;
+    
+    try {
+      const { mediaService } = await import('../services/MediaService');
+      const { MediaStorageService } = await import('../services/MediaStorageService');
+      const { ImageCompressionService } = await import('../services/ImageCompressionService');
+
+      // Get media record
+      const media = await mediaService.getMediaById(mediaId, job.data.workspaceId);
+      if (!media) {
+        throw new Error(`Media not found: ${mediaId}`);
+      }
+
+      // Download original file
+      const originalBuffer = await this.fetchMediaFile(media.storageKey);
+
+      // Generate thumbnails
+      const thumbnails = await ImageCompressionService.generateThumbnails(originalBuffer, media.storageKey);
+
+      // Upload all thumbnails
+      const storageService = MediaStorageService.getInstance();
+      const thumbnailUrls: Record<string, string> = {};
+
+      for (const [size, thumbnail] of Object.entries(thumbnails)) {
+        await storageService.uploadBuffer(thumbnail.key, thumbnail.buffer, 'image/webp');
+        thumbnailUrls[size] = storageService.getPublicUrl(thumbnail.key);
+      }
+
+      // Update media record with medium thumbnail URL (main thumbnail)
+      await mediaService.markProcessingCompleted(mediaId, {
+        thumbnailUrl: thumbnailUrls.medium,
+        metadata: {
+          ...media.metadata,
+          thumbnails: thumbnailUrls,
+        },
+      });
+
+      logger.info('Thumbnail generation completed', {
+        mediaId,
+        thumbnailSizes: Object.keys(thumbnails),
+      });
+    } catch (error) {
+      logger.error('Thumbnail generation failed', { mediaId, error });
       throw error;
     }
   }

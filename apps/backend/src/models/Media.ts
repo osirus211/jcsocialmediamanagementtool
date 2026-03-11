@@ -51,6 +51,14 @@ export interface IMedia extends Document {
   originalUrl?: string; // Original upload URL (before processing)
   cdnUrl?: string; // CDN URL for optimized delivery
   thumbnailUrl?: string;
+  thumbnails?: {
+    small?: string;
+    medium?: string;
+    large?: string;
+  };
+  compressionRatio?: number;
+  isProcessed?: boolean;
+  processingError?: string;
   status: MediaStatus; // Legacy combined status
   uploadStatus: UploadStatus; // Upload lifecycle status
   processingStatus: ProcessingStatus; // Processing lifecycle status
@@ -140,6 +148,21 @@ const MediaSchema = new Schema<IMedia>(
       type: String,
     },
     thumbnailUrl: {
+      type: String,
+    },
+    thumbnails: {
+      small: { type: String },
+      medium: { type: String },
+      large: { type: String },
+    },
+    compressionRatio: {
+      type: Number,
+    },
+    isProcessed: {
+      type: Boolean,
+      default: false,
+    },
+    processingError: {
       type: String,
     },
     status: {
@@ -234,6 +257,10 @@ MediaSchema.methods = {
       originalUrl: obj.originalUrl,
       cdnUrl: obj.cdnUrl,
       thumbnailUrl: obj.thumbnailUrl,
+      thumbnails: obj.thumbnails,
+      compressionRatio: obj.compressionRatio,
+      isProcessed: obj.isProcessed,
+      processingError: obj.processingError,
       status: obj.status,
       uploadStatus: obj.uploadStatus,
       processingStatus: obj.processingStatus,
