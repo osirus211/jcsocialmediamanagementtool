@@ -38,6 +38,7 @@ const CompetitorPage = lazy(() => import('@/pages/analytics/CompetitorPage').the
 
 // Settings
 const WebhooksPage = lazy(() => import('@/pages/settings/WebhooksPage').then(module => ({ default: module.WebhooksPage })));
+const AutomationPage = lazy(() => import('@/pages/settings/AutomationPage').then(module => ({ default: module.default })));
 
 // Team & Collaboration
 const ApprovalsPage = lazy(() => import('@/pages/approvals/ApprovalsPage').then(module => ({ default: module.ApprovalsPage })));
@@ -176,6 +177,10 @@ const router = createBrowserRouter([
       {
         path: 'settings/webhooks',
         element: <SuspenseWrapper><WebhooksPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'settings/automation',
+        element: <SuspenseWrapper><AutomationPage /></SuspenseWrapper>,
       },
       {
         path: 'pricing',

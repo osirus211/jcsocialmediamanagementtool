@@ -11,6 +11,8 @@ import postsRoutes from './routes/posts.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import mediaRoutes from './routes/media.routes';
 import webhooksRoutes from './routes/webhooks.routes';
+import zapierRoutes from './routes/zapier.routes';
+import makeRoutes from './routes/make.routes';
 import docsRoutes from './docs.routes';
 
 const router = Router();
@@ -44,5 +46,7 @@ router.use('/posts', postsRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/media', mediaRoutes);
 router.use('/webhooks', webhooksRoutes);
+router.use('/zapier', zapierRoutes);
+router.use('/make', makeRoutes);
 
 export default router;
