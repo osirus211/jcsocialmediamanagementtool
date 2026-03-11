@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useComposerStore } from '@/store/composer.store';
 import { composerService } from '@/services/composer.service';
-import { SaveStatus } from '@/types/composer.types';
+import { SaveStatus, SocialPlatform } from '@/types/composer.types';
 
 /**
  * Auto-save configuration
@@ -79,7 +79,7 @@ export function useAutoSave() {
       const platformContentArray = Object.entries(platformContent)
         .filter(([_, text]) => text.trim().length > 0)
         .map(([platform, text]) => ({
-          platform,
+          platform: platform as SocialPlatform,
           text,
           enabled: true,
         }));

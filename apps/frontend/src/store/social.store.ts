@@ -5,6 +5,7 @@ import {
   ConnectAccountInput,
   SocialAccountsResponse,
   SocialAccountResponse,
+  AccountStatus,
 } from '@/types/social.types';
 
 interface SocialAccountState {
@@ -143,7 +144,7 @@ export const useSocialAccountStore = create<SocialAccountStore>((set, get) => ({
         // Update account status to expired in the UI
         set((state) => ({
           accounts: state.accounts.map((a) =>
-            a._id === accountId ? { ...a, status: 'expired' } : a
+            a._id === accountId ? { ...a, status: AccountStatus.EXPIRED } : a
           ),
         }));
       }

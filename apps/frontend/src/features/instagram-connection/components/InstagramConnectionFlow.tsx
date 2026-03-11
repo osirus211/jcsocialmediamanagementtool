@@ -111,6 +111,11 @@ export function InstagramConnectionFlow({
     startConnection();
   };
 
+  // Handle show instructions
+  const handleShowInstructions = () => {
+    setShowInstructions(true);
+  };
+
   // Handle account save
   const handleSaveAccounts = async (selectedIds: string[]) => {
     await saveSelectedAccounts();
@@ -126,7 +131,7 @@ export function InstagramConnectionFlow({
     <div className="instagram-connection-flow">
       {/* Show checklist if not completed and not in connection flow */}
       {!checklistCompleted && connectionState.step === 'idle' && (
-        <PreConnectionChecklist onProceed={handleProceed} />
+        <PreConnectionChecklist onProceed={handleProceed} onShowInstructions={handleShowInstructions} />
       )}
 
       {/* Show connection orchestrator during connection flow */}

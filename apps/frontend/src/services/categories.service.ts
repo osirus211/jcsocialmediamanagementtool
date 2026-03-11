@@ -1,4 +1,4 @@
-import { api } from './api';
+import { apiClient } from '@/lib/api-client';
 
 export interface Category {
   _id: string;
@@ -32,7 +32,7 @@ export const categoriesService = {
    * Get all categories for the current workspace
    */
   async getCategories(): Promise<Category[]> {
-    const response = await api.get('/categories');
+    const response = await apiClient.get('/categories');
     return response.data.data;
   },
 
@@ -40,7 +40,7 @@ export const categoriesService = {
    * Create a new category
    */
   async createCategory(data: CreateCategoryData): Promise<Category> {
-    const response = await api.post('/categories', data);
+    const response = await apiClient.post('/categories', data);
     return response.data.data;
   },
 
@@ -48,7 +48,7 @@ export const categoriesService = {
    * Update a category
    */
   async updateCategory(id: string, data: UpdateCategoryData): Promise<Category> {
-    const response = await api.patch(`/categories/${id}`, data);
+    const response = await apiClient.patch(`/categories/${id}`, data);
     return response.data.data;
   },
 
@@ -56,6 +56,6 @@ export const categoriesService = {
    * Delete a category
    */
   async deleteCategory(id: string): Promise<void> {
-    await api.delete(`/categories/${id}`);
+    await apiClient.delete(`/categories/${id}`);
   },
 };

@@ -113,7 +113,7 @@ export function usePublishPost() {
     // Validate
     const validation = validate();
     if (!validation.valid) {
-      setError(validation.error || 'Validation failed');
+      setSaveError(validation.error || 'Validation failed');
       return;
     }
 
@@ -125,8 +125,8 @@ export function usePublishPost() {
       // Build publish request
       const publishRequest = {
         publishMode,
-        scheduledAt: publishMode === PublishMode.SCHEDULE ? scheduledDate : undefined,
-        queueSlot: publishMode === PublishMode.QUEUE ? selectedQueueSlot : undefined,
+        scheduledAt: publishMode === PublishMode.SCHEDULE && scheduledDate ? scheduledDate.toISOString() : undefined,
+        queueSlot: publishMode === PublishMode.QUEUE && selectedQueueSlot ? selectedQueueSlot.id : undefined,
       };
 
       // Call publish API

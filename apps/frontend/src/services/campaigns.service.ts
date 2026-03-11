@@ -1,4 +1,4 @@
-import { api } from './api';
+import { apiClient } from '@/lib/api-client';
 
 export enum CampaignStatus {
   DRAFT = 'draft',
@@ -67,7 +67,7 @@ export const campaignsService = {
       params.append('status', filters.status);
     }
     
-    const response = await api.get(`/campaigns?${params.toString()}`);
+    const response = await apiClient.get(`/campaigns?${params.toString()}`);
     return response.data.data;
   },
 
@@ -75,7 +75,7 @@ export const campaignsService = {
    * Get a single campaign with stats
    */
   async getCampaign(id: string): Promise<CampaignWithStats> {
-    const response = await api.get(`/campaigns/${id}`);
+    const response = await apiClient.get(`/campaigns/${id}`);
     return response.data.data;
   },
 
@@ -83,7 +83,7 @@ export const campaignsService = {
    * Create a new campaign
    */
   async createCampaign(data: CreateCampaignData): Promise<Campaign> {
-    const response = await api.post('/campaigns', data);
+    const response = await apiClient.post('/campaigns', data);
     return response.data.data;
   },
 
@@ -91,7 +91,7 @@ export const campaignsService = {
    * Update a campaign
    */
   async updateCampaign(id: string, data: UpdateCampaignData): Promise<Campaign> {
-    const response = await api.patch(`/campaigns/${id}`, data);
+    const response = await apiClient.patch(`/campaigns/${id}`, data);
     return response.data.data;
   },
 
@@ -99,14 +99,14 @@ export const campaignsService = {
    * Delete a campaign
    */
   async deleteCampaign(id: string): Promise<void> {
-    await api.delete(`/campaigns/${id}`);
+    await apiClient.delete(`/campaigns/${id}`);
   },
 
   /**
    * Get all posts for a campaign
    */
   async getCampaignPosts(id: string): Promise<any[]> {
-    const response = await api.get(`/campaigns/${id}/posts`);
+    const response = await apiClient.get(`/campaigns/${id}/posts`);
     return response.data.data;
   },
 
