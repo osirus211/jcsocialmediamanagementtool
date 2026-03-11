@@ -20,4 +20,12 @@ module.exports = {
   modulePathIgnorePatterns: [
     '<rootDir>/src/services/oauth/',
   ],
+  coverageThreshold: {
+    global: {
+      branches: 60,
+      functions: 65,
+      lines: 65,
+      statements: 65
+    }
+  }
 };
