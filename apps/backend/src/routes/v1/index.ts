@@ -38,6 +38,7 @@ import clientPortalRoutes from './client-portal.routes'; // Phase-4: Client appr
 import categoriesRoutes from './categories.routes'; // Phase-4: Content categories
 import campaignsRoutes from './campaigns.routes'; // Phase-4: Campaign tagging
 import designIntegrationsRoutes from './design-integrations.routes'; // Phase-4: Canva & Figma integration
+import stockPhotosRoutes from './stock-photos.routes'; // Phase-4: Stock photo library
 
 const router = Router();
 
@@ -78,6 +79,7 @@ router.get('/', (_req, res) => {
       categories: '/api/v1/categories',
       campaigns: '/api/v1/campaigns',
       designIntegrations: '/api/v1/design-integrations',
+      stockPhotos: '/api/v1/stock-photos',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -123,6 +125,7 @@ router.use('/client-portal', clientPortalRoutes); // Phase-4: Client approval po
 router.use('/categories', categoriesRoutes); // Phase-4: Content categories
 router.use('/campaigns', campaignsRoutes); // Phase-4: Campaign tagging
 router.use('/design-integrations', designIntegrationsRoutes); // Phase-4: Canva & Figma integration
+router.use('/stock-photos', stockPhotosRoutes); // Phase-4: Stock photo library
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

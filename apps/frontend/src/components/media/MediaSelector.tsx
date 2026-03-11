@@ -3,6 +3,7 @@ import { composerService } from '@/services/composer.service';
 import { Media } from '@/types/composer.types';
 import { MediaGrid } from './MediaGrid';
 import { MediaUploader } from './MediaUploader';
+import { StockPhotoSearch } from './StockPhotoSearch';
 import { X, Image as ImageIcon } from 'lucide-react';
 
 interface MediaSelectorProps {
@@ -38,7 +39,7 @@ export function MediaSelector({
   const [media, setMedia] = useState<Media[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [localSelection, setLocalSelection] = useState<string[]>(selectedMediaIds);
-  const [activeTab, setActiveTab] = useState<'library' | 'upload'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'upload' | 'stock'>('library');
 
   /**
    * Fetch media library
@@ -104,8 +105,25 @@ export function MediaSelector({
   }, [maxSelection]);
 
   /**
-   * Handle confirm selection
+   * Handle stock photo import
    */
+  const handleStockPhotoImport = useCallback((file: File) => {
+    // Add to local selection (this will be handled by upload complete)
+    handleUploadComplete([file.name]); // Simplified for now
+    
+    // Refresh media library to include new stock photo
+    composerService.getMediaLibrary(1, 50).then((response) => {
+      setMedia(response.media);
+    });
+  }, [handleUploadComplete]);
+
+  /**
+   * Handle stock photo error
+   */
+  const handleStockPhotoError = useCallback((error: string) => {
+    console.error('Stock photo error:', error);
+    // Could show toast notification here
+  }, []);
   const handleConfirm = useCallback(() => {
     onSelect(localSelection);
     onClose();
@@ -155,6 +173,17 @@ export function MediaSelector({
           >
             Upload New
           </button>
+
+          <button
+            onClick={() => setActiveTab('stock')}
+            className={`flex-1 px-6 py-3 font-medium transition-colors ${
+              activeTab === 'stock'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Stock Photos
+          </button>
         </div>
 
         {/* Content */}
@@ -195,8 +224,14 @@ export function MediaSelector({
                 />
               )}
             </>
-          ) : (
+          ) : activeTab === 'upload' ? (
             <MediaUploader onUploadComplete={handleUploadComplete} />
+          ) : (
+            <StockPhotoSearch
+              onImport={handleStockPhotoImport}
+              onError={handleStockPhotoError}
+              columns={3}
+            />
           )}
         </div>
 

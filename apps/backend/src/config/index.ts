@@ -87,6 +87,10 @@ const envSchema = z.object({
   AI_TEMPERATURE: z.string().transform(Number).default('0.7'),
   AI_TIMEOUT: z.string().transform(Number).default('30000'),
 
+  // Stock Photo APIs
+  UNSPLASH_ACCESS_KEY: z.string().optional(),
+  PEXELS_API_KEY: z.string().optional(),
+
   // Stripe
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -414,6 +418,11 @@ export const config = {
     maxTokens: env.AI_MAX_TOKENS,
     temperature: env.AI_TEMPERATURE,
     timeout: env.AI_TIMEOUT,
+  },
+
+  stockPhotos: {
+    unsplashAccessKey: env.UNSPLASH_ACCESS_KEY || '',
+    pexelsApiKey: env.PEXELS_API_KEY || '',
   },
 
   stripe: {

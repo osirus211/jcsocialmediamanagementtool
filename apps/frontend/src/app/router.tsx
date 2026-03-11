@@ -38,6 +38,7 @@ import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
 import BillingCancelPage from '@/pages/billing/Cancel';
 
+import { StockPhotosPage } from '@/pages/stock-photos/StockPhotosPage';
 import { NotFoundPage } from '@/pages/NotFound';
 
 const router = createBrowserRouter([
@@ -132,6 +133,10 @@ const router = createBrowserRouter([
       {
         path: 'campaigns',
         element: <CampaignsPage />,
+      },
+      {
+        path: 'stock-photos',
+        element: <StockPhotosPage />,
       },
       {
         path: 'analytics',

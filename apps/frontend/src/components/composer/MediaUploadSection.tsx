@@ -2,7 +2,8 @@ import { useState, useRef } from 'react';
 import { MediaFile, FILE_VALIDATION } from '@/types/composer.types';
 import { MediaItem } from './MediaItem';
 import { DesignImportPanel } from '../media/DesignImportPanel';
-import { Upload, Image, Video, Palette } from 'lucide-react';
+import { StockPhotoPanel } from '../media/StockPhotoPanel';
+import { Upload, Image, Video, Palette, Search } from 'lucide-react';
 
 interface MediaUploadSectionProps {
   media: MediaFile[];
@@ -25,6 +26,7 @@ export function MediaUploadSection({
 }: MediaUploadSectionProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showDesignImport, setShowDesignImport] = useState(false);
+  const [showStockPhotos, setShowStockPhotos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -79,6 +81,17 @@ export function MediaUploadSection({
 
     onUpload([file]);
     setShowDesignImport(false);
+  };
+
+  const handleStockPhotoImport = (file: File) => {
+    // Check max files limit
+    if (media.length + 1 > maxFiles) {
+      alert(`You can only upload up to ${maxFiles} files`);
+      return;
+    }
+
+    onUpload([file]);
+    setShowStockPhotos(false);
   };
 
   const handleMediaUpdate = (updatedMedia: MediaFile) => {
@@ -141,13 +154,21 @@ export function MediaUploadSection({
       </div>
 
       {/* Design Import Button */}
-      <div className="flex justify-center">
+      <div className="flex justify-center gap-3">
         <button
           onClick={() => setShowDesignImport(true)}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
         >
           <Palette className="h-4 w-4" />
           Import from Canva/Figma
+        </button>
+        
+        <button
+          onClick={() => setShowStockPhotos(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+        >
+          <Search className="h-4 w-4" />
+          Stock Photos
         </button>
       </div>
 
@@ -183,6 +204,14 @@ export function MediaUploadSection({
         <DesignImportPanel
           onImport={handleDesignImport}
           onClose={() => setShowDesignImport(false)}
+        />
+      )}
+
+      {/* Stock Photo Panel */}
+      {showStockPhotos && (
+        <StockPhotoPanel
+          onImport={handleStockPhotoImport}
+          onClose={() => setShowStockPhotos(false)}
         />
       )}
     </div>
