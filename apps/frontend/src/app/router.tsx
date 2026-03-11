@@ -1,45 +1,68 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { lazy } from 'react';
 import { MainLayout } from './layouts/MainLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PublicRoute } from '@/components/auth/PublicRoute';
 import { WorkspaceProvider } from '@/components/workspace/WorkspaceProvider';
 import { UpgradeModalProvider } from '@/components/billing/UpgradeModalProvider';
-import { DashboardPage } from '@/pages/Dashboard';
-import { LoginPage } from '@/pages/auth/Login';
-import { RegisterPage } from '@/pages/auth/Register';
-import { WorkspaceListPage } from '@/pages/workspaces/WorkspaceList';
-import { CreateWorkspacePage } from '@/pages/workspaces/CreateWorkspace';
-import { WorkspaceSettingsPage } from '@/pages/workspaces/WorkspaceSettings';
-import { ConnectedAccountsPage } from '@/pages/social/ConnectedAccounts';
-import { ConnectChannelV2Page } from '@/pages/connect-v2/ConnectChannelV2'; // V2 Connect Flow
-import { PostListPage } from '@/pages/posts/PostList';
-import { CreatePostPage } from '@/pages/posts/CreatePost';
-import { CalendarPage } from '@/pages/posts/Calendar';
-import { FailedPostsPage } from '@/pages/posts/FailedPosts';
-import { MediaLibraryPage } from '@/pages/media/MediaLibrary';
-import { LinksPage } from '@/pages/links/Links';
-import { EvergreenPage } from '@/pages/evergreen/EvergreenPage';
-import { BulkImportPage } from '@/pages/bulk/BulkImportPage';
-import { RepurposePage } from '@/pages/repurpose/RepurposePage';
-import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage';
-import { CustomDashboard } from '@/pages/analytics/CustomDashboard';
-import { CompetitorPage } from '@/pages/analytics/CompetitorPage';
-import { WebhooksPage } from '@/pages/settings/WebhooksPage';
-import { ApprovalsPage } from '@/pages/approvals/ApprovalsPage';
-import { ActivityPage } from '@/pages/team/ActivityPage';
-import { DraftsPage } from '@/pages/drafts/DraftsPage';
-import { ClientPortalPage } from '@/pages/client-portal/ClientPortalPage';
-import { ClientReviewPage } from '@/pages/client-portal/ClientReviewPage';
-import { RSSPage } from '@/pages/rss/RSSPage';
-import CampaignsPage from '@/pages/campaigns/CampaignsPage';
-import PricingPage from '@/pages/billing/Pricing';
-import BillingPage from '@/pages/billing/Billing';
-import BillingSuccessPage from '@/pages/billing/Success';
-import BillingCancelPage from '@/pages/billing/Cancel';
+import { SuspenseWrapper } from '@/components/ui/SuspenseWrapper';
 
-import { StockPhotosPage } from '@/pages/stock-photos/StockPhotosPage';
-import { NotFoundPage } from '@/pages/NotFound';
+// Auth pages
+const LoginPage = lazy(() => import('@/pages/auth/Login').then(module => ({ default: module.LoginPage })));
+const RegisterPage = lazy(() => import('@/pages/auth/Register').then(module => ({ default: module.RegisterPage })));
+
+// Dashboard
+const DashboardPage = lazy(() => import('@/pages/Dashboard').then(module => ({ default: module.DashboardPage })));
+const NotFoundPage = lazy(() => import('@/pages/NotFound').then(module => ({ default: module.NotFoundPage })));
+
+// Workspaces
+const WorkspaceListPage = lazy(() => import('@/pages/workspaces/WorkspaceList').then(module => ({ default: module.WorkspaceListPage })));
+const CreateWorkspacePage = lazy(() => import('@/pages/workspaces/CreateWorkspace').then(module => ({ default: module.CreateWorkspacePage })));
+const WorkspaceSettingsPage = lazy(() => import('@/pages/workspaces/WorkspaceSettings').then(module => ({ default: module.WorkspaceSettingsPage })));
+
+// Social & Connections
+const ConnectedAccountsPage = lazy(() => import('@/pages/social/ConnectedAccounts').then(module => ({ default: module.ConnectedAccountsPage })));
+const ConnectChannelV2Page = lazy(() => import('@/pages/connect-v2/ConnectChannelV2').then(module => ({ default: module.ConnectChannelV2Page })));
+
+// Posts & Calendar
+const PostListPage = lazy(() => import('@/pages/posts/PostList').then(module => ({ default: module.PostListPage })));
+const CreatePostPage = lazy(() => import('@/pages/posts/CreatePost').then(module => ({ default: module.CreatePostPage })));
+const CalendarPage = lazy(() => import('@/pages/posts/Calendar').then(module => ({ default: module.CalendarPage })));
+const FailedPostsPage = lazy(() => import('@/pages/posts/FailedPosts').then(module => ({ default: module.FailedPostsPage })));
+
+// Analytics
+const AnalyticsPage = lazy(() => import('@/pages/analytics/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })));
+const CustomDashboard = lazy(() => import('@/pages/analytics/CustomDashboard').then(module => ({ default: module.CustomDashboard })));
+const CompetitorPage = lazy(() => import('@/pages/analytics/CompetitorPage').then(module => ({ default: module.CompetitorPage })));
+
+// Settings
+const WebhooksPage = lazy(() => import('@/pages/settings/WebhooksPage').then(module => ({ default: module.WebhooksPage })));
+
+// Team & Collaboration
+const ApprovalsPage = lazy(() => import('@/pages/approvals/ApprovalsPage').then(module => ({ default: module.ApprovalsPage })));
+const ActivityPage = lazy(() => import('@/pages/team/ActivityPage').then(module => ({ default: module.ActivityPage })));
+const DraftsPage = lazy(() => import('@/pages/drafts/DraftsPage').then(module => ({ default: module.DraftsPage })));
+
+// Content Tools
+const MediaLibraryPage = lazy(() => import('@/pages/media/MediaLibrary').then(module => ({ default: module.MediaLibraryPage })));
+const LinksPage = lazy(() => import('@/pages/links/Links').then(module => ({ default: module.LinksPage })));
+const EvergreenPage = lazy(() => import('@/pages/evergreen/EvergreenPage').then(module => ({ default: module.EvergreenPage })));
+const BulkImportPage = lazy(() => import('@/pages/bulk/BulkImportPage').then(module => ({ default: module.BulkImportPage })));
+const RepurposePage = lazy(() => import('@/pages/repurpose/RepurposePage').then(module => ({ default: module.RepurposePage })));
+const RSSPage = lazy(() => import('@/pages/rss/RSSPage').then(module => ({ default: module.RSSPage })));
+const CampaignsPage = lazy(() => import('@/pages/campaigns/CampaignsPage').then(module => ({ default: module.default })));
+const StockPhotosPage = lazy(() => import('@/pages/stock-photos/StockPhotosPage').then(module => ({ default: module.StockPhotosPage })));
+
+// Billing
+const PricingPage = lazy(() => import('@/pages/billing/Pricing').then(module => ({ default: module.default })));
+const BillingPage = lazy(() => import('@/pages/billing/Billing').then(module => ({ default: module.default })));
+const BillingSuccessPage = lazy(() => import('@/pages/billing/Success').then(module => ({ default: module.default })));
+const BillingCancelPage = lazy(() => import('@/pages/billing/Cancel').then(module => ({ default: module.default })));
+
+// Client Portal
+const ClientPortalPage = lazy(() => import('@/pages/client-portal/ClientPortalPage').then(module => ({ default: module.ClientPortalPage })));
+const ClientReviewPage = lazy(() => import('@/pages/client-portal/ClientReviewPage').then(module => ({ default: module.ClientReviewPage })));
 
 const router = createBrowserRouter([
   {
@@ -56,130 +79,130 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardPage />,
+        element: <SuspenseWrapper><DashboardPage /></SuspenseWrapper>,
       },
       {
         path: 'workspaces',
-        element: <WorkspaceListPage />,
+        element: <SuspenseWrapper><WorkspaceListPage /></SuspenseWrapper>,
       },
       {
         path: 'workspaces/create',
-        element: <CreateWorkspacePage />,
+        element: <SuspenseWrapper><CreateWorkspacePage /></SuspenseWrapper>,
       },
       {
         path: 'workspaces/:workspaceId/settings',
-        element: <WorkspaceSettingsPage />,
+        element: <SuspenseWrapper><WorkspaceSettingsPage /></SuspenseWrapper>,
       },
       {
         path: 'social/accounts',
-        element: <ConnectedAccountsPage />,
+        element: <SuspenseWrapper><ConnectedAccountsPage /></SuspenseWrapper>,
       },
       {
         path: 'connect-v2',
-        element: <ConnectChannelV2Page />, // V2 Connect Flow
+        element: <SuspenseWrapper><ConnectChannelV2Page /></SuspenseWrapper>,
       },
       {
         path: 'posts',
-        element: <PostListPage />,
+        element: <SuspenseWrapper><PostListPage /></SuspenseWrapper>,
       },
       {
         path: 'posts/create',
-        element: <CreatePostPage />,
+        element: <SuspenseWrapper><CreatePostPage /></SuspenseWrapper>,
       },
       {
         path: 'posts/calendar',
-        element: <CalendarPage />,
+        element: <SuspenseWrapper><CalendarPage /></SuspenseWrapper>,
       },
       {
         path: 'posts/failed',
-        element: <FailedPostsPage />,
+        element: <SuspenseWrapper><FailedPostsPage /></SuspenseWrapper>,
       },
       {
         path: 'drafts',
-        element: <DraftsPage />,
+        element: <SuspenseWrapper><DraftsPage /></SuspenseWrapper>,
       },
       {
         path: 'approvals',
-        element: <ApprovalsPage />,
+        element: <SuspenseWrapper><ApprovalsPage /></SuspenseWrapper>,
       },
       {
         path: 'team/activity',
-        element: <ActivityPage />,
+        element: <SuspenseWrapper><ActivityPage /></SuspenseWrapper>,
       },
       {
         path: 'bulk-import',
-        element: <BulkImportPage />,
+        element: <SuspenseWrapper><BulkImportPage /></SuspenseWrapper>,
       },
       {
         path: 'media',
-        element: <MediaLibraryPage />,
+        element: <SuspenseWrapper><MediaLibraryPage /></SuspenseWrapper>,
       },
       {
         path: 'links',
-        element: <LinksPage />,
+        element: <SuspenseWrapper><LinksPage /></SuspenseWrapper>,
       },
       {
         path: 'evergreen',
-        element: <EvergreenPage />,
+        element: <SuspenseWrapper><EvergreenPage /></SuspenseWrapper>,
       },
       {
         path: 'repurpose',
-        element: <RepurposePage />,
+        element: <SuspenseWrapper><RepurposePage /></SuspenseWrapper>,
       },
       {
         path: 'rss',
-        element: <RSSPage />,
+        element: <SuspenseWrapper><RSSPage /></SuspenseWrapper>,
       },
       {
         path: 'campaigns',
-        element: <CampaignsPage />,
+        element: <SuspenseWrapper><CampaignsPage /></SuspenseWrapper>,
       },
       {
         path: 'stock-photos',
-        element: <StockPhotosPage />,
+        element: <SuspenseWrapper><StockPhotosPage /></SuspenseWrapper>,
       },
       {
         path: 'analytics',
-        element: <AnalyticsPage />,
+        element: <SuspenseWrapper><AnalyticsPage /></SuspenseWrapper>,
       },
       {
         path: 'analytics/dashboard',
-        element: <CustomDashboard />,
+        element: <SuspenseWrapper><CustomDashboard /></SuspenseWrapper>,
       },
       {
         path: 'analytics/competitors',
-        element: <CompetitorPage />,
+        element: <SuspenseWrapper><CompetitorPage /></SuspenseWrapper>,
       },
       {
         path: 'settings/webhooks',
-        element: <WebhooksPage />,
+        element: <SuspenseWrapper><WebhooksPage /></SuspenseWrapper>,
       },
       {
         path: 'pricing',
-        element: <PricingPage />,
+        element: <SuspenseWrapper><PricingPage /></SuspenseWrapper>,
       },
       {
         path: 'billing',
-        element: <BillingPage />,
+        element: <SuspenseWrapper><BillingPage /></SuspenseWrapper>,
       },
       {
         path: 'billing/success',
-        element: <BillingSuccessPage />,
+        element: <SuspenseWrapper><BillingSuccessPage /></SuspenseWrapper>,
       },
       {
         path: 'billing/cancel',
-        element: <BillingCancelPage />,
+        element: <SuspenseWrapper><BillingCancelPage /></SuspenseWrapper>,
       },
       {
         path: 'client-portal',
-        element: <ClientPortalPage />,
+        element: <SuspenseWrapper><ClientPortalPage /></SuspenseWrapper>,
       },
     ],
   },
   // Public client review page (no authentication required)
   {
     path: '/review/:token',
-    element: <ClientReviewPage />,
+    element: <SuspenseWrapper><ClientReviewPage /></SuspenseWrapper>,
   },
   {
     path: '/auth',
@@ -191,17 +214,17 @@ const router = createBrowserRouter([
     children: [
       {
         path: 'login',
-        element: <LoginPage />,
+        element: <SuspenseWrapper><LoginPage /></SuspenseWrapper>,
       },
       {
         path: 'register',
-        element: <RegisterPage />,
+        element: <SuspenseWrapper><RegisterPage /></SuspenseWrapper>,
       },
     ],
   },
   {
     path: '*',
-    element: <NotFoundPage />,
+    element: <SuspenseWrapper><NotFoundPage /></SuspenseWrapper>,
   },
 ]);
 
