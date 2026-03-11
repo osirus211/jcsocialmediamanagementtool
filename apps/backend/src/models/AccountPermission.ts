@@ -69,6 +69,5 @@ AccountPermissionSchema.index(
 // Additional compound indexes for lookups
 AccountPermissionSchema.index({ workspaceId: 1, userId: 1 }); // For member permission lookups
 AccountPermissionSchema.index({ workspaceId: 1, socialAccountId: 1 }); // For account permission lookups
-);
 
 export const AccountPermission = model<IAccountPermission>('AccountPermission', AccountPermissionSchema);
