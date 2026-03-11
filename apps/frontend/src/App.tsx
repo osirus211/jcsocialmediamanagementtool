@@ -11,6 +11,8 @@ function App() {
         <AuthProvider>
           <AppRouter />
         </AuthProvider>
+        {/* Add ReactQueryDevtools when @tanstack/react-query-devtools is installed */}
+        {/* <ReactQueryDevtools initialIsOpen={false} /> */}
       </QueryClientProvider>
     </ErrorBoundary>
   );
