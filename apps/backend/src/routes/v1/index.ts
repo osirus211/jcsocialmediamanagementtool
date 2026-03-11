@@ -35,6 +35,8 @@ import draftsRoutes from './drafts.routes'; // Phase-4: Collaborative draft edit
 import accountPermissionsRoutes from './account-permissions.routes'; // Phase-4: Granular permissions
 import postCommentsRoutes from './post-comments.routes'; // Phase-4: In-line post comments
 import clientPortalRoutes from './client-portal.routes'; // Phase-4: Client approval portal
+import categoriesRoutes from './categories.routes'; // Phase-4: Content categories
+import campaignsRoutes from './campaigns.routes'; // Phase-4: Campaign tagging
 
 const router = Router();
 
@@ -72,6 +74,8 @@ router.get('/', (_req, res) => {
       accountPermissions: '/api/v1/account-permissions',
       postComments: '/api/v1/posts/:postId/comments',
       clientPortal: '/api/v1/client-portal',
+      categories: '/api/v1/categories',
+      campaigns: '/api/v1/campaigns',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -114,6 +118,8 @@ router.use('/drafts', draftsRoutes); // Phase-4: Collaborative draft editing
 router.use('/account-permissions', accountPermissionsRoutes); // Phase-4: Granular permissions
 router.use('/posts', postCommentsRoutes); // Phase-4: In-line post comments
 router.use('/client-portal', clientPortalRoutes); // Phase-4: Client approval portal
+router.use('/categories', categoriesRoutes); // Phase-4: Content categories
+router.use('/campaigns', campaignsRoutes); // Phase-4: Campaign tagging
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

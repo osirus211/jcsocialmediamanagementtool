@@ -32,6 +32,7 @@ import { DraftsPage } from '@/pages/drafts/DraftsPage';
 import { ClientPortalPage } from '@/pages/client-portal/ClientPortalPage';
 import { ClientReviewPage } from '@/pages/client-portal/ClientReviewPage';
 import { RSSPage } from '@/pages/rss/RSSPage';
+import CampaignsPage from '@/pages/campaigns/CampaignsPage';
 import PricingPage from '@/pages/billing/Pricing';
 import BillingPage from '@/pages/billing/Billing';
 import BillingSuccessPage from '@/pages/billing/Success';
@@ -127,6 +128,10 @@ const router = createBrowserRouter([
       {
         path: 'rss',
         element: <RSSPage />,
+      },
+      {
+        path: 'campaigns',
+        element: <CampaignsPage />,
       },
       {
         path: 'analytics',

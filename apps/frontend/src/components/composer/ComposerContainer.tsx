@@ -17,6 +17,11 @@ import { TemplatesPanel } from './TemplatesPanel';
 import { PostPreviewPanel } from './preview/PostPreviewPanel';
 import { DraftLockBanner } from './DraftLockBanner';
 import { AIAssistantPanel } from './AIAssistantPanel';
+import CategoryPicker from '../categories/CategoryPicker';
+import CampaignPicker from '../campaigns/CampaignPicker';
+import CategoryBadge from '../categories/CategoryBadge';
+import { categoriesService } from '@/services/categories.service';
+import { X } from 'lucide-react';
 
 interface ComposerContainerProps {
   draftId?: string;
@@ -43,11 +48,19 @@ export function ComposerContainer({
     hasUnsavedChanges,
     contentType,
     reelOptions,
+    categoryId,
+    campaignId,
+    tags,
     setContent,
     setSelectedAccounts,
     setPublishMode,
     setScheduledDate,
     setQueueSlot,
+    setCategory,
+    setCampaign,
+    addTag,
+    removeTag,
+    clearTags,
     addMedia,
     removeMedia,
     updateMedia,
@@ -69,6 +82,8 @@ export function ComposerContainer({
   const [showPreview, setShowPreview] = useState(true);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [autoShortenLinks, setAutoShortenLinks] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Draft collaboration
@@ -347,6 +362,22 @@ export function ComposerContainer({
     }
   };
 
+  // Tag handling functions
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const tag = tagInput.trim();
+      if (tag.length <= 30 && !tags.includes(tag)) {
+        addTag(tag);
+        setTagInput('');
+      }
+    }
+  };
+
+  const handleRemoveTag = (tag: string) => {
+    removeTag(tag);
+  };
+
   const canPublish = 
     selectedAccounts.length > 0 &&
     (mainContent.trim().length > 0 || Object.values(platformContent).some((c) => c?.trim())) &&
@@ -451,6 +482,80 @@ export function ComposerContainer({
                 <ContentTypeSelector />
               </section>
             )}
+
+            {/* Category Selection */}
+            <section aria-labelledby="category-selection-label">
+              <h2 id="category-selection-label" className="sr-only">Select category</h2>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Category
+                </label>
+                <CategoryPicker
+                  selectedCategoryId={categoryId}
+                  onSelect={setCategory}
+                  placeholder="Select category (optional)"
+                />
+              </div>
+            </section>
+
+            {/* Campaign Selection */}
+            <section aria-labelledby="campaign-selection-label">
+              <h2 id="campaign-selection-label" className="sr-only">Select campaign</h2>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Campaign
+                </label>
+                <CampaignPicker
+                  selectedCampaignId={campaignId}
+                  onSelect={setCampaign}
+                  placeholder="Select campaign (optional)"
+                />
+              </div>
+            </section>
+
+            {/* Tags Input */}
+            <section aria-labelledby="tags-section-label">
+              <h2 id="tags-section-label" className="sr-only">Post tags</h2>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Tags
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    placeholder="Type a tag and press Enter"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    maxLength={30}
+                    disabled={tags.length >= 10}
+                  />
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                        >
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    {tags.length}/10 tags • Max 30 characters per tag
+                  </p>
+                </div>
+              </div>
+            </section>
 
             {/* Content Section */}
             <section aria-labelledby="content-section-label">

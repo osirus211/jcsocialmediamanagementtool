@@ -54,6 +54,12 @@ export interface IScheduledPost extends Document {
   failureReason?: string;
   platformPostId?: string;
   metadata?: Record<string, any>;
+  
+  // Content organization
+  categoryId?: mongoose.Types.ObjectId;
+  campaignId?: mongoose.Types.ObjectId;
+  tags: string[];
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -150,6 +156,26 @@ const ScheduledPostSchema = new Schema<IScheduledPost>(
       type: Schema.Types.Mixed,
       default: {},
     },
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      index: true,
+    },
+    campaignId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Campaign',
+      index: true,
+    },
+    tags: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function (tags: string[]) {
+          return tags.length <= 10 && tags.every(tag => tag.length <= 30);
+        },
+        message: 'Maximum 10 tags allowed, each max 30 characters',
+      },
+    },
   },
   {
     timestamps: true,
@@ -163,6 +189,11 @@ ScheduledPostSchema.index({ workspaceId: 1, scheduledAt: -1 }); // For listing p
 ScheduledPostSchema.index({ socialAccountId: 1, status: 1 }); // For account queries
 ScheduledPostSchema.index({ createdBy: 1, status: 1 }); // For user's posts
 ScheduledPostSchema.index({ workspaceId: 1, status: 1, submittedForApprovalAt: -1 }); // For approval queue
+
+// Indexes for content organization
+ScheduledPostSchema.index({ workspaceId: 1, categoryId: 1 });
+ScheduledPostSchema.index({ workspaceId: 1, campaignId: 1 });
+ScheduledPostSchema.index({ workspaceId: 1, tags: 1 });
 
 /**
  * Instance Methods
@@ -196,6 +227,9 @@ ScheduledPostSchema.methods = {
       failureReason: obj.failureReason,
       platformPostId: obj.platformPostId,
       metadata: obj.metadata,
+      categoryId: obj.categoryId?.toString(),
+      campaignId: obj.campaignId?.toString(),
+      tags: obj.tags,
       createdAt: obj.createdAt,
       updatedAt: obj.updatedAt,
     };

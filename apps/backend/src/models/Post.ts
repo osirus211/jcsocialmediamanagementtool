@@ -123,6 +123,11 @@ export interface IPost extends Document {
   lastEditedBy?: mongoose.Types.ObjectId;
   lastEditedAt?: Date;
 
+  // Content organization
+  categoryId?: mongoose.Types.ObjectId;
+  campaignId?: mongoose.Types.ObjectId;
+  tags: string[];
+
   // Methods
   canBeEdited(): boolean;
   canBeDeleted(): boolean;
@@ -270,6 +275,26 @@ const PostSchema = new Schema<IPost>(
     lastEditedAt: {
       type: Date,
     },
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      index: true,
+    },
+    campaignId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Campaign',
+      index: true,
+    },
+    tags: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function (tags: string[]) {
+          return tags.length <= 10 && tags.every(tag => tag.length <= 30);
+        },
+        message: 'Maximum 10 tags allowed, each max 30 characters',
+      },
+    },
   },
   {
     timestamps: true,
@@ -285,6 +310,11 @@ PostSchema.index({ socialAccountId: 1, status: 1 });
 
 // Index for calendar view queries
 PostSchema.index({ workspaceId: 1, scheduledAt: 1, status: 1 });
+
+// Indexes for content organization
+PostSchema.index({ workspaceId: 1, categoryId: 1 });
+PostSchema.index({ workspaceId: 1, campaignId: 1 });
+PostSchema.index({ workspaceId: 1, tags: 1 });
 
 /**
  * Check if post can be edited

@@ -47,6 +47,11 @@ interface ComposerState {
   reelOptions: {
     shareToFeed: boolean;
   };
+  
+  // Content organization
+  categoryId?: string;
+  campaignId?: string;
+  tags: string[];
 }
 
 /**
@@ -61,6 +66,13 @@ interface ComposerActions {
   setQueueSlot: (slot: QueueSlot | undefined) => void;
   setContentType: (type: 'post' | 'story' | 'reel') => void;
   setReelShareToFeed: (shareToFeed: boolean) => void;
+  
+  // Content organization
+  setCategory: (categoryId: string | undefined) => void;
+  setCampaign: (campaignId: string | undefined) => void;
+  addTag: (tag: string) => void;
+  removeTag: (tag: string) => void;
+  clearTags: () => void;
   
   // Media management
   addMedia: (files: File[]) => Promise<void>;
@@ -117,6 +129,9 @@ const initialState: ComposerState = {
   reelOptions: {
     shareToFeed: true,
   },
+  categoryId: undefined,
+  campaignId: undefined,
+  tags: [],
 };
 
 /**
@@ -197,6 +212,36 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
       reelOptions: { ...state.reelOptions, shareToFeed },
       hasUnsavedChanges: true,
     }));
+  },
+
+  // Content organization methods
+  setCategory: (categoryId) => {
+    set({ categoryId, hasUnsavedChanges: true });
+  },
+
+  setCampaign: (campaignId) => {
+    set({ campaignId, hasUnsavedChanges: true });
+  },
+
+  addTag: (tag) => {
+    set((state) => {
+      if (state.tags.includes(tag) || state.tags.length >= 10) return state;
+      return {
+        tags: [...state.tags, tag],
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  removeTag: (tag) => {
+    set((state) => ({
+      tags: state.tags.filter(t => t !== tag),
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  clearTags: () => {
+    set({ tags: [], hasUnsavedChanges: true });
   },
 
   // ============================================
@@ -454,6 +499,9 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
           .filter((m) => m.uploadStatus === 'completed')
           .map((m) => m.id),
         platformContent: platformContent.length > 0 ? platformContent : undefined,
+        categoryId: state.categoryId,
+        campaignId: state.campaignId,
+        tags: state.tags,
       };
 
       let savedDraft;

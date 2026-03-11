@@ -44,6 +44,9 @@ export interface GetPostsQuery {
   platform?: SocialPlatform;
   socialAccountId?: string;
   createdBy?: string;
+  categoryId?: string;
+  campaignId?: string;
+  tags?: string[];
   page?: number;
   limit?: number;
 }
@@ -203,6 +206,18 @@ export class PostService {
 
     if (query.createdBy) {
       filter.createdBy = new mongoose.Types.ObjectId(query.createdBy);
+    }
+
+    if (query.categoryId) {
+      filter.categoryId = new mongoose.Types.ObjectId(query.categoryId);
+    }
+
+    if (query.campaignId) {
+      filter.campaignId = new mongoose.Types.ObjectId(query.campaignId);
+    }
+
+    if (query.tags && query.tags.length > 0) {
+      filter.tags = { $in: query.tags };
     }
 
     // Execute query
