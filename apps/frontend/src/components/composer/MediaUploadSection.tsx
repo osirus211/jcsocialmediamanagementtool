@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { MediaFile, FILE_VALIDATION } from '@/types/composer.types';
 import { MediaItem } from './MediaItem';
-import { Upload, Image, Video } from 'lucide-react';
+import { DesignImportPanel } from '../media/DesignImportPanel';
+import { Upload, Image, Video, Palette } from 'lucide-react';
 
 interface MediaUploadSectionProps {
   media: MediaFile[];
@@ -23,6 +24,7 @@ export function MediaUploadSection({
   maxFiles = 10,
 }: MediaUploadSectionProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [showDesignImport, setShowDesignImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -67,6 +69,17 @@ export function MediaUploadSection({
     ...FILE_VALIDATION.image.types,
     ...FILE_VALIDATION.video.types,
   ].join(',');
+
+  const handleDesignImport = (file: File) => {
+    // Check max files limit
+    if (media.length + 1 > maxFiles) {
+      alert(`You can only upload up to ${maxFiles} files`);
+      return;
+    }
+
+    onUpload([file]);
+    setShowDesignImport(false);
+  };
 
   const handleMediaUpdate = (updatedMedia: MediaFile) => {
     if (onMediaUpdate) {
@@ -127,6 +140,17 @@ export function MediaUploadSection({
         </div>
       </div>
 
+      {/* Design Import Button */}
+      <div className="flex justify-center">
+        <button
+          onClick={() => setShowDesignImport(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+        >
+          <Palette className="h-4 w-4" />
+          Import from Canva/Figma
+        </button>
+      </div>
+
       {/* Media Grid */}
       {media.length > 0 && (
         <div 
@@ -152,6 +176,14 @@ export function MediaUploadSection({
         <p className="text-sm text-gray-600">
           {media.length} / {maxFiles} files uploaded
         </p>
+      )}
+
+      {/* Design Import Panel */}
+      {showDesignImport && (
+        <DesignImportPanel
+          onImport={handleDesignImport}
+          onClose={() => setShowDesignImport(false)}
+        />
       )}
     </div>
   );

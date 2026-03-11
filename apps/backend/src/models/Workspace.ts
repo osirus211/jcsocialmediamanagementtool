@@ -39,6 +39,26 @@ export interface IWorkspace extends Document {
     portalPassword?: string;
   };
   
+  // Design Integrations
+  integrations: {
+    canva: {
+      connected: boolean;
+      accessToken?: string;
+      refreshToken?: string;
+      userId?: string;
+      displayName?: string;
+      connectedAt?: Date;
+    };
+    figma: {
+      connected: boolean;
+      accessToken?: string;
+      refreshToken?: string;
+      userId?: string;
+      displayName?: string;
+      connectedAt?: Date;
+    };
+  };
+  
   // Limits based on plan
   limits: {
     maxMembers: number;
@@ -139,6 +159,52 @@ const WorkspaceSchema = new Schema<IWorkspace>(
       },
       portalPassword: {
         type: String,
+      },
+    },
+    
+    // Design Integrations
+    integrations: {
+      canva: {
+        connected: {
+          type: Boolean,
+          default: false,
+        },
+        accessToken: {
+          type: String,
+        },
+        refreshToken: {
+          type: String,
+        },
+        userId: {
+          type: String,
+        },
+        displayName: {
+          type: String,
+        },
+        connectedAt: {
+          type: Date,
+        },
+      },
+      figma: {
+        connected: {
+          type: Boolean,
+          default: false,
+        },
+        accessToken: {
+          type: String,
+        },
+        refreshToken: {
+          type: String,
+        },
+        userId: {
+          type: String,
+        },
+        displayName: {
+          type: String,
+        },
+        connectedAt: {
+          type: Date,
+        },
       },
     },
     

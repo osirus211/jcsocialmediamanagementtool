@@ -37,6 +37,7 @@ import postCommentsRoutes from './post-comments.routes'; // Phase-4: In-line pos
 import clientPortalRoutes from './client-portal.routes'; // Phase-4: Client approval portal
 import categoriesRoutes from './categories.routes'; // Phase-4: Content categories
 import campaignsRoutes from './campaigns.routes'; // Phase-4: Campaign tagging
+import designIntegrationsRoutes from './design-integrations.routes'; // Phase-4: Canva & Figma integration
 
 const router = Router();
 
@@ -76,6 +77,7 @@ router.get('/', (_req, res) => {
       clientPortal: '/api/v1/client-portal',
       categories: '/api/v1/categories',
       campaigns: '/api/v1/campaigns',
+      designIntegrations: '/api/v1/design-integrations',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -120,6 +122,7 @@ router.use('/posts', postCommentsRoutes); // Phase-4: In-line post comments
 router.use('/client-portal', clientPortalRoutes); // Phase-4: Client approval portal
 router.use('/categories', categoriesRoutes); // Phase-4: Content categories
 router.use('/campaigns', campaignsRoutes); // Phase-4: Campaign tagging
+router.use('/design-integrations', designIntegrationsRoutes); // Phase-4: Canva & Figma integration
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);
