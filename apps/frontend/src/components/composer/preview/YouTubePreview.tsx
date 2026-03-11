@@ -3,6 +3,7 @@
  * Shows how the post will appear on YouTube (video uploads and Shorts)
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 
 interface YouTubePreviewProps {
@@ -12,8 +13,16 @@ interface YouTubePreviewProps {
   channelAvatar?: string;
 }
 
-export function YouTubePreview({ content, media, channelName, channelAvatar }: YouTubePreviewProps) {
-  const videoMedia = media.find(m => m.type === 'video');
+const YouTubePreview = memo(function YouTubePreview({ 
+  content, 
+  media, 
+  channelName, 
+  channelAvatar 
+}: YouTubePreviewProps) {
+  const videoMedia = useMemo(() => 
+    media.find(m => m.type === 'video'), 
+    [media]
+  );
   const isShort = videoMedia && videoMedia.duration && videoMedia.duration <= 60;
 
   return (
@@ -112,4 +121,6 @@ export function YouTubePreview({ content, media, channelName, channelAvatar }: Y
       </div>
     </div>
   );
-}
+});
+
+export { YouTubePreview };

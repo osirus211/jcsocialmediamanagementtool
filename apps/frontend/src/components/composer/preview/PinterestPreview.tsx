@@ -3,6 +3,7 @@
  * Shows how the post will appear as a Pinterest Pin
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 
 interface PinterestPreviewProps {
@@ -12,8 +13,16 @@ interface PinterestPreviewProps {
   accountAvatar?: string;
 }
 
-export function PinterestPreview({ content, media, accountName, accountAvatar }: PinterestPreviewProps) {
-  const imageMedia = media.find(m => m.type === 'image');
+const PinterestPreview = memo(function PinterestPreview({ 
+  content, 
+  media, 
+  accountName, 
+  accountAvatar 
+}: PinterestPreviewProps) {
+  const imageMedia = useMemo(() => 
+    media.find(m => m.type === 'image'), 
+    [media]
+  );
 
   return (
     <div className="w-full max-w-sm mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -98,4 +107,6 @@ export function PinterestPreview({ content, media, accountName, accountAvatar }:
       </div>
     </div>
   );
-}
+});
+
+export { PinterestPreview };

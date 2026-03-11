@@ -3,6 +3,7 @@
  * Renders a Bluesky post card
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 import { Heart, MessageCircle, Repeat2, MoreHorizontal } from 'lucide-react';
 
@@ -16,7 +17,7 @@ interface BlueskyPreviewProps {
 
 const BLUESKY_LIMIT = 300;
 
-export function BlueskyPreview({
+const BlueskyPreview = memo(function BlueskyPreview({
   content,
   media,
   accountHandle = 'handle.bsky.social',
@@ -24,7 +25,10 @@ export function BlueskyPreview({
   accountAvatar,
 }: BlueskyPreviewProps) {
   const isOverLimit = content.length > BLUESKY_LIMIT;
-  const completedMedia = media.filter((m) => m.uploadStatus === 'completed');
+  const completedMedia = useMemo(() => 
+    media.filter((m) => m.uploadStatus === 'completed'), 
+    [media]
+  );
 
   return (
     <div className="bg-white border border-gray-300 rounded-lg overflow-hidden w-full max-w-[600px] mx-auto">
@@ -112,4 +116,6 @@ export function BlueskyPreview({
       </div>
     </div>
   );
-}
+});
+
+export { BlueskyPreview };

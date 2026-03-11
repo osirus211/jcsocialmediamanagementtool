@@ -3,6 +3,7 @@
  * Shared component for rendering media in platform-appropriate layouts
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 
 interface PreviewMediaGridProps {
@@ -10,10 +11,13 @@ interface PreviewMediaGridProps {
   maxItems?: number;
 }
 
-export function PreviewMediaGrid({ media, maxItems = 4 }: PreviewMediaGridProps) {
-  const completedMedia = media
-    .filter((m) => m.uploadStatus === 'completed')
-    .slice(0, maxItems);
+const PreviewMediaGrid = memo(function PreviewMediaGrid({ media, maxItems = 4 }: PreviewMediaGridProps) {
+  const completedMedia = useMemo(() => 
+    media
+      .filter((m) => m.uploadStatus === 'completed')
+      .slice(0, maxItems),
+    [media, maxItems]
+  );
 
   if (completedMedia.length === 0) {
     return null;
@@ -86,4 +90,6 @@ export function PreviewMediaGrid({ media, maxItems = 4 }: PreviewMediaGridProps)
       ))}
     </div>
   );
-}
+});
+
+export { PreviewMediaGrid };

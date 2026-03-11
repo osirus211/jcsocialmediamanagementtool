@@ -34,42 +34,41 @@ export function ComposerContainer({
   onSuccess,
   onCancel,
 }: ComposerContainerProps) {
-  const {
-    mainContent,
-    platformContent,
-    selectedAccounts,
-    media,
-    publishMode,
-    scheduledDate,
-    selectedQueueSlot,
-    saveStatus,
-    lastSaved,
-    saveError,
-    hasUnsavedChanges,
-    contentType,
-    reelOptions,
-    categoryId,
-    campaignId,
-    tags,
-    setContent,
-    setSelectedAccounts,
-    setPublishMode,
-    setScheduledDate,
-    setQueueSlot,
-    setCategory,
-    setCampaign,
-    addTag,
-    removeTag,
-    clearTags,
-    addMedia,
-    removeMedia,
-    updateMedia,
-    replaceMedia,
-    saveDraft,
-    setDraftId,
-    setIsNewDraft,
-    reset,
-  } = useComposerStore();
+  // Granular store selectors for better performance
+  const mainContent = useComposerStore(state => state.mainContent);
+  const platformContent = useComposerStore(state => state.platformContent);
+  const selectedAccounts = useComposerStore(state => state.selectedAccounts);
+  const media = useComposerStore(state => state.media);
+  const publishMode = useComposerStore(state => state.publishMode);
+  const scheduledDate = useComposerStore(state => state.scheduledDate);
+  const selectedQueueSlot = useComposerStore(state => state.selectedQueueSlot);
+  const saveStatus = useComposerStore(state => state.saveStatus);
+  const lastSaved = useComposerStore(state => state.lastSaved);
+  const saveError = useComposerStore(state => state.saveError);
+  const hasUnsavedChanges = useComposerStore(state => state.hasUnsavedChanges);
+  const contentType = useComposerStore(state => state.contentType);
+  const reelOptions = useComposerStore(state => state.reelOptions);
+  const categoryId = useComposerStore(state => state.categoryId);
+  const campaignId = useComposerStore(state => state.campaignId);
+  const tags = useComposerStore(state => state.tags);
+  const setContent = useComposerStore(state => state.setContent);
+  const setSelectedAccounts = useComposerStore(state => state.setSelectedAccounts);
+  const setPublishMode = useComposerStore(state => state.setPublishMode);
+  const setScheduledDate = useComposerStore(state => state.setScheduledDate);
+  const setQueueSlot = useComposerStore(state => state.setQueueSlot);
+  const setCategory = useComposerStore(state => state.setCategory);
+  const setCampaign = useComposerStore(state => state.setCampaign);
+  const addTag = useComposerStore(state => state.addTag);
+  const removeTag = useComposerStore(state => state.removeTag);
+  const clearTags = useComposerStore(state => state.clearTags);
+  const addMedia = useComposerStore(state => state.addMedia);
+  const removeMedia = useComposerStore(state => state.removeMedia);
+  const updateMedia = useComposerStore(state => state.updateMedia);
+  const replaceMedia = useComposerStore(state => state.replaceMedia);
+  const saveDraft = useComposerStore(state => state.saveDraft);
+  const setDraftId = useComposerStore(state => state.setDraftId);
+  const setIsNewDraft = useComposerStore(state => state.setIsNewDraft);
+  const reset = useComposerStore(state => state.reset);
 
   const { accounts } = useSocialAccountStore();
   const [isPublishing, setIsPublishing] = useState(false);

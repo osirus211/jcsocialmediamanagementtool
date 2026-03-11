@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import { useComposerStore } from '@/store/composer.store';
 import { aiService, ContentTone, CaptionGenerationOutput, CaptionScoreOutput, EngagementPredictionOutput } from '@/services/ai.service';
 import { SocialPlatform } from '@/types/composer.types';
@@ -29,7 +29,7 @@ interface CaptionVariant extends CaptionGenerationOutput {
   isLoadingScore?: boolean;
 }
 
-export function AIAssistantPanel({ selectedPlatforms, mainContent }: AIAssistantPanelProps) {
+const AIAssistantPanel = memo(function AIAssistantPanel({ selectedPlatforms, mainContent }: AIAssistantPanelProps) {
   const { setContent } = useComposerStore();
   const [activeTab, setActiveTab] = useState<TabType>('generate');
   const [isLoading, setIsLoading] = useState(false);
@@ -719,4 +719,6 @@ export function AIAssistantPanel({ selectedPlatforms, mainContent }: AIAssistant
       </div>
     </div>
   );
-}
+});
+
+export { AIAssistantPanel };

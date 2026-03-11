@@ -3,6 +3,7 @@
  * Renders a Threads post card
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 import { Heart, MessageCircle, Repeat2, Send, MoreHorizontal } from 'lucide-react';
 
@@ -15,14 +16,17 @@ interface ThreadsPreviewProps {
 
 const THREADS_LIMIT = 500;
 
-export function ThreadsPreview({
+const ThreadsPreview = memo(function ThreadsPreview({
   content,
   media,
   accountUsername = 'username',
   accountAvatar,
 }: ThreadsPreviewProps) {
   const isOverLimit = content.length > THREADS_LIMIT;
-  const completedMedia = media.filter((m) => m.uploadStatus === 'completed');
+  const completedMedia = useMemo(() => 
+    media.filter((m) => m.uploadStatus === 'completed'), 
+    [media]
+  );
 
   return (
     <div className="bg-white border border-gray-300 rounded-lg overflow-hidden w-full max-w-[500px] mx-auto">
@@ -101,4 +105,6 @@ export function ThreadsPreview({
       </div>
     </div>
   );
-}
+});
+
+export { ThreadsPreview };
