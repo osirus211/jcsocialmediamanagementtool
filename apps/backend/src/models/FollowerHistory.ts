@@ -57,6 +57,8 @@ const FollowerHistorySchema = new Schema<IFollowerHistory>(
 FollowerHistorySchema.index({ accountId: 1, recordedAt: -1 });
 FollowerHistorySchema.index({ workspaceId: 1, recordedAt: -1 });
 FollowerHistorySchema.index({ accountId: 1, platform: 1, recordedAt: -1 });
+FollowerHistorySchema.index({ workspaceId: 1, platform: 1, recordedAt: -1 }); // For workspace analytics by platform
+FollowerHistorySchema.index({ platform: 1, recordedAt: -1 }); // For cross-workspace analytics
 
 // Prevent duplicate snapshots for same account at same time
 FollowerHistorySchema.index(

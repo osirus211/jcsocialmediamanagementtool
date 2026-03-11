@@ -111,6 +111,8 @@ const ClientReviewSchema = new Schema<IClientReview>(
 ClientReviewSchema.index({ workspaceId: 1, status: 1 });
 ClientReviewSchema.index({ workspaceId: 1, createdBy: 1 });
 ClientReviewSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+ClientReviewSchema.index({ workspaceId: 1, status: 1, createdAt: -1 }); // For filtered review lists
+ClientReviewSchema.index({ workspaceId: 1, createdAt: -1 }); // For date-sorted lists
 
 // Pre-save middleware to set reviewedAt when status changes
 ClientReviewSchema.pre('save', function (next) {

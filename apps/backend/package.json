@@ -15,7 +15,8 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "seed:free": "tsx scripts/seed-free-plan.ts",
-    "migrate:all-to-v2": "tsx scripts/migrate-all-to-v2.ts"
+    "migrate:all-to-v2": "tsx scripts/migrate-all-to-v2.ts",
+    "db:indexes": "tsx src/scripts/create-indexes.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.3",

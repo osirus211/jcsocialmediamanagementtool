@@ -86,5 +86,7 @@ const CampaignSchema = new Schema<ICampaign>(
 
 // Index for workspace + status queries
 CampaignSchema.index({ workspaceId: 1, status: 1 });
+CampaignSchema.index({ workspaceId: 1, status: 1, createdAt: -1 }); // For filtered campaign lists
+CampaignSchema.index({ workspaceId: 1, startDate: 1, endDate: 1 }); // For date range queries
 
 export const Campaign = mongoose.model<ICampaign>('Campaign', CampaignSchema);

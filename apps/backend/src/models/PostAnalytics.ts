@@ -161,6 +161,9 @@ PostAnalyticsSchema.index({ postId: 1, collectedAt: -1 });
 PostAnalyticsSchema.index({ workspaceId: 1, collectedAt: -1 });
 PostAnalyticsSchema.index({ platform: 1, collectedAt: -1 });
 PostAnalyticsSchema.index({ postId: 1, collectionAttempt: 1 }, { unique: true });
+PostAnalyticsSchema.index({ workspaceId: 1, platform: 1, collectedAt: -1 }); // For platform-filtered analytics
+PostAnalyticsSchema.index({ workspaceId: 1, postId: 1 }); // For post-level analytics lookup
+PostAnalyticsSchema.index({ postId: 1, platform: 1 }); // For cross-platform post comparison
 
 // Calculate engagement rate before saving
 PostAnalyticsSchema.pre('save', function (next) {

@@ -76,5 +76,7 @@ const PostCommentSchema = new Schema<IPostComment>(
 // Compound indexes for efficient queries
 PostCommentSchema.index({ postId: 1, createdAt: -1 });
 PostCommentSchema.index({ workspaceId: 1, createdAt: -1 });
+PostCommentSchema.index({ workspaceId: 1, authorId: 1, createdAt: -1 }); // For user activity
+PostCommentSchema.index({ postId: 1, isResolved: 1 }); // For unresolved comment filtering
 
 export const PostComment = model<IPostComment>('PostComment', PostCommentSchema);
