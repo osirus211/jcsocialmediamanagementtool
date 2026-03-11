@@ -1,0 +1,236 @@
+name: Deploy Blue-Green
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options: [production, staging]
+      force_slot:
+        description: 'Force specific slot (optional)'
+        required: false
+        type: choice
+        options: ['', 'blue', 'green']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine active slot
+        id: slot
+        run: |
+          if [ -n "${{ inputs.force_slot }}" ]; then
+            echo "Using forced slot: ${{ inputs.force_slot }}"
+            if [ "${{ inputs.force_slot }}" = "blue" ]; then
+              echo "active=green" >> $GITHUB_OUTPUT
+              echo "inactive=blue" >> $GITHUB_OUTPUT
+            else
+              echo "active=blue" >> $GITHUB_OUTPUT
+              echo "inactive=green" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Check which slot is currently active
+            ACTIVE=$(curl -sf ${{ secrets.DEPLOY_HOST }}/api/v1/health | jq -r '.slot // "blue"' 2>/dev/null || echo "blue")
+            echo "Current active slot: $ACTIVE"
+            if [ "$ACTIVE" = "blue" ]; then
+              echo "active=blue" >> $GITHUB_OUTPUT
+              echo "inactive=green" >> $GITHUB_OUTPUT
+            else
+              echo "active=green" >> $GITHUB_OUTPUT
+              echo "inactive=blue" >> $GITHUB_OUTPUT
+            fi
+          fi
+          echo "Will deploy to: $(cat $GITHUB_OUTPUT | grep inactive | cut -d'=' -f2)"
+
+      - name: Build and push Docker images
+        run: |
+          # Build and push backend image
+          docker build -f apps/backend/Dockerfile.production \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest \
+            apps/backend
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          
+          # Build and push frontend image
+          docker build -f apps/frontend/Dockerfile.production \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest \
+            apps/frontend
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+
+      - name: Deploy to inactive slot
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/social-media-app
+            
+            # Set environment variables
+            export BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+            export FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+            export SLOT=${{ steps.slot.outputs.inactive }}
+            
+            echo "Deploying to $SLOT slot..."
+            
+            # Pull latest images
+            docker pull $BACKEND_IMAGE
+            docker pull $FRONTEND_IMAGE
+            
+            # Deploy to inactive slot
+            docker-compose -f deployment/blue-green/docker-compose.$SLOT.yml down || true
+            docker-compose -f deployment/blue-green/docker-compose.$SLOT.yml up -d
+            
+            echo "Deployment to $SLOT slot initiated"
+
+      - name: Health check inactive slot
+        run: |
+          SLOT=${{ steps.slot.outputs.inactive }}
+          if [ "$SLOT" = "blue" ]; then
+            BACKEND_PORT=3001
+          else
+            BACKEND_PORT=3002
+          fi
+          
+          echo "Waiting for $SLOT slot to be healthy on port $BACKEND_PORT..."
+          
+          for i in {1..30}; do
+            echo "Health check attempt $i/30..."
+            STATUS=$(curl -sf ${{ secrets.DEPLOY_HOST }}:$BACKEND_PORT/api/v1/health | jq -r '.status' 2>/dev/null || echo "")
+            if [ "$STATUS" = "ok" ]; then
+              echo "✅ $SLOT slot is healthy!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "❌ Health check failed after 30 attempts"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Run smoke tests on inactive slot
+        run: |
+          SLOT=${{ steps.slot.outputs.inactive }}
+          if [ "$SLOT" = "blue" ]; then
+            TEST_URL="http://${{ secrets.DEPLOY_HOST }}:3001"
+          else
+            TEST_URL="http://${{ secrets.DEPLOY_HOST }}:3002"
+          fi
+          
+          echo "Running smoke tests against $TEST_URL..."
+          
+          # Test health endpoint
+          curl -f $TEST_URL/api/v1/health
+          
+          # Test API endpoints (if auth is available)
+          # Add more smoke tests as needed
+
+      - name: Switch traffic to inactive slot
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/social-media-app
+            echo "Switching traffic from ${{ steps.slot.outputs.active }} to ${{ steps.slot.outputs.inactive }}"
+            ./deployment/blue-green/switch-slot.sh ${{ steps.slot.outputs.inactive }}
+
+      - name: Verify production health
+        run: |
+          echo "Verifying production health after traffic switch..."
+          sleep 15
+          
+          for i in {1..10}; do
+            STATUS=$(curl -sf ${{ secrets.DEPLOY_HOST }}/api/v1/health | jq -r '.status' 2>/dev/null || echo "")
+            SLOT=$(curl -sf ${{ secrets.DEPLOY_HOST }}/api/v1/health | jq -r '.slot' 2>/dev/null || echo "")
+            
+            if [ "$STATUS" = "ok" ] && [ "$SLOT" = "${{ steps.slot.outputs.inactive }}" ]; then
+              echo "✅ Production is healthy and serving from $SLOT slot"
+              break
+            fi
+            
+            if [ $i -eq 10 ]; then
+              echo "❌ Production health verification failed"
+              exit 1
+            fi
+            
+            echo "Attempt $i/10 - Status: $STATUS, Slot: $SLOT"
+            sleep 10
+          done
+
+      - name: Stop old slot
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/social-media-app
+            echo "Stopping old ${{ steps.slot.outputs.active }} slot..."
+            docker-compose -f deployment/blue-green/docker-compose.${{ steps.slot.outputs.active }}.yml down
+            echo "✅ Blue-green deployment completed successfully"
+
+      - name: Rollback on failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/social-media-app
+            echo "❌ Deployment failed - initiating rollback to ${{ steps.slot.outputs.active }} slot"
+            ./deployment/blue-green/rollback.sh
+            echo "🔄 Rollback completed"
+
+      - name: Cleanup old images
+        if: success()
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Cleaning up old Docker images..."
+            docker image prune -f
+            docker system prune -f --volumes=false
+            echo "✅ Cleanup completed"
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "✅ Blue-green deployment completed successfully"
+          else
+            echo "❌ Blue-green deployment failed"
+          fi

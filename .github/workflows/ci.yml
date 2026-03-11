@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'apps/backend/package-lock.json'
+      - name: Install backend dependencies
+        run: cd apps/backend && npm ci
+      - name: Type check backend
+        run: cd apps/backend && npm run typecheck || npx tsc --noEmit
+      - name: Test backend
+        run: cd apps/backend && npm test -- --passWithNoTests
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'apps/frontend/package-lock.json'
+      - name: Install frontend dependencies
+        run: cd apps/frontend && npm ci
+      - name: Type check frontend
+        run: cd apps/frontend && npx tsc --noEmit
+      - name: Test frontend
+        run: cd apps/frontend && npm test -- --passWithNoTests
+
+  build:
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend Docker image
+        run: |
+          docker build -f apps/backend/Dockerfile.production \
+            -t social-backend:${{ github.sha }} \
+            apps/backend
+      - name: Build frontend Docker image
+        run: |
+          docker build -f apps/frontend/Dockerfile.production \
+            -t social-frontend:${{ github.sha }} \
+            apps/frontend
+      - name: Test backend container
+        run: |
+          docker run --rm -d --name test-backend \
+            -e NODE_ENV=production \
+            -e MONGODB_URI=mongodb://localhost:27017/test \
+            -e REDIS_URL=redis://localhost:6379 \
+            -p 5000:5000 \
+            social-backend:${{ github.sha }}
+          sleep 10
+          docker logs test-backend
+          docker stop test-backend
+      - name: Test frontend container
+        run: |
+          docker run --rm -d --name test-frontend \
+            -p 80:80 \
+            social-frontend:${{ github.sha }}
+          sleep 5
+          docker logs test-frontend
+          docker stop test-frontend
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

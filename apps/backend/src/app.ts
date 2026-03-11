@@ -154,13 +154,27 @@ app.get('/health', async (_req: Request, res: Response) => {
     const isHealthy = await healthCheckService.isHealthy();
 
     if (isHealthy) {
-      res.status(200).json({ status: 'ok' });
+      res.status(200).json({ 
+        status: 'ok',
+        slot: process.env.SLOT || 'blue',
+        version: process.env.npm_package_version || '1.0.0',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      });
     } else {
-      res.status(503).json({ status: 'unhealthy' });
+      res.status(503).json({ 
+        status: 'unhealthy',
+        slot: process.env.SLOT || 'blue',
+        version: process.env.npm_package_version || '1.0.0',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      });
     }
   } catch (error: any) {
     res.status(503).json({
       status: 'error',
+      slot: process.env.SLOT || 'blue',
+      version: process.env.npm_package_version || '1.0.0',
       message: 'Health check failed',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
