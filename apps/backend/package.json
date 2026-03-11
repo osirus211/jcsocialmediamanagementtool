@@ -16,7 +16,11 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "seed:free": "tsx scripts/seed-free-plan.ts",
     "migrate:all-to-v2": "tsx scripts/migrate-all-to-v2.ts",
-    "db:indexes": "tsx src/scripts/create-indexes.ts"
+    "db:indexes": "tsx src/scripts/create-indexes.ts",
+    "k6:smoke": "k6 run k6/scenarios/smoke-test.js",
+    "k6:load": "k6 run k6/scenarios/load-test.js",
+    "k6:stress": "k6 run k6/scenarios/stress-test.js",
+    "k6:spike": "k6 run k6/scenarios/spike-test.js"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.4.3",
