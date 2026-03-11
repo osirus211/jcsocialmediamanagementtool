@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useComposerStore, composerSelectors } from '@/store/composer.store';
+import { useComposerStore } from '@/store/composer.store';
 import { composerService } from '@/services/composer.service';
-import { ComposerStatus } from '@/types/composer.types';
+import { SaveStatus } from '@/types/composer.types';
 
 /**
  * Auto-save configuration
@@ -29,19 +29,19 @@ const MAX_RETRY_ATTEMPTS = 1;
  * - Graceful error handling
  */
 export function useAutoSave() {
-  const draftId = useComposerStore(composerSelectors.draftId);
-  const isDirty = useComposerStore(composerSelectors.isDirty);
-  const text = useComposerStore(composerSelectors.text);
-  const platformContent = useComposerStore(composerSelectors.platformContent);
-  const selectedAccountIds = useComposerStore(composerSelectors.selectedAccountIds);
-  const mediaIds = useComposerStore(composerSelectors.mediaIds);
-  const status = useComposerStore(composerSelectors.status);
-
   const {
+    draftId,
+    hasUnsavedChanges,
+    mainContent,
+    platformContent,
+    selectedAccounts,
+    media,
+    saveStatus,
     setDraftId,
-    markSaved,
-    setStatus,
-    setError,
+    setSaveStatus,
+    setSaveError,
+    setLastSaved,
+    setHasUnsavedChanges,
   } = useComposerStore();
 
   // Track if save is in progress (prevent race conditions)
@@ -63,24 +63,34 @@ export function useAutoSave() {
     }
 
     // Don't save if not dirty
-    if (!isDirty) {
+    if (!hasUnsavedChanges) {
       return;
     }
 
-    // Don't save if already publishing
-    if (status === ComposerStatus.PUBLISHING) {
+    // Don't save if already saving
+    if (saveStatus === 'saving') {
       return;
     }
 
     try {
       isSavingRef.current = true;
-      setStatus(ComposerStatus.SAVING);
+      setSaveStatus('saving');
+
+      const platformContentArray = Object.entries(platformContent)
+        .filter(([_, text]) => text.trim().length > 0)
+        .map(([platform, text]) => ({
+          platform,
+          text,
+          enabled: true,
+        }));
 
       const payload = {
-        content: text,
-        socialAccountIds: selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
-        mediaIds: mediaIds.length > 0 ? mediaIds : undefined,
-        platformContent: platformContent.length > 0 ? platformContent : undefined,
+        content: mainContent,
+        socialAccountIds: selectedAccounts.length > 0 ? selectedAccounts : undefined,
+        mediaIds: media
+          .filter((m) => m.uploadStatus === 'completed')
+          .map((m) => m.id),
+        platformContent: platformContentArray.length > 0 ? platformContentArray : undefined,
       };
 
       let savedPost;
@@ -95,7 +105,9 @@ export function useAutoSave() {
       }
 
       // Mark as saved
-      markSaved();
+      setSaveStatus('saved');
+      setLastSaved(new Date());
+      setHasUnsavedChanges(false);
       retryCountRef.current = 0; // Reset retry counter on success
     } catch (error: any) {
       console.error('Auto-save error:', error);
@@ -111,24 +123,26 @@ export function useAutoSave() {
         }, 2000);
       } else {
         // Max retries reached, show error
-        setError(error.response?.data?.message || 'Failed to save draft');
+        setSaveError(error.response?.data?.message || 'Failed to save draft');
+        setSaveStatus('error');
         retryCountRef.current = 0;
       }
     } finally {
       isSavingRef.current = false;
     }
   }, [
-    isDirty,
-    status,
+    hasUnsavedChanges,
+    saveStatus,
     draftId,
-    text,
+    mainContent,
     platformContent,
-    selectedAccountIds,
-    mediaIds,
+    selectedAccounts,
+    media,
     setDraftId,
-    markSaved,
-    setStatus,
-    setError,
+    setSaveStatus,
+    setSaveError,
+    setLastSaved,
+    setHasUnsavedChanges,
   ]);
 
   /**
@@ -150,7 +164,7 @@ export function useAutoSave() {
    * Effect: Trigger save when content changes
    */
   useEffect(() => {
-    if (isDirty) {
+    if (hasUnsavedChanges) {
       triggerSave();
     }
 
@@ -160,7 +174,7 @@ export function useAutoSave() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [isDirty, text, platformContent, selectedAccountIds, mediaIds, triggerSave]);
+  }, [hasUnsavedChanges, mainContent, platformContent, selectedAccounts, media, triggerSave]);
 
   /**
    * Manual save function (for explicit save button)
@@ -177,8 +191,8 @@ export function useAutoSave() {
 
   return {
     manualSave,
-    isSaving: status === ComposerStatus.SAVING,
-    isSaved: status === ComposerStatus.SAVED,
-    hasError: status === ComposerStatus.ERROR,
+    isSaving: saveStatus === 'saving',
+    isSaved: saveStatus === 'saved',
+    hasError: saveStatus === 'error',
   };
 }

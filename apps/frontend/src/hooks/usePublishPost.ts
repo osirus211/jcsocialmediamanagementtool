@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useComposerStore, composerSelectors } from '@/store/composer.store';
+import { useComposerStore } from '@/store/composer.store';
 import { composerService } from '@/services/composer.service';
-import { ComposerStatus, PublishMode } from '@/types/composer.types';
+import { PublishMode } from '@/types/composer.types';
 
 /**
  * usePublishPost Hook
@@ -26,19 +26,18 @@ import { ComposerStatus, PublishMode } from '@/types/composer.types';
 export function usePublishPost() {
   const navigate = useNavigate();
   
-  const draftId = useComposerStore(composerSelectors.draftId);
-  const isDirty = useComposerStore(composerSelectors.isDirty);
-  const publishMode = useComposerStore(composerSelectors.publishMode);
-  const scheduledAt = useComposerStore(composerSelectors.scheduledAt);
-  const queueSlot = useComposerStore(composerSelectors.queueSlot);
-  const text = useComposerStore(composerSelectors.text);
-  const selectedAccountIds = useComposerStore(composerSelectors.selectedAccountIds);
-  const status = useComposerStore(composerSelectors.status);
-
   const {
-    setStatus,
-    setError,
-    resetComposer,
+    draftId,
+    hasUnsavedChanges,
+    publishMode,
+    scheduledDate,
+    selectedQueueSlot,
+    mainContent,
+    selectedAccounts,
+    saveStatus,
+    setSaveStatus,
+    setSaveError,
+    reset,
   } = useComposerStore();
 
   const [isPublishing, setIsPublishing] = useState(false);
@@ -48,12 +47,12 @@ export function usePublishPost() {
    */
   const validate = useCallback((): { valid: boolean; error?: string } => {
     // Check content
-    if (!text.trim()) {
+    if (!mainContent.trim()) {
       return { valid: false, error: 'Post content is required' };
     }
 
     // Check accounts
-    if (selectedAccountIds.length === 0) {
+    if (selectedAccounts.length === 0) {
       return { valid: false, error: 'Please select at least one account' };
     }
 
@@ -63,23 +62,23 @@ export function usePublishPost() {
     }
 
     // Check not dirty
-    if (isDirty) {
+    if (hasUnsavedChanges) {
       return { valid: false, error: 'Please wait for draft to save' };
     }
 
     // Check not already publishing
-    if (isPublishing || status === ComposerStatus.PUBLISHING) {
+    if (isPublishing || saveStatus === 'saving') {
       return { valid: false, error: 'Publish already in progress' };
     }
 
     // Validate schedule mode
     if (publishMode === PublishMode.SCHEDULE) {
-      if (!scheduledAt) {
+      if (!scheduledDate) {
         return { valid: false, error: 'Please select a date and time' };
       }
 
       // Validate future date
-      const scheduleDate = new Date(scheduledAt);
+      const scheduleDate = new Date(scheduledDate);
       const now = new Date();
       
       if (scheduleDate <= now) {
@@ -89,22 +88,22 @@ export function usePublishPost() {
 
     // Validate queue mode
     if (publishMode === PublishMode.QUEUE) {
-      if (!queueSlot) {
+      if (!selectedQueueSlot) {
         return { valid: false, error: 'Please select a queue slot' };
       }
     }
 
     return { valid: true };
   }, [
-    text,
-    selectedAccountIds,
+    mainContent,
+    selectedAccounts,
     draftId,
-    isDirty,
+    hasUnsavedChanges,
     isPublishing,
-    status,
+    saveStatus,
     publishMode,
-    scheduledAt,
-    queueSlot,
+    scheduledDate,
+    selectedQueueSlot,
   ]);
 
   /**
@@ -120,24 +119,24 @@ export function usePublishPost() {
 
     try {
       setIsPublishing(true);
-      setStatus(ComposerStatus.PUBLISHING);
-      setError(null);
+      setSaveStatus('saving');
+      setSaveError(undefined);
 
       // Build publish request
       const publishRequest = {
         publishMode,
-        scheduledAt: publishMode === PublishMode.SCHEDULE ? scheduledAt : undefined,
-        queueSlot: publishMode === PublishMode.QUEUE ? queueSlot : undefined,
+        scheduledAt: publishMode === PublishMode.SCHEDULE ? scheduledDate : undefined,
+        queueSlot: publishMode === PublishMode.QUEUE ? selectedQueueSlot : undefined,
       };
 
       // Call publish API
       await composerService.publishPost(draftId!, publishRequest);
 
       // Success
-      setStatus(ComposerStatus.SUCCESS);
+      setSaveStatus('saved');
 
       // Reset composer
-      resetComposer();
+      reset();
 
       // Redirect to posts list
       setTimeout(() => {
@@ -147,8 +146,8 @@ export function usePublishPost() {
       console.error('Publish error:', error);
       
       const errorMessage = error.response?.data?.message || 'Failed to publish post';
-      setError(errorMessage);
-      setStatus(ComposerStatus.ERROR);
+      setSaveError(errorMessage);
+      setSaveStatus('error');
     } finally {
       setIsPublishing(false);
     }
@@ -156,11 +155,11 @@ export function usePublishPost() {
     validate,
     draftId,
     publishMode,
-    scheduledAt,
-    queueSlot,
-    setStatus,
-    setError,
-    resetComposer,
+    scheduledDate,
+    selectedQueueSlot,
+    setSaveStatus,
+    setSaveError,
+    reset,
     navigate,
   ]);
 
