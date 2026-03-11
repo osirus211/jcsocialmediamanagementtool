@@ -70,9 +70,15 @@ if (config.env === 'production') {
 }
 
 // CORS configuration
+const allowedOrigins = [
+  config.cors.origin,
+  // Chrome extension - update with actual extension ID after publishing
+  'chrome-extension://*'
+];
+
 app.use(
   cors({
-    origin: config.cors.origin,
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Workspace-ID', 'X-API-Key'],
