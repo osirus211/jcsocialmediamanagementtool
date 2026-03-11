@@ -3,6 +3,7 @@
  * Renders Instagram feed post, story, or reel preview
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Play } from 'lucide-react';
 
@@ -16,7 +17,7 @@ interface InstagramPreviewProps {
 
 const INSTAGRAM_LIMIT = 2200;
 
-export function InstagramPreview({
+const InstagramPreview = memo(function InstagramPreview({
   content,
   media,
   accountUsername = 'your_username',
@@ -24,10 +25,13 @@ export function InstagramPreview({
   contentType = 'post',
 }: InstagramPreviewProps) {
   const isOverLimit = content.length > INSTAGRAM_LIMIT;
-  const completedMedia = media.filter((m) => m.uploadStatus === 'completed');
+  const completedMedia = useMemo(() => 
+    media.filter((m) => m.uploadStatus === 'completed'), 
+    [media]
+  );
 
   // Highlight hashtags in caption
-  const renderCaption = (text: string) => {
+  const renderCaption = useMemo(() => (text: string) => {
     const parts = text.split(/(\s+)/);
     return parts.map((part, index) => {
       if (part.startsWith('#')) {
@@ -39,7 +43,7 @@ export function InstagramPreview({
       }
       return <span key={index}>{part}</span>;
     });
-  };
+  }, []);
 
   // Story Preview
   if (contentType === 'story') {
@@ -230,4 +234,6 @@ export function InstagramPreview({
       </div>
     </div>
   );
-}
+});
+
+export { InstagramPreview };

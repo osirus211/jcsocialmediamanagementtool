@@ -3,7 +3,7 @@
  * Live preview panel showing platform-specific post previews
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useMemo, useCallback } from 'react';
 import { useComposerStore } from '@/store/composer.store';
 import { useSocialAccountStore } from '@/store/social.store';
 import { SocialPlatform } from '@/types/composer.types';
@@ -40,18 +40,18 @@ const PLATFORM_NAMES: Record<SocialPlatform, string> = {
   pinterest: 'Pinterest',
 };
 
-export function PostPreviewPanel() {
+const PostPreviewPanel = memo(function PostPreviewPanel() {
   const { mainContent, platformContent, media, selectedAccounts, contentType } = useComposerStore();
   const { accounts } = useSocialAccountStore();
 
   // Get unique platforms from selected accounts
-  const selectedPlatforms = Array.from(
+  const selectedPlatforms = useMemo(() => Array.from(
     new Set(
       accounts
         .filter((acc) => selectedAccounts.includes(acc._id))
         .map((acc) => acc.platform.toLowerCase() as SocialPlatform)
     )
-  );
+  ), [accounts, selectedAccounts]);
 
   const [activeTab, setActiveTab] = useState<SocialPlatform | null>(
     selectedPlatforms.length > 0 ? selectedPlatforms[0] : null
@@ -67,17 +67,17 @@ export function PostPreviewPanel() {
   }, [selectedPlatforms, activeTab]);
 
   // Get content for active platform
-  const getContent = (platform: SocialPlatform) => {
+  const getContent = useCallback((platform: SocialPlatform) => {
     return platformContent[platform] || mainContent;
-  };
+  }, [platformContent, mainContent]);
 
   // Get account info for platform
-  const getAccountInfo = (platform: SocialPlatform) => {
+  const getAccountInfo = useCallback((platform: SocialPlatform) => {
     const account = accounts.find(
       (acc) => selectedAccounts.includes(acc._id) && acc.platform.toLowerCase() === platform
     );
     return account;
-  };
+  }, [accounts, selectedAccounts]);
 
   if (selectedPlatforms.length === 0) {
     return (
@@ -197,4 +197,6 @@ export function PostPreviewPanel() {
       </div>
     </div>
   );
-}
+});
+
+export { PostPreviewPanel };

@@ -3,6 +3,7 @@
  * Renders a realistic LinkedIn post card
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 import { ThumbsUp, MessageSquare, Repeat2, Send } from 'lucide-react';
 import { PreviewMediaGrid } from './PreviewMediaGrid';
@@ -18,7 +19,7 @@ interface LinkedInPreviewProps {
 const LINKEDIN_LIMIT = 3000;
 const PREVIEW_TRUNCATE = 150;
 
-export function LinkedInPreview({
+const LinkedInPreview = memo(function LinkedInPreview({
   content,
   media,
   accountName = 'Your Name',
@@ -27,7 +28,14 @@ export function LinkedInPreview({
 }: LinkedInPreviewProps) {
   const isOverLimit = content.length > LINKEDIN_LIMIT;
   const shouldTruncate = content.length > PREVIEW_TRUNCATE;
-  const displayContent = shouldTruncate ? content.slice(0, PREVIEW_TRUNCATE) + '...' : content;
+  const displayContent = useMemo(() => 
+    shouldTruncate ? content.slice(0, PREVIEW_TRUNCATE) + '...' : content,
+    [content, shouldTruncate]
+  );
+  const completedMedia = useMemo(() => 
+    media.filter((m) => m.uploadStatus === 'completed'), 
+    [media]
+  );
 
   return (
     <div className="bg-white border border-gray-300 rounded-lg overflow-hidden w-full max-w-[375px] mx-auto">
@@ -73,7 +81,7 @@ export function LinkedInPreview({
       </div>
 
       {/* Media */}
-      {media.filter((m) => m.uploadStatus === 'completed').length > 0 && (
+      {completedMedia.length > 0 && (
         <div className="w-full">
           <PreviewMediaGrid media={media} maxItems={1} />
         </div>
@@ -110,4 +118,6 @@ export function LinkedInPreview({
       </div>
     </div>
   );
-}
+});
+
+export { LinkedInPreview };

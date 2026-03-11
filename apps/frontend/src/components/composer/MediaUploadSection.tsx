@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, memo, useCallback, useMemo } from 'react';
 import { MediaFile, FILE_VALIDATION } from '@/types/composer.types';
 import { MediaItem } from './MediaItem';
 import { DesignImportPanel } from '../media/DesignImportPanel';
@@ -15,7 +15,7 @@ interface MediaUploadSectionProps {
   maxFiles?: number;
 }
 
-export function MediaUploadSection({
+const MediaUploadSection = memo(function MediaUploadSection({
   media,
   selectedPlatforms = [],
   onUpload,
@@ -29,31 +29,21 @@ export function MediaUploadSection({
   const [showStockPhotos, setShowStockPhotos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const acceptedTypes = useMemo(() => [
+    ...FILE_VALIDATION.image.types,
+    ...FILE_VALIDATION.video.types,
+  ].join(','), []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleDragLeave = () => {
+  const handleDragLeave = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    handleFiles(files);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      handleFiles(files);
-    }
-  };
-
-  const handleFiles = (files: File[]) => {
+  const handleFiles = useCallback((files: File[]) => {
     // Check max files limit
     if (media.length + files.length > maxFiles) {
       alert(`You can only upload up to ${maxFiles} files`);
@@ -61,18 +51,28 @@ export function MediaUploadSection({
     }
 
     onUpload(files);
-  };
+  }, [media.length, maxFiles, onUpload]);
 
-  const handleBrowseClick = () => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  }, [handleFiles]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      handleFiles(files);
+    }
+  }, [handleFiles]);
+
+  const handleBrowseClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const acceptedTypes = [
-    ...FILE_VALIDATION.image.types,
-    ...FILE_VALIDATION.video.types,
-  ].join(',');
-
-  const handleDesignImport = (file: File) => {
+  const handleDesignImport = useCallback((file: File) => {
     // Check max files limit
     if (media.length + 1 > maxFiles) {
       alert(`You can only upload up to ${maxFiles} files`);
@@ -81,9 +81,9 @@ export function MediaUploadSection({
 
     onUpload([file]);
     setShowDesignImport(false);
-  };
+  }, [media.length, maxFiles, onUpload]);
 
-  const handleStockPhotoImport = (file: File) => {
+  const handleStockPhotoImport = useCallback((file: File) => {
     // Check max files limit
     if (media.length + 1 > maxFiles) {
       alert(`You can only upload up to ${maxFiles} files`);
@@ -92,13 +92,13 @@ export function MediaUploadSection({
 
     onUpload([file]);
     setShowStockPhotos(false);
-  };
+  }, [media.length, maxFiles, onUpload]);
 
-  const handleMediaUpdate = (updatedMedia: MediaFile) => {
+  const handleMediaUpdate = useCallback((updatedMedia: MediaFile) => {
     if (onMediaUpdate) {
       onMediaUpdate(updatedMedia.id, updatedMedia);
     }
-  };
+  }, [onMediaUpdate]);
 
   return (
     <div className="space-y-4">
@@ -216,4 +216,6 @@ export function MediaUploadSection({
       )}
     </div>
   );
-}
+});
+
+export { MediaUploadSection };

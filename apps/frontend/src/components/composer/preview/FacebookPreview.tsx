@@ -3,6 +3,7 @@
  * Renders a Facebook post card
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 import { ThumbsUp, MessageCircle, Share2, Globe, MoreHorizontal } from 'lucide-react';
 import { PreviewMediaGrid } from './PreviewMediaGrid';
@@ -16,13 +17,17 @@ interface FacebookPreviewProps {
 
 const FACEBOOK_LIMIT = 63206;
 
-export function FacebookPreview({
+const FacebookPreview = memo(function FacebookPreview({
   content,
   media,
   accountName = 'Your Name',
   accountAvatar,
 }: FacebookPreviewProps) {
   const isOverLimit = content.length > FACEBOOK_LIMIT;
+  const completedMedia = useMemo(() => 
+    media.filter((m) => m.uploadStatus === 'completed'), 
+    [media]
+  );
 
   return (
     <div className="bg-white border border-gray-300 rounded-lg overflow-hidden w-full max-w-[375px] mx-auto">
@@ -68,7 +73,7 @@ export function FacebookPreview({
       </div>
 
       {/* Media */}
-      {media.filter((m) => m.uploadStatus === 'completed').length > 0 && (
+      {completedMedia.length > 0 && (
         <div className="w-full">
           <PreviewMediaGrid media={media} maxItems={1} />
         </div>
@@ -114,4 +119,6 @@ export function FacebookPreview({
       </div>
     </div>
   );
-}
+});
+
+export { FacebookPreview };

@@ -3,6 +3,7 @@
  * Renders a realistic Twitter card UI
  */
 
+import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
 import { Heart, MessageCircle, Repeat2, Share2, BarChart } from 'lucide-react';
 import { PreviewMediaGrid } from './PreviewMediaGrid';
@@ -17,7 +18,7 @@ interface TwitterPreviewProps {
 
 const TWITTER_LIMIT = 280;
 
-export function TwitterPreview({
+const TwitterPreview = memo(function TwitterPreview({
   content,
   media,
   accountName = 'Your Name',
@@ -25,7 +26,10 @@ export function TwitterPreview({
   accountAvatar,
 }: TwitterPreviewProps) {
   const isOverLimit = content.length > TWITTER_LIMIT;
-  const displayContent = isOverLimit ? content.slice(0, TWITTER_LIMIT) + '...' : content;
+  const displayContent = useMemo(() => 
+    isOverLimit ? content.slice(0, TWITTER_LIMIT) + '...' : content,
+    [content, isOverLimit]
+  );
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-4 w-full max-w-[375px] mx-auto">
@@ -103,4 +107,6 @@ export function TwitterPreview({
       </div>
     </div>
   );
-}
+});
+
+export { TwitterPreview };

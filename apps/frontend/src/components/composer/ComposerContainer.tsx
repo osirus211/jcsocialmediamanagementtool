@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useComposerStore } from '@/store/composer.store';
 import { useSocialAccountStore } from '@/store/social.store';
 import { composerService } from '@/services/composer.service';
@@ -98,17 +98,20 @@ export function ComposerContainer({
   });
 
   // Get unique platforms from selected accounts
-  const selectedPlatforms = Array.from(
+  const selectedPlatforms = useMemo(() => Array.from(
     new Set(
       accounts
         .filter((acc) => selectedAccounts.includes(acc._id))
         .map((acc) => acc.platform.toLowerCase() as SocialPlatform)
     )
-  );
+  ), [accounts, selectedAccounts]);
 
   // Detect URLs in content
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  const urlsInContent = mainContent.match(urlRegex) || [];
+  const urlsInContent = useMemo(() => {
+    const urlRegex = /https?:\/\/[^\s]+/g;
+    return mainContent.match(urlRegex) || [];
+  }, [mainContent]);
+  
   const urlCount = urlsInContent.length;
 
   // Toast management
@@ -187,7 +190,7 @@ export function ComposerContainer({
     };
   }, [hasUnsavedChanges, mainContent, platformContent, selectedAccounts, media, collaboration]);
 
-  const loadDraft = async (id: string) => {
+  const loadDraft = useCallback(async (id: string) => {
     try {
       const draft = await composerService.getDraft(id);
       
@@ -209,7 +212,7 @@ export function ComposerContainer({
       console.error('Failed to load draft:', error);
       alert('Failed to load draft: ' + (error.message || 'Unknown error'));
     }
-  };
+  }, [setDraftId, setIsNewDraft, setContent, setSelectedAccounts]);
 
   const fetchQueueSlots = useCallback(async () => {
     setIsLoadingSlots(true);
@@ -228,7 +231,7 @@ export function ComposerContainer({
     }
   }, [publishMode, setQueueSlot]);
 
-  const validatePublish = (): string[] => {
+  const validatePublish = useCallback((): string[] => {
     const errors: string[] = [];
 
     // Check accounts selected
@@ -266,9 +269,9 @@ export function ComposerContainer({
     }
 
     return errors;
-  };
+  }, [selectedAccounts, mainContent, platformContent, selectedPlatforms, publishMode, scheduledDate, selectedQueueSlot]);
 
-  const handlePublish = async () => {
+  const handlePublish = useCallback(async () => {
     // Validate
     const errors = validatePublish();
     if (errors.length > 0) {
@@ -348,22 +351,22 @@ export function ComposerContainer({
       setIsPublishing(false);
       setIsRetryingPublish(false);
     }
-  };
+  }, [validatePublish, mainContent, autoShortenLinks, urlsInContent, setContent, hasUnsavedChanges, saveDraft, publishMode, contentType, scheduledDate, selectedQueueSlot, reelOptions, addToast, reset, onSuccess]);
 
-  const handleRetryPublish = async () => {
+  const handleRetryPublish = useCallback(async () => {
     setIsRetryingPublish(true);
     await handlePublish();
-  };
+  }, [handlePublish]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     reset();
     if (onCancel) {
       onCancel();
     }
-  };
+  }, [reset, onCancel]);
 
   // Tag handling functions
-  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTagInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && tagInput.trim()) {
       e.preventDefault();
       const tag = tagInput.trim();
@@ -372,17 +375,19 @@ export function ComposerContainer({
         setTagInput('');
       }
     }
-  };
+  }, [tagInput, tags, addTag]);
 
-  const handleRemoveTag = (tag: string) => {
+  const handleRemoveTag = useCallback((tag: string) => {
     removeTag(tag);
-  };
+  }, [removeTag]);
 
-  const canPublish = 
+  const canPublish = useMemo(() => 
     selectedAccounts.length > 0 &&
     (mainContent.trim().length > 0 || Object.values(platformContent).some((c) => c?.trim())) &&
     !hasUnsavedChanges &&
-    !isPublishing;
+    !isPublishing,
+    [selectedAccounts, mainContent, platformContent, hasUnsavedChanges, isPublishing]
+  );
 
   return (
     <>

@@ -1,3 +1,4 @@
+import { memo, useCallback, useMemo } from 'react';
 import { PublishMode } from '@/types/composer.types';
 import { Save, Send, X, Loader2, FileText, Link } from 'lucide-react';
 import { AIToggleButton } from './AIToggleButton';
@@ -19,7 +20,7 @@ interface ComposerActionsProps {
   showAIPanel?: boolean;
 }
 
-export function ComposerActions({
+const ComposerActions = memo(function ComposerActions({
   onSave,
   onPublish,
   onCancel,
@@ -35,7 +36,7 @@ export function ComposerActions({
   urlCount = 0,
   showAIPanel = false,
 }: ComposerActionsProps) {
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm(
         'You have unsaved changes. Are you sure you want to cancel?'
@@ -43,16 +44,16 @@ export function ComposerActions({
       if (!confirmed) return;
     }
     onCancel();
-  };
+  }, [hasUnsavedChanges, onCancel]);
 
-  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, action: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       action();
     }
-  };
+  }, []);
 
-  const getPublishButtonText = () => {
+  const publishButtonText = useMemo(() => {
     if (isLoading) return 'Publishing...';
     
     switch (publishMode) {
@@ -65,15 +66,14 @@ export function ComposerActions({
       default:
         return 'Publish';
     }
-  };
+  }, [isLoading, publishMode]);
 
-  const getPublishAriaLabel = () => {
-    const baseText = getPublishButtonText();
+  const publishAriaLabel = useMemo(() => {
     if (!canPublish) {
-      return `${baseText} (disabled: ${hasUnsavedChanges ? 'save draft first' : 'complete required fields'})`;
+      return `${publishButtonText} (disabled: ${hasUnsavedChanges ? 'save draft first' : 'complete required fields'})`;
     }
-    return baseText;
-  };
+    return publishButtonText;
+  }, [publishButtonText, canPublish, hasUnsavedChanges]);
 
   return (
     <div 
@@ -162,22 +162,24 @@ export function ComposerActions({
           onClick={onPublish}
           disabled={isLoading || isSaving || !canPublish}
           className="px-6 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium min-h-[44px]"
-          aria-label={getPublishAriaLabel()}
+          aria-label={publishAriaLabel}
           aria-disabled={!canPublish}
         >
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              <span>{getPublishButtonText()}</span>
+              <span>{publishButtonText}</span>
             </>
           ) : (
             <>
               <Send className="h-4 w-4" aria-hidden="true" />
-              <span>{getPublishButtonText()}</span>
+              <span>{publishButtonText}</span>
             </>
           )}
         </button>
       </div>
     </div>
   );
-}
+});
+
+export { ComposerActions };
