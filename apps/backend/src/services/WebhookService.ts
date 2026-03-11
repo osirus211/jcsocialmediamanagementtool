@@ -67,46 +67,37 @@ export class WebhookService {
   }
 
   /**
-   * Send webhook to endpoint
+   * Send webhook to endpoint using retry service
    */
   private async sendWebhook(webhook: any, event: WebhookEvent): Promise<void> {
     try {
-      const payload = {
-        event: event.event,
-        timestamp: new Date().toISOString(),
-        data: event.data,
-      };
+      // Use the new retry service instead of direct HTTP calls
+      const { WebhookDeliveryQueue } = await import('../queue/WebhookDeliveryQueue');
+      const queue = WebhookDeliveryQueue.getInstance();
 
-      const response = await axios.post(webhook.url, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Signature': this.generateSignature(webhook.secret, payload),
-        },
-        timeout: 10000, // 10 seconds
+      await queue.addDelivery({
+        webhookId: webhook._id.toString(),
+        workspaceId: event.workspaceId,
+        event: event.event,
+        payload: event.data,
+        url: webhook.url,
+        secret: webhook.secret,
+        attempt: 1,
+        maxAttempts: 5,
       });
 
-      logger.info('Webhook sent successfully', {
+      logger.info('Webhook delivery queued', {
         webhookId: webhook._id.toString(),
         url: webhook.url,
         event: event.event,
-        status: response.status,
       });
-
-      // Update webhook stats
-      webhook.lastTriggeredAt = new Date();
-      webhook.successCount = (webhook.successCount || 0) + 1;
-      await webhook.save();
     } catch (error: any) {
-      logger.error('Failed to send webhook', {
+      logger.error('Failed to queue webhook delivery', {
         webhookId: webhook._id.toString(),
         url: webhook.url,
         event: event.event,
         error: error.message,
       });
-
-      // Update webhook stats
-      webhook.failureCount = (webhook.failureCount || 0) + 1;
-      await webhook.save();
     }
   }
 

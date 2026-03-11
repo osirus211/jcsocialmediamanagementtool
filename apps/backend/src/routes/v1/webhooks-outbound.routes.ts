@@ -246,35 +246,100 @@ router.get('/:id/deliveries', validateRequest(webhookParamsSchema), async (req, 
   try {
     const workspaceId = req.user.currentWorkspaceId;
     const { id } = req.params;
+    const { limit = 50, skip = 0, event, status } = req.query;
 
-    const webhooks = await WebhookManagementService.listEndpoints(workspaceId);
-    const webhook = webhooks.find(w => w._id.toString() === id);
+    // Import WebhookRetryService dynamically
+    const { WebhookRetryService } = await import('../../services/WebhookRetryService');
 
-    if (!webhook) {
+    const result = await WebhookRetryService.getDeliveryHistory(id, workspaceId, {
+      limit: parseInt(limit as string),
+      skip: parseInt(skip as string),
+      event: event as string,
+      status: status as string,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        deliveries: result.deliveries,
+        pagination: {
+          total: result.total,
+          limit: parseInt(limit as string),
+          skip: parseInt(skip as string),
+          hasMore: result.total > parseInt(skip as string) + parseInt(limit as string),
+        },
+        stats: result.stats,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get delivery history',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /webhooks/outbound/:id/retry
+ * Retry failed webhook deliveries
+ */
+router.post('/:id/retry', validateRequest(webhookParamsSchema), async (req, res) => {
+  try {
+    const workspaceId = req.user.currentWorkspaceId;
+    const { id } = req.params;
+
+    // Verify webhook exists and belongs to workspace
+    const webhook = await WebhookManagementService.listEndpoints(workspaceId);
+    const targetWebhook = webhook.find(w => w._id.toString() === id);
+
+    if (!targetWebhook) {
       return res.status(404).json({
         success: false,
         message: 'Webhook not found',
       });
     }
 
-    // Return basic delivery stats (in a real implementation, you'd store detailed delivery logs)
-    const deliveries = {
-      totalDeliveries: webhook.successCount + webhook.failureCount,
-      successfulDeliveries: webhook.successCount,
-      failedDeliveries: webhook.failureCount,
-      lastTriggeredAt: webhook.lastTriggeredAt,
-      // In a full implementation, you'd return the last 50 delivery attempts with timestamps, status codes, etc.
-      recentDeliveries: [],
-    };
+    // Import services dynamically
+    const { WebhookDelivery } = await import('../../models/WebhookDelivery');
+    const { WebhookDeliveryQueue } = await import('../../queue/WebhookDeliveryQueue');
+
+    // Find failed deliveries for this webhook
+    const failedDeliveries = await WebhookDelivery.find({
+      webhookId: id,
+      workspaceId,
+      status: { $in: ['failed', 'dead_letter'] },
+    }).limit(10); // Limit to prevent abuse
+
+    const queue = WebhookDeliveryQueue.getInstance();
+    let retriedCount = 0;
+
+    for (const delivery of failedDeliveries) {
+      // Reset delivery for retry
+      await queue.addDelivery({
+        webhookId: id,
+        workspaceId,
+        event: delivery.event,
+        payload: delivery.payload,
+        url: delivery.url,
+        secret: targetWebhook.secret,
+        attempt: 1, // Reset to first attempt
+        maxAttempts: 5,
+      });
+      retriedCount++;
+    }
 
     res.json({
       success: true,
-      data: deliveries,
+      data: {
+        retriedCount,
+        message: `${retriedCount} failed deliveries queued for retry`,
+      },
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: 'Failed to get delivery history',
+      message: 'Failed to retry webhook deliveries',
       error: error.message,
     });
   }

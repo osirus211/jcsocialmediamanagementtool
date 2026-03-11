@@ -10,9 +10,11 @@ import {
   CheckCircle, 
   XCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  History
 } from 'lucide-react';
 import { WebhookEndpoint, webhooksService } from '@/services/webhooks.service';
+import { WebhookDeliveryLog } from '@/components/webhooks/WebhookDeliveryLog';
 
 interface WebhookEndpointCardProps {
   webhook: WebhookEndpoint;
@@ -49,6 +51,7 @@ export function WebhookEndpointCard({ webhook, onEdit, onDelete, onUpdate }: Web
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [showDeliveryLog, setShowDeliveryLog] = useState(false);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Never';
@@ -280,6 +283,15 @@ export function WebhookEndpointCard({ webhook, onEdit, onDelete, onUpdate }: Web
           )}
         </button>
 
+        <button
+          onClick={() => setShowDeliveryLog(true)}
+          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+          title="View delivery history"
+        >
+          <History className="h-4 w-4" />
+          History
+        </button>
+
         {testResult && (
           <div className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm ${
             testResult.success 
@@ -333,6 +345,13 @@ export function WebhookEndpointCard({ webhook, onEdit, onDelete, onUpdate }: Web
           </div>
         </div>
       )}
+
+      {/* Webhook Delivery Log Modal */}
+      <WebhookDeliveryLog
+        webhookId={webhook._id}
+        isOpen={showDeliveryLog}
+        onClose={() => setShowDeliveryLog(false)}
+      />
     </div>
   );
 }

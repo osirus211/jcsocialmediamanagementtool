@@ -23,6 +23,43 @@ export interface WebhookEndpointWithSecret extends WebhookEndpoint {
   secret: string;
 }
 
+export interface WebhookDelivery {
+  _id: string;
+  webhookId: string;
+  workspaceId: string;
+  event: string;
+  payload: Record<string, any>;
+  url: string;
+  attempt: number;
+  maxAttempts: number;
+  status: 'pending' | 'success' | 'failed' | 'dead_letter';
+  statusCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  deliveredAt?: string;
+  nextRetryAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebhookDeliveryStats {
+  totalDeliveries: number;
+  successfulDeliveries: number;
+  failedDeliveries: number;
+  deadLetterDeliveries: number;
+}
+
+export interface WebhookDeliveryHistory {
+  deliveries: WebhookDelivery[];
+  pagination: {
+    total: number;
+    limit: number;
+    skip: number;
+    hasMore: boolean;
+  };
+  stats: WebhookDeliveryStats;
+}
+
 export interface WebhookDeliveries {
   totalDeliveries: number;
   successfulDeliveries: number;
@@ -118,6 +155,41 @@ class WebhooksService {
     const response = await apiClient.get<{ success: boolean; data: WebhookDeliveries }>(
       `/webhooks/outbound/${id}/deliveries`
     );
+    return response.data;
+  }
+
+  /**
+   * Get detailed delivery history for webhook endpoint
+   */
+  async getDeliveryHistory(
+    id: string,
+    options: {
+      limit?: number;
+      skip?: number;
+      event?: string;
+      status?: string;
+    } = {}
+  ): Promise<WebhookDeliveryHistory> {
+    const params = new URLSearchParams();
+    if (options.limit) params.append('limit', options.limit.toString());
+    if (options.skip) params.append('skip', options.skip.toString());
+    if (options.event) params.append('event', options.event);
+    if (options.status) params.append('status', options.status);
+
+    const response = await apiClient.get<{ success: boolean; data: WebhookDeliveryHistory }>(
+      `/webhooks/outbound/${id}/deliveries?${params.toString()}`
+    );
+    return response.data;
+  }
+
+  /**
+   * Retry failed webhook deliveries
+   */
+  async retryFailedDeliveries(id: string): Promise<{ retriedCount: number; message: string }> {
+    const response = await apiClient.post<{ 
+      success: boolean; 
+      data: { retriedCount: number; message: string } 
+    }>(`/webhooks/outbound/${id}/retry`);
     return response.data;
   }
 }

@@ -373,6 +373,11 @@ const startServer = async () => {
         analyticsSchedulerService.start();
         logger.info('📅 Analytics scheduler started');
         
+        // Start webhook retry scheduler
+        const { webhookRetryScheduler } = await import('./services/WebhookRetryScheduler');
+        webhookRetryScheduler.start();
+        logger.info('📅 Webhook retry scheduler started');
+        
         console.log('✅ Phase 7 analytics collection system started');
       } catch (error) {
         console.log('❌ Phase 7 analytics collection system failed to start:', error);

@@ -97,6 +97,12 @@ export const workerConfigs: Record<string, WorkerConfig> = {
     restartDelay: 5000,
   },
 
+  'webhook-delivery-worker': {
+    enabled: config.workers.enableWebhooks !== false, // Default to true
+    maxRestarts: 3,
+    restartDelay: 5000,
+  },
+
   // ============================================================================
   // OPTIONAL_RUNTIME WORKERS - Enabled by default (configurable via env vars)
   // ============================================================================

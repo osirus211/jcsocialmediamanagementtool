@@ -67,6 +67,7 @@ import { MediaProcessingWorker } from './MediaProcessingWorker';
 import { EmailWorker } from './EmailWorker';
 import { NotificationWorker } from './NotificationWorker';
 import { AnalyticsCollectorWorker } from './AnalyticsCollectorWorker';
+import { WebhookDeliveryWorker } from './WebhookDeliveryWorker';
 
 // Import OPTIONAL_RUNTIME workers (configurable)
 import { ConnectionHealthCheckWorker } from './ConnectionHealthCheckWorker';
@@ -166,6 +167,12 @@ export function initializeWorkers(): WorkerManager {
     'analytics-collector-worker',
     new WorkerAdapter(new AnalyticsCollectorWorker(), 'analytics-collector-worker'),
     workerConfigs['analytics-collector-worker']
+  );
+
+  manager.registerWorker(
+    'webhook-delivery-worker',
+    new WorkerAdapter(new WebhookDeliveryWorker(), 'webhook-delivery-worker'),
+    workerConfigs['webhook-delivery-worker'] || { enabled: true, priority: 'high' }
   );
 
   // ============================================================================
