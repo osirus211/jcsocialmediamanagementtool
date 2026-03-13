@@ -28,10 +28,12 @@ import {
   EyeOff,
   RefreshCw,
   ExternalLink,
+  Database,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { AccountService } from '@/services/account.service';
 import { toast } from '@/lib/notifications';
+import { GDPRSettings } from '@/components/settings/GDPRSettings';
 import type { 
   LoginActivity, 
   TrustedDevice, 
@@ -277,6 +279,7 @@ export function AccountSettingsPage() {
     { id: 'email', label: 'Email Management', icon: Mail },
     { id: 'password', label: 'Password', icon: Key },
     { id: 'security', label: 'Security', icon: Shield },
+    { id: 'gdpr', label: 'Data & Privacy', icon: Database },
     { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
   ];
 
@@ -683,6 +686,11 @@ export function AccountSettingsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* GDPR & Data Privacy Tab */}
+        {activeTab === 'gdpr' && (
+          <GDPRSettings />
         )}
 
         {/* Danger Zone Tab */}

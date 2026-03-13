@@ -232,6 +232,19 @@ const startServer = async () => {
       // Don't throw - backup is non-critical for app startup
     }
 
+    console.log('🔧 Initializing GDPR scheduler...');
+    // Start GDPR scheduler - critical for compliance
+    try {
+      const { GDPRScheduler } = await import('./jobs/schedulers/gdprScheduler');
+      GDPRScheduler.start();
+      console.log('🛡️  GDPR Scheduler STARTED');
+      logger.info('🛡️  GDPR scheduler started');
+    } catch (error) {
+      console.log('❌ GDPR scheduler failed to start:', error);
+      logger.error('❌ GDPR scheduler failed to start:', error);
+      // Don't throw - but log as error since GDPR compliance is important
+    }
+
     console.log('🔧 Initializing magic link cleanup job...');
     // Start magic link cleanup job - independent of Redis
     try {

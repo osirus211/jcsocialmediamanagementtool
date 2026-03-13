@@ -678,33 +678,17 @@ export class AuthService {
   }
 
   /**
-   * Delete account (soft delete)
+   * Delete account (soft delete with GDPR compliance)
    */
   static async deleteAccount(userId: string, password: string): Promise<void> {
     try {
-      const user = await User.findById(userId).select('+password');
-      if (!user) {
-        throw new NotFoundError('User not found');
-      }
+      // Use GDPR service for compliant account deletion
+      const { GDPRService } = await import('./GDPRService');
+      await GDPRService.requestAccountDeletion(userId, password);
 
-      // Verify password for local accounts
-      if (user.provider === OAuthProvider.LOCAL) {
-        const isPasswordValid = await user.comparePassword(password);
-        if (!isPasswordValid) {
-          throw new UnauthorizedError('Invalid password');
-        }
-      }
-
-      // Soft delete the user
-      user.softDeletedAt = new Date();
-      user.refreshTokens = []; // Clear all sessions
-      await user.save();
-
-      logger.info('User account deleted', {
-        userId: user._id.toString(),
-      });
+      logger.info('Account deletion requested via GDPR service', { userId });
     } catch (error: any) {
-      logger.error('Error deleting user account', {
+      logger.error('Error requesting account deletion', {
         userId,
         error: error.message,
       });
@@ -1042,38 +1026,16 @@ export class AuthService {
    */
   static async exportAccountData(userId: string): Promise<any> {
     try {
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new NotFoundError('User not found');
-      }
-
-      // TODO: Gather all user data from various collections
-      const exportData = {
-        user: {
-          id: user._id.toString(),
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          bio: user.bio,
-          timezone: user.timezone,
-          language: user.language,
-          createdAt: user.createdAt,
-          lastLoginAt: user.lastLoginAt,
-          isEmailVerified: user.isEmailVerified,
-          twoFactorEnabled: user.twoFactorEnabled,
-        },
-        // TODO: Add posts, analytics, workspaces, etc.
-        posts: [],
-        workspaces: [],
-        analytics: [],
-        exportedAt: new Date().toISOString(),
-      };
-
-      logger.info('Account data exported', {
-        userId: user._id.toString(),
+      // Use GDPR service for compliant data export
+      const { GDPRService } = await import('./GDPRService');
+      const result = await GDPRService.exportUserData(userId, 'json');
+      
+      logger.info('Account data exported via GDPR service', {
+        userId,
+        requestId: result.requestId,
       });
 
-      return exportData;
+      return result.data;
     } catch (error: any) {
       logger.error('Error exporting account data', {
         userId,
