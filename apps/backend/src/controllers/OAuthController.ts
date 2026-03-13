@@ -26,6 +26,7 @@ import { oauthStateService } from '../services/OAuthStateService';
 import { securityAuditService } from '../services/SecurityAuditService';
 import { SecurityEventType } from '../models/SecurityEvent';
 import { getClientIp, getHashedClientIp } from '../utils/ipHash';
+import { encrypt } from '../utils/encryption';
 import axios from 'axios';
 import crypto from 'crypto';
 
@@ -242,6 +243,56 @@ export class OAuthController {
   }
 
   /**
+   * Get GitHub OAuth configuration
+   */
+  private getGitHubConfig(): { clientId: string; clientSecret: string; redirectUri: string; scopes: string[] } {
+    const clientId = config.oauth?.github?.clientId;
+    const clientSecret = config.oauth?.github?.clientSecret;
+    const callbackUrl = config.oauth?.github?.callbackUrl;
+
+    if (!clientId || !clientSecret) {
+      throw new BadRequestError('GitHub OAuth not configured');
+    }
+
+    // Use explicit callback URL from env, or fallback to constructed URL
+    const redirectUri = callbackUrl || `${config.apiUrl || 'http://localhost:5000'}/api/v1/oauth/github/callback`;
+
+    return {
+      clientId,
+      clientSecret,
+      redirectUri,
+      scopes: ['user:email', 'read:user'],
+    };
+  }
+
+  /**
+   * Get Apple OAuth configuration
+   */
+  private getAppleConfig(): { clientId: string; teamId: string; keyId: string; privateKey: string; redirectUri: string; scopes: string[] } {
+    const clientId = config.oauth?.apple?.clientId;
+    const teamId = config.oauth?.apple?.teamId;
+    const keyId = config.oauth?.apple?.keyId;
+    const privateKey = config.oauth?.apple?.privateKey;
+    const callbackUrl = config.oauth?.apple?.callbackUrl;
+
+    if (!clientId || !teamId || !keyId || !privateKey) {
+      throw new BadRequestError('Apple OAuth not configured');
+    }
+
+    // Use explicit callback URL from env, or fallback to constructed URL
+    const redirectUri = callbackUrl || `${config.apiUrl || 'http://localhost:5000'}/api/v1/oauth/apple/callback`;
+
+    return {
+      clientId,
+      teamId,
+      keyId,
+      privateKey,
+      redirectUri,
+      scopes: ['name', 'email'],
+    };
+  }
+
+  /**
    * Generate PKCE code verifier and challenge
    */
   private generatePKCE(): { codeVerifier: string; codeChallenge: string } {
@@ -279,8 +330,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, and Google Business Profile platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'github' && platform !== 'apple') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, GitHub, and Apple platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -466,6 +517,61 @@ export class OAuthController {
         });
 
         authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      } else if (platform === 'github') {
+        // GitHub OAuth
+        const githubConfig = this.getGitHubConfig();
+
+        // Store state in Redis with IP binding
+        state = await oauthStateService.createState(workspaceId, userId, platform, {
+          ipHash, // IP binding
+          metadata: {
+            platform,
+            timestamp: new Date().toISOString(),
+            userAgent: req.headers['user-agent'],
+          },
+        });
+
+        // Build authorization URL
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: githubConfig.clientId,
+          redirect_uri: githubConfig.redirectUri,
+          scope: githubConfig.scopes.join(' '),
+          state,
+        });
+
+        authorizationUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
+      } else if (platform === 'apple') {
+        // Apple OAuth with PKCE
+        const appleConfig = this.getAppleConfig();
+
+        // Generate PKCE
+        const { codeVerifier, codeChallenge } = this.generatePKCE();
+
+        // Store state in Redis with IP binding and PKCE verifier
+        state = await oauthStateService.createState(workspaceId, userId, platform, {
+          codeVerifier, // Server-side PKCE storage
+          ipHash, // IP binding
+          metadata: {
+            platform,
+            timestamp: new Date().toISOString(),
+            userAgent: req.headers['user-agent'],
+          },
+        });
+
+        // Build authorization URL
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: appleConfig.clientId,
+          redirect_uri: appleConfig.redirectUri,
+          scope: appleConfig.scopes.join(' '),
+          response_mode: 'form_post', // Apple requires form_post
+          state,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        });
+
+        authorizationUrl = `https://appleid.apple.com/auth/authorize?${params.toString()}`;
       }
 
       // Log OAuth initiation
@@ -574,8 +680,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, and Google Business Profile platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'github' && platform !== 'apple') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, GitHub, and Apple platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -729,6 +835,16 @@ export class OAuthController {
       if (platform === 'google-business') {
         // Pass the already-consumed stateData to avoid double-consumption
         return await this.handleGoogleBusinessCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
+      }
+
+      if (platform === 'github') {
+        // Pass the already-consumed stateData to avoid double-consumption
+        return await this.handleGitHubCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
+      }
+
+      if (platform === 'apple') {
+        // Pass the already-consumed stateData to avoid double-consumption
+        return await this.handleAppleCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
       }
 
       // Get Twitter configuration
@@ -1170,6 +1286,16 @@ export class OAuthController {
       // Check Threads configuration
       if (config.oauth?.threads?.clientId && config.oauth?.threads?.clientSecret) {
         platforms.push('threads');
+      }
+
+      // Check GitHub configuration
+      if (config.oauth?.github?.clientId && config.oauth?.github?.clientSecret) {
+        platforms.push('github');
+      }
+
+      // Check Apple configuration
+      if (config.oauth?.apple?.clientId && config.oauth?.apple?.teamId && config.oauth?.apple?.keyId && config.oauth?.apple?.privateKey) {
+        platforms.push('apple');
       }
 
       res.json({
@@ -1949,6 +2075,276 @@ export class OAuthController {
       
       res.redirect(
         `${frontendUrl}/social/accounts?error=GOOGLE_BUSINESS_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
+      );
+    }
+  }
+
+  /**
+   * Handle GitHub OAuth callback
+   * 
+   * SECURITY: State already consumed by main callback handler
+   */
+  private async handleGitHubCallback(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    code: string,
+    state: string,
+    consumedState: any,
+    clientIp: string,
+    ipHash: string,
+    debugReport: any,
+    startTime: number
+  ): Promise<void> {
+    try {
+      logger.debug('[OAuth] GitHub callback handler started', { step: 'github_callback_start' });
+
+      // Get GitHub configuration
+      const githubConfig = this.getGitHubConfig();
+
+      // Create GitHub OAuth provider
+      const { GitHubOAuthProvider } = await import('../providers/oauth/GitHubOAuthProvider');
+      const githubProvider = new GitHubOAuthProvider(
+        githubConfig.clientId,
+        githubConfig.clientSecret,
+        githubConfig.redirectUri
+      );
+
+      // Exchange code for tokens
+      const tokens = await githubProvider.exchangeCodeForTokenLegacy({ code, state });
+      logger.debug('[OAuth] GitHub token exchange successful', { step: 'github_token_exchange' });
+
+      // Get user profile
+      const userProfile = await githubProvider.getUserProfile(tokens.accessToken);
+      logger.debug('[OAuth] GitHub user profile fetched', { step: 'github_profile_fetch' });
+
+      // Create or update social account
+      const socialAccount = await SocialAccount.findOneAndUpdate(
+        {
+          workspaceId: consumedState.workspaceId,
+          platform: SocialPlatform.GITHUB,
+          platformUserId: userProfile.id,
+        },
+        {
+          workspaceId: consumedState.workspaceId,
+          userId: consumedState.userId,
+          platform: SocialPlatform.GITHUB,
+          platformUserId: userProfile.id,
+          username: userProfile.username,
+          displayName: userProfile.displayName,
+          email: userProfile.email,
+          profileImageUrl: userProfile.avatarUrl,
+          profileUrl: userProfile.profileUrl,
+          accessToken: encrypt(tokens.accessToken),
+          refreshToken: tokens.refreshToken ? encrypt(tokens.refreshToken) : undefined,
+          tokenExpiresAt: tokens.expiresAt,
+          status: AccountStatus.ACTIVE,
+          isActive: true,
+          connectedAt: new Date(),
+          lastRefreshedAt: new Date(),
+          metadata: {
+            ...userProfile.metadata,
+            scopes: tokens.scope,
+          },
+        },
+        { upsert: true, new: true }
+      );
+
+      logger.info('[OAuth] GitHub account connected successfully', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        accountId: socialAccount._id,
+        username: userProfile.username,
+      });
+
+      // Log success
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'github',
+        action: 'callback',
+        success: true,
+        metadata: {
+          accountId: socialAccount._id.toString(),
+          username: userProfile.username,
+        },
+      });
+
+      const frontendUrl = config.cors.origin;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=github&account=${socialAccount._id}`;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] GitHub callback success redirect', { step: 'github_success_redirect' });
+      
+      res.redirect(redirectUrl);
+    } catch (error: any) {
+      logger.error('[OAuth] GitHub callback failed', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        error: error.message,
+      });
+
+      // Log failure
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'github',
+        action: 'callback',
+        success: false,
+        errorMessage: error.message,
+      });
+
+      const frontendUrl = config.cors.origin;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] GitHub callback error handled', { step: 'github_error_handler' });
+      
+      res.redirect(
+        `${frontendUrl}/social/accounts?error=GITHUB_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
+      );
+    }
+  }
+
+  /**
+   * Handle Apple OAuth callback
+   * 
+   * SECURITY: State already consumed by main callback handler
+   * NOTE: Apple uses POST callback, not GET
+   */
+  private async handleAppleCallback(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    code: string,
+    state: string,
+    consumedState: any,
+    clientIp: string,
+    ipHash: string,
+    debugReport: any,
+    startTime: number
+  ): Promise<void> {
+    try {
+      logger.debug('[OAuth] Apple callback handler started', { step: 'apple_callback_start' });
+
+      // Get Apple configuration
+      const appleConfig = this.getAppleConfig();
+
+      // Create Apple OAuth provider
+      const { AppleOAuthProvider } = await import('../providers/oauth/AppleOAuthProvider');
+      const appleProvider = new AppleOAuthProvider(
+        appleConfig.clientId,
+        appleConfig.teamId,
+        appleConfig.keyId,
+        appleConfig.privateKey,
+        appleConfig.redirectUri
+      );
+
+      // Get PKCE verifier from state
+      const codeVerifier = consumedState.codeVerifier;
+      if (!codeVerifier) {
+        throw new Error('PKCE code verifier not found in state');
+      }
+
+      // Exchange code for tokens
+      const tokens = await appleProvider.exchangeCodeForTokenLegacy({ code, state, codeVerifier });
+      logger.debug('[OAuth] Apple token exchange successful', { step: 'apple_token_exchange' });
+
+      // Get user profile from ID token
+      const idToken = (req.body as any).id_token || tokens.accessToken; // Apple sends id_token in callback
+      const userProfile = await appleProvider.getUserProfile(tokens.accessToken, idToken);
+      logger.debug('[OAuth] Apple user profile extracted', { step: 'apple_profile_extract' });
+
+      // Create or update social account
+      const socialAccount = await SocialAccount.findOneAndUpdate(
+        {
+          workspaceId: consumedState.workspaceId,
+          platform: SocialPlatform.APPLE,
+          platformUserId: userProfile.id,
+        },
+        {
+          workspaceId: consumedState.workspaceId,
+          userId: consumedState.userId,
+          platform: SocialPlatform.APPLE,
+          platformUserId: userProfile.id,
+          username: userProfile.username,
+          displayName: userProfile.displayName,
+          email: userProfile.email,
+          profileImageUrl: userProfile.avatarUrl,
+          profileUrl: userProfile.profileUrl,
+          accessToken: encrypt(tokens.accessToken),
+          refreshToken: tokens.refreshToken ? encrypt(tokens.refreshToken) : undefined,
+          tokenExpiresAt: tokens.expiresAt,
+          status: AccountStatus.ACTIVE,
+          isActive: true,
+          connectedAt: new Date(),
+          lastRefreshedAt: new Date(),
+          metadata: {
+            ...userProfile.metadata,
+            scopes: tokens.scope,
+          },
+        },
+        { upsert: true, new: true }
+      );
+
+      logger.info('[OAuth] Apple account connected successfully', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        accountId: socialAccount._id,
+        hasEmail: !!userProfile.email,
+      });
+
+      // Log success
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'apple',
+        action: 'callback',
+        success: true,
+        metadata: {
+          accountId: socialAccount._id.toString(),
+          hasEmail: !!userProfile.email,
+        },
+      });
+
+      const frontendUrl = config.cors.origin;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=apple&account=${socialAccount._id}`;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] Apple callback success redirect', { step: 'apple_success_redirect' });
+      
+      res.redirect(redirectUrl);
+    } catch (error: any) {
+      logger.error('[OAuth] Apple callback failed', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        error: error.message,
+      });
+
+      // Log failure
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'apple',
+        action: 'callback',
+        success: false,
+        errorMessage: error.message,
+      });
+
+      const frontendUrl = config.cors.origin;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] Apple callback error handled', { step: 'apple_error_handler' });
+      
+      res.redirect(
+        `${frontendUrl}/social/accounts?error=APPLE_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
       );
     }
   }

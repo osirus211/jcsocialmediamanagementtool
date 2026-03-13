@@ -24,6 +24,8 @@ export enum SocialPlatform {
   GOOGLE_BUSINESS = 'google-business',
   TIKTOK = 'tiktok',
   PINTEREST = 'pinterest',
+  GITHUB = 'github',
+  APPLE = 'apple',
 }
 
 export enum AccountStatus {

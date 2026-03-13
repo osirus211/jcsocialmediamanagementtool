@@ -7,7 +7,7 @@ import { apiClient } from '../lib/api-client';
 
 export interface SocialAccount {
   _id: string;
-  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram' | 'github' | 'apple';
   platformUserId: string;
   username: string;
   displayName: string;

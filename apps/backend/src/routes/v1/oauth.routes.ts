@@ -46,6 +46,9 @@ const instagramConnectRateLimit = rateLimit({
 // Rate limit: 20 requests/min per IP
 router.get('/:platform/callback', callbackRateLimit, oauthController.callback.bind(oauthController));
 
+// Apple OAuth callback (POST - Apple uses form_post response mode)
+router.post('/apple/callback', callbackRateLimit, oauthController.callback.bind(oauthController));
+
 /**
  * Protected routes (require authentication)
  */

@@ -78,6 +78,18 @@ const envSchema = z.object({
   THREADS_CLIENT_SECRET: z.string().optional(),
   THREADS_CALLBACK_URL: z.string().url().optional(),
 
+  // GitHub OAuth
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CALLBACK_URL: z.string().url().optional(),
+
+  // Apple OAuth
+  APPLE_CLIENT_ID: z.string().optional(),
+  APPLE_TEAM_ID: z.string().optional(),
+  APPLE_KEY_ID: z.string().optional(),
+  APPLE_PRIVATE_KEY: z.string().optional(),
+  APPLE_CALLBACK_URL: z.string().url().optional(),
+
   // AI Providers
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -403,6 +415,18 @@ export const config = {
       clientId: env.THREADS_CLIENT_ID,
       clientSecret: env.THREADS_CLIENT_SECRET,
       callbackUrl: env.THREADS_CALLBACK_URL,
+    },
+    github: {
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+      callbackUrl: env.GITHUB_CALLBACK_URL,
+    },
+    apple: {
+      clientId: env.APPLE_CLIENT_ID,
+      teamId: env.APPLE_TEAM_ID,
+      keyId: env.APPLE_KEY_ID,
+      privateKey: env.APPLE_PRIVATE_KEY,
+      callbackUrl: env.APPLE_CALLBACK_URL,
     },
   },
 
