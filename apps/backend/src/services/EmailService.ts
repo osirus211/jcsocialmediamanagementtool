@@ -206,6 +206,140 @@ export class EmailService {
   isReady(): boolean {
     return this.isConfigured;
   }
+
+  /**
+   * Send data export ready notification
+   */
+  static async sendDataExportReady(data: {
+    to: string;
+    downloadUrl: string;
+    expiresAt: Date;
+    fileSize: number;
+    format: string;
+  }): Promise<SendEmailResult> {
+    const service = new EmailService();
+    
+    const fileSizeMB = (data.fileSize / (1024 * 1024)).toFixed(2);
+    const expiryDate = data.expiresAt.toLocaleDateString();
+    
+    const subject = 'Your Data Export is Ready';
+    const body = `Your data export is ready for download.
+
+Download Details:
+- Format: ${data.format.toUpperCase()}
+- File Size: ${fileSizeMB} MB
+- Expires: ${expiryDate}
+
+Download Link: ${data.downloadUrl}
+
+This link will expire in 7 days for security reasons. Please download your data before then.
+
+If you have any questions, please contact our support team.
+
+Best regards,
+The Team`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Your Data Export is Ready</h2>
+        
+        <p>Your data export has been successfully prepared and is ready for download.</p>
+        
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #374151;">Download Details</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li style="margin: 8px 0;"><strong>Format:</strong> ${data.format.toUpperCase()}</li>
+            <li style="margin: 8px 0;"><strong>File Size:</strong> ${fileSizeMB} MB</li>
+            <li style="margin: 8px 0;"><strong>Expires:</strong> ${expiryDate}</li>
+          </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${data.downloadUrl}" 
+             style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            Download Your Data
+          </a>
+        </div>
+        
+        <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e;">
+            <strong>Important:</strong> This download link will expire in 7 days for security reasons. 
+            Please download your data before then.
+          </p>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px;">
+          If you have any questions, please contact our support team.
+        </p>
+        
+        <p style="color: #6b7280;">
+          Best regards,<br>
+          The Team
+        </p>
+      </div>
+    `;
+
+    return service.sendEmail({
+      to: data.to,
+      subject,
+      body,
+      html,
+    });
+  }
+
+  /**
+   * Send data export failed notification
+   */
+  static async sendDataExportFailed(data: {
+    to: string;
+    error: string;
+  }): Promise<SendEmailResult> {
+    const service = new EmailService();
+    
+    const subject = 'Data Export Failed';
+    const body = `We encountered an issue while preparing your data export.
+
+Error Details:
+${data.error}
+
+Please try requesting your data export again. If the problem persists, please contact our support team.
+
+We apologize for the inconvenience.
+
+Best regards,
+The Team`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Data Export Failed</h2>
+        
+        <p>We encountered an issue while preparing your data export.</p>
+        
+        <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 6px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #dc2626;">Error Details</h3>
+          <p style="margin: 0; color: #7f1d1d; font-family: monospace; font-size: 14px;">
+            ${data.error}
+          </p>
+        </div>
+        
+        <p>Please try requesting your data export again. If the problem persists, please contact our support team.</p>
+        
+        <p>We apologize for the inconvenience.</p>
+        
+        <p style="color: #6b7280;">
+          Best regards,<br>
+          The Team
+        </p>
+      </div>
+    `;
+
+    return service.sendEmail({
+      to: data.to,
+      subject,
+      body,
+      html,
+    });
+  }
 }
 
 export const emailService = new EmailService();

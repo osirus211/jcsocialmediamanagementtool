@@ -321,4 +321,81 @@ export class GDPRController {
       next(error);
     }
   }
+
+  /**
+   * Download exported data
+   * GET /api/v1/gdpr/download/:requestId
+   */
+  static async downloadExportedData(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { requestId } = req.params;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      // Verify the request belongs to the user
+      const { GDPRRequestLog } = await import('../models/GDPRRequestLog');
+      const gdprRequest = await GDPRRequestLog.findOne({
+        _id: requestId,
+        userId,
+        requestType: 'data_export',
+        status: 'completed',
+      });
+
+      if (!gdprRequest) {
+        res.status(404).json({
+          success: false,
+          message: 'Export request not found or not completed',
+        });
+        return;
+      }
+
+      // Check if export has expired (7 days)
+      const expiryDate = new Date(gdprRequest.completedAt!);
+      expiryDate.setDate(expiryDate.getDate() + 7);
+      
+      if (new Date() > expiryDate) {
+        res.status(410).json({
+          success: false,
+          message: 'Export has expired. Please request a new export.',
+        });
+        return;
+      }
+
+      // Re-generate the export data (in production, this would be served from storage)
+      const format = gdprRequest.requestData?.format || 'json';
+      const exportResult = await GDPRService.exportUserData(userId, format);
+
+      // Set appropriate headers
+      const filename = `gdpr-data-export-${new Date().toISOString().split('T')[0]}.${format}`;
+      const contentType = format === 'csv' ? 'text/csv' : 'application/json';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      // Send the data
+      if (format === 'csv') {
+        const csvData = GDPRService.convertToCSV(exportResult.data);
+        res.send(csvData);
+      } else {
+        res.json(exportResult.data);
+      }
+
+      logger.info('Data export downloaded', {
+        userId,
+        requestId,
+        format,
+      });
+
+    } catch (error) {
+      logger.error('Error downloading exported data', {
+        userId: req.user?.userId,
+        requestId: req.params.requestId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      next(error);
+    }
+  }
 }

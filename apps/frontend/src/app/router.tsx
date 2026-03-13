@@ -45,6 +45,7 @@ const UserProfilePage = lazy(() => import('@/pages/settings/UserProfilePage').th
 const AccountSettingsPage = lazy(() => import('@/pages/settings/AccountSettingsPage').then(module => ({ default: module.AccountSettingsPage })));
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/SecuritySettingsPage').then(module => ({ default: module.SecuritySettingsPage })));
 const TwoFactorSetupPage = lazy(() => import('@/pages/settings/TwoFactorSetupPage').then(module => ({ default: module.TwoFactorSetupPage })));
+const DataExportPage = lazy(() => import('@/pages/settings/DataExportPage').then(module => ({ default: module.DataExportPage })));
 
 // Team & Collaboration
 const ApprovalsPage = lazy(() => import('@/pages/approvals/ApprovalsPage').then(module => ({ default: module.ApprovalsPage })));
@@ -195,6 +196,10 @@ const router = createBrowserRouter([
       {
         path: 'settings/2fa/setup',
         element: <SuspenseWrapper><TwoFactorSetupPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'settings/data-export',
+        element: <SuspenseWrapper><DataExportPage /></SuspenseWrapper>,
       },
       {
         path: 'settings/webhooks',

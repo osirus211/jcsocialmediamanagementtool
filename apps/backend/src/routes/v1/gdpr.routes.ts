@@ -80,6 +80,13 @@ router.get(
   GDPRController.getDataSummary
 );
 
+// Download exported data
+router.get(
+  '/download/:requestId',
+  requireAuth,
+  GDPRController.downloadExportedData
+);
+
 // Update consent preferences
 router.post(
   '/consent',

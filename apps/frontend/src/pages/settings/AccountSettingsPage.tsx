@@ -704,16 +704,25 @@ export function AccountSettingsPage() {
               </h2>
               <p className="text-sm text-gray-600 mb-4">
                 Download a copy of all your account data including posts, analytics, and settings.
-                This may take a few minutes to prepare.
+                Use our advanced export tool for more options and better control.
               </p>
-              <button
-                onClick={handleExportData}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" />
-                {isLoading ? 'Preparing Export...' : 'Export Data'}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleExportData}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  {isLoading ? 'Preparing Export...' : 'Quick Export'}
+                </button>
+                <Link
+                  to="/settings/data-export"
+                  className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50"
+                >
+                  <Download className="w-4 h-4" />
+                  Advanced Export
+                </Link>
+              </div>
             </div>
 
             {/* Deactivate Account */}

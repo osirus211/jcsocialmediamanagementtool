@@ -24,6 +24,7 @@ export interface GDPRExportData {
   analytics: any[];
   loginHistory: any[];
   auditLogs: any[];
+  billingHistory: any[];
   exportMetadata: {
     exportedAt: string;
     requestId: string;
@@ -107,13 +108,14 @@ export class GDPRService {
       }
 
       // Gather all user data from various collections
-      const [workspaces, posts, socialAccounts, analytics, loginHistory, auditLogs] = await Promise.all([
+      const [workspaces, posts, socialAccounts, analytics, loginHistory, auditLogs, billingHistory] = await Promise.all([
         this.getUserWorkspaces(userId),
         this.getUserPosts(userId),
         this.getUserSocialAccounts(userId),
         this.getUserAnalytics(userId),
         this.getUserLoginHistory(userId),
         this.getUserAuditLogs(userId),
+        this.getUserBillingHistory(userId),
       ]);
 
       const exportData: GDPRExportData = {
@@ -136,6 +138,7 @@ export class GDPRService {
         analytics,
         loginHistory,
         auditLogs,
+        billingHistory,
         exportMetadata: {
           exportedAt: new Date().toISOString(),
           requestId: request._id.toString(),
@@ -152,6 +155,7 @@ export class GDPRService {
           analytics: analytics.length,
           loginHistory: loginHistory.length,
           auditLogs: auditLogs.length,
+          billingHistory: billingHistory.length,
         },
         format,
       });
@@ -436,6 +440,66 @@ export class GDPRService {
         csvRows.push(`Post ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
       });
     });
+
+    // Social Accounts
+    data.socialAccounts.forEach((account, index) => {
+      Object.entries(account).forEach(([key, value]) => {
+        csvRows.push(`Social Account ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+      });
+    });
+
+    // Analytics
+    data.analytics.forEach((analytic, index) => {
+      Object.entries(analytic).forEach(([key, value]) => {
+        csvRows.push(`Analytics ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+      });
+    });
+
+    // Login History
+    data.loginHistory.forEach((login, index) => {
+      Object.entries(login).forEach(([key, value]) => {
+        csvRows.push(`Login ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+      });
+    });
+
+    // Audit Logs
+    data.auditLogs.forEach((log, index) => {
+      Object.entries(log).forEach(([key, value]) => {
+        csvRows.push(`Audit Log ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+      });
+    });
+
+    // Billing History
+    if (data.billingHistory && typeof data.billingHistory === 'object') {
+      const billing = data.billingHistory as any;
+      
+      // Subscriptions
+      if (billing.subscriptions) {
+        billing.subscriptions.forEach((subscription: any, index: number) => {
+          Object.entries(subscription).forEach(([key, value]) => {
+            csvRows.push(`Subscription ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+          });
+        });
+      }
+
+      // Invoices
+      if (billing.invoices) {
+        billing.invoices.forEach((invoice: any, index: number) => {
+          Object.entries(invoice).forEach(([key, value]) => {
+            csvRows.push(`Invoice ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+          });
+        });
+      }
+
+      // Payments
+      if (billing.payments) {
+        billing.payments.forEach((payment: any, index: number) => {
+          Object.entries(payment).forEach(([key, value]) => {
+            csvRows.push(`Payment ${index + 1},${key},"${String(value).replace(/"/g, '""')}"`);
+          });
+        });
+      }
+    }
     
     return csvRows.join('\n');
   }
@@ -517,6 +581,34 @@ export class GDPRService {
     } catch (error) {
       logger.warn('Error fetching user audit logs for GDPR export', { userId, error });
       return [];
+    }
+  }
+
+  private static async getUserBillingHistory(userId: string): Promise<any[]> {
+    try {
+      // Import billing models dynamically to avoid circular dependencies
+      const { Subscription } = await import('../models/Subscription');
+      const { Invoice } = await import('../models/Invoice');
+      const { Payment } = await import('../models/Payment');
+
+      const [subscriptions, invoices, payments] = await Promise.all([
+        Subscription.find({ userId }).select('-__v').lean(),
+        Invoice.find({ userId }).select('-__v').lean(),
+        Payment.find({ userId }).select('-__v').lean(),
+      ]);
+
+      return {
+        subscriptions: subscriptions || [],
+        invoices: invoices || [],
+        payments: payments || [],
+      };
+    } catch (error) {
+      logger.warn('Error fetching user billing history for GDPR export', { userId, error });
+      return {
+        subscriptions: [],
+        invoices: [],
+        payments: [],
+      };
     }
   }
 

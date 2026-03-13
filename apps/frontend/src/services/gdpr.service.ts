@@ -26,6 +26,7 @@ export interface GDPRExportData {
   analytics: any[];
   loginHistory: any[];
   auditLogs: any[];
+  billingHistory: any[];
   exportMetadata: {
     exportedAt: string;
     requestId: string;
