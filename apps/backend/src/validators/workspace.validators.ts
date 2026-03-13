@@ -20,6 +20,18 @@ export const createWorkspaceSchema = z.object({
         'Workspace slug can only contain lowercase letters, numbers, and hyphens'
       )
       .trim(),
+    description: z
+      .string()
+      .max(500, 'Description cannot exceed 500 characters')
+      .trim()
+      .optional(),
+    timezone: z
+      .string()
+      .optional()
+      .default('UTC'),
+    industry: z
+      .enum(['marketing-agency', 'e-commerce', 'saas', 'media', 'non-profit', 'education', 'healthcare', 'real-estate', 'other'])
+      .optional(),
   }),
 });
 
@@ -44,7 +56,20 @@ export const updateWorkspaceSchema = z.object({
       )
       .trim()
       .optional(),
-    settings: z.record(z.any()).optional(),
+    description: z
+      .string()
+      .max(500, 'Description cannot exceed 500 characters')
+      .trim()
+      .optional(),
+    settings: z.object({
+      requireApproval: z.boolean().optional(),
+      allowedDomains: z.array(z.string()).optional(),
+      timezone: z.string().optional(),
+      language: z.string().optional(),
+      industry: z
+        .enum(['marketing-agency', 'e-commerce', 'saas', 'media', 'non-profit', 'education', 'healthcare', 'real-estate', 'other'])
+        .optional(),
+    }).optional(),
   }),
 });
 

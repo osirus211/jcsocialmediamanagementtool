@@ -16,6 +16,8 @@ export enum WorkspacePlan {
 export interface IWorkspace extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
+  slug: string;
+  description?: string;
   ownerId: mongoose.Types.ObjectId;
   plan: WorkspacePlan;
   
@@ -25,6 +27,7 @@ export interface IWorkspace extends Document {
     allowedDomains?: string[];
     timezone: string;
     language: string;
+    industry?: string;
   };
   
   // Client Portal (white-label)
@@ -93,6 +96,21 @@ const WorkspaceSchema = new Schema<IWorkspace>(
       trim: true,
       maxlength: 100,
     },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      maxlength: 50,
+      match: /^[a-z0-9-]+$/,
+      index: true,
+    },
+    description: {
+      type: String,
+      maxlength: 500,
+      trim: true,
+    },
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -123,6 +141,10 @@ const WorkspaceSchema = new Schema<IWorkspace>(
       language: {
         type: String,
         default: 'en',
+      },
+      industry: {
+        type: String,
+        enum: ['marketing-agency', 'e-commerce', 'saas', 'media', 'non-profit', 'education', 'healthcare', 'real-estate', 'other'],
       },
     },
     
@@ -266,6 +288,7 @@ const WorkspaceSchema = new Schema<IWorkspace>(
 // Indexes
 WorkspaceSchema.index({ ownerId: 1, isActive: 1 });
 WorkspaceSchema.index({ plan: 1, isActive: 1 });
+WorkspaceSchema.index({ slug: 1 }, { unique: true });
 
 // Update plan limits when plan changes
 WorkspaceSchema.pre('save', function (next) {

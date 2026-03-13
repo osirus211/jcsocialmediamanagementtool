@@ -8,6 +8,8 @@ import { useWorkspaceStore } from '@/store/workspace.store';
  * Features:
  * - Workspace name input
  * - Auto-generate slug from name
+ * - Timezone selection
+ * - Industry selection
  * - Validation
  * - Loading states
  * - Success feedback
@@ -19,6 +21,9 @@ export const CreateWorkspacePage = () => {
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [timezone, setTimezone] = useState('UTC');
+  const [industry, setIndustry] = useState('');
   const [error, setError] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
@@ -31,6 +36,34 @@ export const CreateWorkspacePage = () => {
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
   };
+
+  const industryOptions = [
+    { value: '', label: 'Select Industry (Optional)' },
+    { value: 'marketing-agency', label: 'Marketing Agency' },
+    { value: 'e-commerce', label: 'E-commerce' },
+    { value: 'saas', label: 'SaaS' },
+    { value: 'media', label: 'Media' },
+    { value: 'non-profit', label: 'Non-profit' },
+    { value: 'education', label: 'Education' },
+    { value: 'healthcare', label: 'Healthcare' },
+    { value: 'real-estate', label: 'Real Estate' },
+    { value: 'other', label: 'Other' },
+  ];
+
+  const timezoneOptions = [
+    { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+    { value: 'America/New_York', label: 'Eastern Time (ET)' },
+    { value: 'America/Chicago', label: 'Central Time (CT)' },
+    { value: 'America/Denver', label: 'Mountain Time (MT)' },
+    { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+    { value: 'Europe/London', label: 'London (GMT/BST)' },
+    { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+    { value: 'Europe/Berlin', label: 'Berlin (CET/CEST)' },
+    { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+    { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+    { value: 'Asia/Kolkata', label: 'Mumbai (IST)' },
+    { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
+  ];
 
   const handleNameChange = (value: string) => {
     setName(value);
@@ -88,6 +121,9 @@ export const CreateWorkspacePage = () => {
       await createWorkspace({
         name: name.trim(),
         slug: slug.trim(),
+        description: description.trim() || undefined,
+        timezone: timezone || 'UTC',
+        industry: industry || undefined,
       });
 
       // Navigate to dashboard (workspace will be auto-switched)
@@ -200,6 +236,81 @@ export const CreateWorkspacePage = () => {
               </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Unique identifier for your workspace (lowercase, numbers, hyphens only)
+              </p>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label
+                htmlFor="description"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                Description (Optional)
+              </label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description of your workspace..."
+                rows={3}
+                maxLength={500}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
+                disabled={isLoading}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {description.length}/500 characters
+              </p>
+            </div>
+
+            {/* Timezone */}
+            <div>
+              <label
+                htmlFor="timezone"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                Timezone
+              </label>
+              <select
+                id="timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={isLoading}
+              >
+                {timezoneOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Used for scheduling and analytics
+              </p>
+            </div>
+
+            {/* Industry */}
+            <div>
+              <label
+                htmlFor="industry"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                Industry
+              </label>
+              <select
+                id="industry"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={isLoading}
+              >
+                {industryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Helps us provide relevant features and insights
               </p>
             </div>
 

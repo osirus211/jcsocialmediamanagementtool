@@ -17,20 +17,39 @@ export class WorkspaceService {
    */
   async createWorkspace(params: {
     name: string;
+    slug: string;
+    description?: string;
     ownerId: mongoose.Types.ObjectId;
     plan?: WorkspacePlan;
+    timezone?: string;
+    industry?: string;
   }): Promise<IWorkspace> {
-    const { name, ownerId, plan = WorkspacePlan.FREE } = params;
+    const { name, slug, description, ownerId, plan = WorkspacePlan.FREE, timezone = 'UTC', industry } = params;
 
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
+      // Check if slug is already taken
+      const existingWorkspace = await Workspace.findOne({ slug, isActive: true });
+      if (existingWorkspace) {
+        throw new Error('Workspace slug is already taken');
+      }
+
       // Create workspace
       const workspace = new Workspace({
         name,
+        slug: slug.toLowerCase(),
+        description,
         ownerId,
         plan,
+        settings: {
+          requireApproval: false,
+          allowedDomains: [],
+          timezone,
+          language: 'en',
+          industry,
+        },
         usage: {
           currentMembers: 1,
           currentPosts: 0,
@@ -53,7 +72,7 @@ export class WorkspaceService {
         workspaceId: workspace._id,
         userId: ownerId,
         action: ActivityAction.WORKSPACE_CREATED,
-        details: { name, plan },
+        details: { name, slug, plan, timezone, industry },
         session,
       });
 
@@ -99,7 +118,7 @@ export class WorkspaceService {
   async updateWorkspace(params: {
     workspaceId: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
-    updates: Partial<Pick<IWorkspace, 'name' | 'settings' | 'billingEmail' | 'clientPortal'>>;
+    updates: Partial<Pick<IWorkspace, 'name' | 'slug' | 'description' | 'settings' | 'billingEmail' | 'clientPortal'>>;
   }): Promise<IWorkspace> {
     const { workspaceId, userId, updates } = params;
 
@@ -107,6 +126,19 @@ export class WorkspaceService {
     const member = await this.getMember(workspaceId, userId);
     if (!member || !workspacePermissionService.hasPermission(member.role, Permission.MANAGE_WORKSPACE)) {
       throw new Error('Insufficient permissions to update workspace');
+    }
+
+    // If updating slug, check uniqueness
+    if (updates.slug) {
+      const existingWorkspace = await Workspace.findOne({ 
+        slug: updates.slug.toLowerCase(), 
+        isActive: true,
+        _id: { $ne: workspaceId }
+      });
+      if (existingWorkspace) {
+        throw new Error('Workspace slug is already taken');
+      }
+      updates.slug = updates.slug.toLowerCase();
     }
 
     const workspace = await Workspace.findByIdAndUpdate(

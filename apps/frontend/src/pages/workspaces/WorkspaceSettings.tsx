@@ -6,15 +6,19 @@ import { WorkspaceRole, WorkspaceMember } from '@/types/workspace.types';
 import { QueueSlotSettings } from '@/components/settings/QueueSlotSettings';
 import { MemberPermissionsPanel } from '@/components/settings/MemberPermissionsPanel';
 import { PermissionsSummaryBadge } from '@/components/settings/PermissionsSummaryBadge';
+import { DeleteWorkspaceModal } from '@/components/workspace/DeleteWorkspaceModal';
+import { BulkImportModal } from '@/components/workspace/BulkImportModal';
+import { TransferOwnershipModal } from '@/components/workspace/TransferOwnershipModal';
 
 /**
  * Workspace Settings Page
  * 
  * Features:
  * - Update workspace name/slug
+ * - Timezone and industry settings
  * - Member management (list, roles, remove)
  * - Leave workspace
- * - Delete workspace (owner only)
+ * - Delete workspace (multi-step confirmation)
  * - Role-based permissions
  */
 export const WorkspaceSettingsPage = () => {
@@ -40,9 +44,15 @@ export const WorkspaceSettingsPage = () => {
   const [activeTab, setActiveTab] = useState<'general' | 'members' | 'queue'>('general');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [timezone, setTimezone] = useState('UTC');
+  const [industry, setIndustry] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<WorkspaceMember | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false);
 
   const workspace = workspaces.find((w) => w._id === workspaceId) || currentWorkspace;
 
@@ -57,8 +67,39 @@ export const WorkspaceSettingsPage = () => {
     if (workspace) {
       setName(workspace.name);
       setSlug(workspace.slug);
+      setDescription(workspace.description || '');
+      setTimezone(workspace.settings?.timezone || 'UTC');
+      setIndustry(workspace.settings?.industry || '');
     }
   }, [workspace]);
+
+  const industryOptions = [
+    { value: '', label: 'Select Industry (Optional)' },
+    { value: 'marketing-agency', label: 'Marketing Agency' },
+    { value: 'e-commerce', label: 'E-commerce' },
+    { value: 'saas', label: 'SaaS' },
+    { value: 'media', label: 'Media' },
+    { value: 'non-profit', label: 'Non-profit' },
+    { value: 'education', label: 'Education' },
+    { value: 'healthcare', label: 'Healthcare' },
+    { value: 'real-estate', label: 'Real Estate' },
+    { value: 'other', label: 'Other' },
+  ];
+
+  const timezoneOptions = [
+    { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+    { value: 'America/New_York', label: 'Eastern Time (ET)' },
+    { value: 'America/Chicago', label: 'Central Time (CT)' },
+    { value: 'America/Denver', label: 'Mountain Time (MT)' },
+    { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+    { value: 'Europe/London', label: 'London (GMT/BST)' },
+    { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+    { value: 'Europe/Berlin', label: 'Berlin (CET/CEST)' },
+    { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+    { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
+    { value: 'Asia/Kolkata', label: 'Mumbai (IST)' },
+    { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
+  ];
 
   const isOwner = workspace?.userRole === WorkspaceRole.OWNER;
   const isAdmin = workspace?.userRole === WorkspaceRole.ADMIN || isOwner;
@@ -74,6 +115,12 @@ export const WorkspaceSettingsPage = () => {
       await updateWorkspace(workspaceId, {
         name: name.trim(),
         slug: slug.trim(),
+        description: description.trim() || undefined,
+        settings: {
+          ...workspace.settings,
+          timezone,
+          industry: industry || undefined,
+        },
       });
       setSuccess('Workspace updated successfully');
     } catch (error: any) {
@@ -84,15 +131,11 @@ export const WorkspaceSettingsPage = () => {
   const handleDeleteWorkspace = async () => {
     if (!workspaceId || !workspace) return;
 
-    if (!confirm(`Are you sure you want to delete "${workspace.name}"? This action cannot be undone.`)) {
-      return;
-    }
-
     try {
       await deleteWorkspace(workspaceId);
       navigate('/workspaces');
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to delete workspace');
+      throw error; // Let the modal handle the error
     }
   };
 
@@ -294,13 +337,73 @@ export const WorkspaceSettingsPage = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Workspace Slug
                   </label>
-                  <input
-                    type="text"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">@</span>
+                    <input
+                      type="text"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!isAdmin || isLoading}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                    ⚠️ Changing the slug will break existing links and integrations
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Brief description of your workspace..."
+                    rows={3}
+                    maxLength={500}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
                     disabled={!isAdmin || isLoading}
                   />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {description.length}/500 characters
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Timezone
+                  </label>
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={!isAdmin || isLoading}
+                  >
+                    {timezoneOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Industry
+                  </label>
+                  <select
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    disabled={!isAdmin || isLoading}
+                  >
+                    {industryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Workspace Logo */}
@@ -386,22 +489,41 @@ export const WorkspaceSettingsPage = () => {
                 )}
 
                 {isOwner && (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        Delete Workspace
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Permanently delete this workspace and all its data
-                      </p>
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                          Transfer Ownership
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Transfer ownership to another admin member
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowTransferOwnershipModal(true)}
+                        className="px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
+                      >
+                        Transfer
+                      </button>
                     </div>
-                    <button
-                      onClick={handleDeleteWorkspace}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                          Delete Workspace
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Permanently delete this workspace and all its data
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowDeleteModal(true)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -412,12 +534,27 @@ export const WorkspaceSettingsPage = () => {
         {activeTab === 'members' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Members
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Manage workspace members and their roles
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Members
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Manage workspace members and their roles
+                  </p>
+                </div>
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowBulkImportModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Bulk Import
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -520,6 +657,36 @@ export const WorkspaceSettingsPage = () => {
           member={selectedMemberForPermissions}
           isOpen={!!selectedMemberForPermissions}
           onClose={() => setSelectedMemberForPermissions(null)}
+        />
+      )}
+
+      {/* Delete Workspace Modal */}
+      {workspace && (
+        <DeleteWorkspaceModal
+          workspace={workspace}
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteWorkspace}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* Bulk Import Modal */}
+      {workspaceId && (
+        <BulkImportModal
+          workspaceId={workspaceId}
+          isOpen={showBulkImportModal}
+          onClose={() => setShowBulkImportModal(false)}
+        />
+      )}
+
+      {/* Transfer Ownership Modal */}
+      {workspace && (
+        <TransferOwnershipModal
+          workspace={workspace}
+          members={members}
+          isOpen={showTransferOwnershipModal}
+          onClose={() => setShowTransferOwnershipModal(false)}
         />
       )}
     </div>

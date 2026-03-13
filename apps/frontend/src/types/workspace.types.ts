@@ -24,6 +24,8 @@ export interface WorkspaceSettings {
   allowMemberInvites?: boolean;
   requireEmailVerification?: boolean;
   defaultMemberRole?: string;
+  timezone?: string;
+  industry?: string;
   [key: string]: any;
 }
 
@@ -31,6 +33,7 @@ export interface Workspace {
   _id: string;
   name: string;
   slug: string;
+  description?: string;
   ownerId: string | User;
   membersCount: number;
   plan: WorkspacePlan;
@@ -74,11 +77,15 @@ export interface User {
 export interface CreateWorkspaceInput {
   name: string;
   slug: string;
+  description?: string;
+  timezone?: string;
+  industry?: string;
 }
 
 export interface UpdateWorkspaceInput {
   name?: string;
   slug?: string;
+  description?: string;
   settings?: WorkspaceSettings;
 }
 

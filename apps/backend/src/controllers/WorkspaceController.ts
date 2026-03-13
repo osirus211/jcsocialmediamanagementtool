@@ -15,7 +15,7 @@ export class WorkspaceController {
    */
   static async createWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, slug } = req.body;
+      const { name, slug, description, timezone, industry } = req.body;
       const userId = req.user?.userId;
 
       if (!userId) {
@@ -25,7 +25,11 @@ export class WorkspaceController {
 
       const workspace = await workspaceService.createWorkspace({
         name,
+        slug,
+        description,
         ownerId: new mongoose.Types.ObjectId(userId),
+        timezone,
+        industry,
       });
 
       // Audit log: Workspace created
@@ -37,7 +41,11 @@ export class WorkspaceController {
         entityId: workspace._id.toString(),
         metadata: {
           name: workspace.name,
+          slug: workspace.slug,
+          description: workspace.description,
           plan: workspace.plan,
+          timezone,
+          industry,
         },
         req,
       });
