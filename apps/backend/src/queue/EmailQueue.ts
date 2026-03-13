@@ -27,6 +27,7 @@ export type NotificationType =
   | 'ACCOUNT_LIMITS'
   | 'USER_SIGNUP'
   | 'PASSWORD_RESET'
+  | 'MAGIC_LINK'
   | 'SUBSCRIPTION_CREATED'
   | 'SUBSCRIPTION_UPDATED'
   | 'SUBSCRIPTION_CANCELLED'
@@ -108,6 +109,7 @@ export class EmailQueue {
     const priorities: Record<NotificationType, number> = {
       SYSTEM_ALERT: 1, // Highest priority
       PASSWORD_RESET: 2,
+      MAGIC_LINK: 2, // High priority for passwordless auth
       USER_SIGNUP: 3,
       OAUTH_EXPIRED: 4,
       OAUTH_REFRESH_FAILURE: 4,

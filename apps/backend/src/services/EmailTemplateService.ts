@@ -49,6 +49,9 @@ export class EmailTemplateService {
         case 'PASSWORD_RESET':
           return this.renderPasswordReset(data);
         
+        case 'MAGIC_LINK':
+          return this.renderMagicLink(data);
+        
         case 'SUBSCRIPTION_CREATED':
           return this.renderSubscriptionCreated(data);
         
@@ -195,6 +198,40 @@ export class EmailTemplateService {
       <p>You requested a password reset.</p>
       <p><a href="${resetUrl}">Reset your password</a></p>
       <p>This link expires in ${expiresIn}.</p>
+    `;
+
+    return { subject, body, html };
+  }
+
+  private renderMagicLink(data: Record<string, any>): EmailTemplate {
+    const magicLinkUrl = data.magicLinkUrl || '';
+    const expiresIn = data.expiresIn || '15 minutes';
+    const userName = this.escapeHtml(data.userName || '');
+
+    const subject = 'Your Magic Link - Sign in to Social Media Manager';
+    const body = `${userName ? `Hi ${userName},\n\n` : ''}Click the link below to sign in to your Social Media Manager account:\n\n${magicLinkUrl}\n\nThis link expires in ${expiresIn} and can only be used once.\n\nIf you didn't request this, please ignore this email.`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1f2937;">Sign in to Social Media Manager</h2>
+        ${userName ? `<p>Hi ${userName},</p>` : ''}
+        <p>Click the button below to sign in to your account:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${magicLinkUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
+            Sign In Now
+          </a>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">
+          This link expires in ${expiresIn} and can only be used once.
+        </p>
+        <p style="color: #6b7280; font-size: 14px;">
+          If you didn't request this, please ignore this email.
+        </p>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+        <p style="color: #9ca3af; font-size: 12px;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <span style="word-break: break-all;">${magicLinkUrl}</span>
+        </p>
+      </div>
     `;
 
     return { subject, body, html };

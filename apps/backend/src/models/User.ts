@@ -53,6 +53,10 @@ export interface IUser extends Document {
   twoFactorBackupCodes: string[];
   twoFactorVerifiedAt?: Date;
   
+  // Magic link / passwordless authentication
+  magicLinkToken?: string;
+  magicLinkExpiresAt?: Date;
+  
   createdAt: Date;
   updatedAt: Date;
 
@@ -137,6 +141,8 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     twoFactorSecret: { type: String, default: null, select: false },
     twoFactorBackupCodes: { type: [String], default: [], select: false },
     twoFactorVerifiedAt: { type: Date, default: null },
+    magicLinkToken: { type: String, default: null, select: false },
+    magicLinkExpiresAt: { type: Date, default: null, select: false },
   },
   {
     timestamps: true,

@@ -11,6 +11,8 @@ import { SuspenseWrapper } from '@/components/ui/SuspenseWrapper';
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/Login').then(module => ({ default: module.LoginPage })));
 const RegisterPage = lazy(() => import('@/pages/auth/Register').then(module => ({ default: module.RegisterPage })));
+const MagicLinkRequestPage = lazy(() => import('@/pages/auth/MagicLinkRequest').then(module => ({ default: module.MagicLinkRequestPage })));
+const MagicLinkVerifyPage = lazy(() => import('@/pages/auth/MagicLinkVerify').then(module => ({ default: module.MagicLinkVerifyPage })));
 
 // Dashboard
 const DashboardPage = lazy(() => import('@/pages/Dashboard').then(module => ({ default: module.DashboardPage })));
@@ -224,6 +226,14 @@ const router = createBrowserRouter([
       {
         path: 'register',
         element: <SuspenseWrapper><RegisterPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'magic-link',
+        element: <SuspenseWrapper><MagicLinkRequestPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'magic-link/verify',
+        element: <SuspenseWrapper><MagicLinkVerifyPage /></SuspenseWrapper>,
       },
     ],
   },

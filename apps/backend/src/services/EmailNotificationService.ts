@@ -6,6 +6,7 @@
 
 import mongoose from 'mongoose';
 import { SystemEvent } from './EventService';
+import { EmailTemplateService } from './EmailTemplateService';
 import { logger } from '../utils/logger';
 import { config } from '../config';
 
@@ -246,6 +247,40 @@ export class EmailNotificationService {
       });
     } catch (error: any) {
       logger.error('Failed to send OAuth expired email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send magic link email for passwordless authentication
+   */
+  async sendMagicLink(params: {
+    to: string;
+    magicLinkUrl: string;
+    userName?: string;
+    expiresIn?: string;
+  }): Promise<void> {
+    try {
+      const templateService = new EmailTemplateService();
+      const template = templateService.render('MAGIC_LINK', {
+        magicLinkUrl: params.magicLinkUrl,
+        userName: params.userName || '',
+        expiresIn: params.expiresIn || '15 minutes',
+      });
+
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: template.subject,
+        html: template.html,
+        text: template.body,
+      });
+
+      logger.info('Magic link email sent', {
+        to: params.to,
+        expiresIn: params.expiresIn,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send magic link email:', error);
       throw error;
     }
   }

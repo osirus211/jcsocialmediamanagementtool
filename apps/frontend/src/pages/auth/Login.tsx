@@ -90,6 +90,20 @@ export const LoginPage = () => {
           Sign up
         </Link>
       </p>
+
+      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            Or sign in without a password
+          </p>
+          <Link
+            to="/auth/magic-link"
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Send me a magic link instead →
+          </Link>
+        </div>
+      </div>
     </div>
   );
 };

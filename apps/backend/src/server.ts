@@ -232,6 +232,19 @@ const startServer = async () => {
       // Don't throw - backup is non-critical for app startup
     }
 
+    console.log('🔧 Initializing magic link cleanup job...');
+    // Start magic link cleanup job - independent of Redis
+    try {
+      const { MagicLinkCleanupJob } = await import('./jobs/MagicLinkCleanupJob');
+      MagicLinkCleanupJob.start();
+      console.log('🔗 Magic Link Cleanup Job STARTED');
+      logger.info('🔗 Magic link cleanup job started');
+    } catch (error) {
+      console.log('⚠️  Magic link cleanup job failed to start (non-critical):', error);
+      logger.warn('⚠️  Magic link cleanup job failed to start (non-critical):', error);
+      // Don't throw - cleanup is non-critical for app startup
+    }
+
     console.log('🔧 Checking publishing worker...');
     // Start worker - ALWAYS when Redis is connected
     if (redisConnected) {

@@ -3,6 +3,7 @@ import { AuthController } from '../../controllers/AuthController';
 import { requireAuth } from '../../middleware/auth';
 import { validateRequest } from '../../middleware/validate';
 import { getCsrfToken } from '../../middleware/csrf';
+import magicLinkRoutes from './magicLink.routes';
 import {
   authRateLimiter,
   registrationRateLimiter,
@@ -103,5 +104,8 @@ router.post(
   validateRequest(verifyEmailSchema),
   AuthController.verifyEmail
 );
+
+// Magic link routes
+router.use('/magic-link', magicLinkRoutes);
 
 export default router;
