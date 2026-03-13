@@ -19,6 +19,7 @@ interface WorkspaceState {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
   currentWorkspaceId: string | null;
+  recentWorkspaceIds: string[]; // Track recent workspace usage
   isLoading: boolean;
   workspacesLoaded: boolean;
   members: WorkspaceMember[];
@@ -30,6 +31,8 @@ interface WorkspaceActions {
   setWorkspaces: (workspaces: Workspace[]) => void;
   setCurrentWorkspace: (workspace: Workspace | null) => void;
   setCurrentWorkspaceId: (workspaceId: string | null) => void;
+  setRecentWorkspaceIds: (workspaceIds: string[]) => void;
+  addToRecentWorkspaces: (workspaceId: string) => void;
   setLoading: (loading: boolean) => void;
   setWorkspacesLoaded: (loaded: boolean) => void;
   setMembers: (members: WorkspaceMember[]) => void;
@@ -74,6 +77,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       workspaces: [],
       currentWorkspace: null,
       currentWorkspaceId: null,
+      recentWorkspaceIds: [],
       isLoading: false,
       workspacesLoaded: false,
       members: [],
@@ -90,6 +94,17 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
 
       setCurrentWorkspaceId: (workspaceId) => set({ currentWorkspaceId: workspaceId }),
+
+      setRecentWorkspaceIds: (workspaceIds) => set({ recentWorkspaceIds: workspaceIds }),
+
+      addToRecentWorkspaces: (workspaceId) => {
+        set((state) => {
+          const filtered = state.recentWorkspaceIds.filter(id => id !== workspaceId);
+          return {
+            recentWorkspaceIds: [workspaceId, ...filtered].slice(0, 5) // Keep last 5
+          };
+        });
+      },
       
       setLoading: (loading) => set({ isLoading: loading }),
       
@@ -260,6 +275,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           if (!workspace) {
             throw new Error('Workspace not found');
           }
+
+          // Add to recent workspaces
+          get().addToRecentWorkspaces(workspaceId);
 
           // Set as current workspace
           set({
@@ -456,6 +474,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           workspaces: [],
           currentWorkspace: null,
           currentWorkspaceId: null,
+          recentWorkspaceIds: [],
           isLoading: false,
           workspacesLoaded: false,
           members: [],
@@ -502,9 +521,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     }),
     {
       name: 'workspace-storage',
-      // Only persist workspace ID (not full workspace object)
+      // Only persist workspace ID and recent workspaces (not full workspace object)
       partialize: (state) => ({
         currentWorkspaceId: state.currentWorkspaceId,
+        recentWorkspaceIds: state.recentWorkspaceIds,
       }),
     }
   )
