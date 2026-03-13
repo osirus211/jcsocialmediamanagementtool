@@ -4,6 +4,7 @@ import { Post } from '../models/Post';
 import { usageService } from './UsageService';
 import { PlanLimitError } from '../errors/PlanLimitError';
 import { logger } from '../utils/logger';
+import mongoose from 'mongoose';
 
 /**
  * Plan Enforcement Service
@@ -130,14 +131,14 @@ class PlanEnforcementService {
     const limits = PLAN_LIMITS[billing.plan];
 
     // Get current usage from Usage model
-    const usage = await usageService.getCurrentUsage(workspaceId);
+    const usage = await usageService.getCurrentUsage(new mongoose.Types.ObjectId(workspaceId));
 
     // Check post limit (unlimited = -1)
-    if (limits.maxPosts !== -1 && usage.postsUsed >= limits.maxPosts) {
+    if (limits.maxPosts !== -1 && usage.postsScheduled >= limits.maxPosts) {
       throw new PlanLimitError(
         `Monthly post limit reached (${limits.maxPosts}). Upgrade to post more.`,
         'posts',
-        usage.postsUsed,
+        usage.postsScheduled,
         limits.maxPosts
       );
     }
@@ -228,14 +229,14 @@ class PlanEnforcementService {
     }
 
     // Get current usage from Usage model
-    const usage = await usageService.getCurrentUsage(workspaceId);
+    const usage = await usageService.getCurrentUsage(new mongoose.Types.ObjectId(workspaceId));
 
     // Check AI usage limit (unlimited = -1)
-    if (limits.maxAIRequests !== -1 && usage.aiUsed >= limits.maxAIRequests) {
+    if (limits.maxAIRequests !== -1 && usage.aiRequests >= limits.maxAIRequests) {
       throw new PlanLimitError(
         `Monthly AI request limit reached (${limits.maxAIRequests}). Upgrade for more.`,
         'ai',
-        usage.aiUsed,
+        usage.aiRequests,
         limits.maxAIRequests
       );
     }
@@ -273,17 +274,17 @@ class PlanEnforcementService {
     const limits = PLAN_LIMITS[billing.plan];
 
     // Get current usage from Usage model
-    const usage = await usageService.getCurrentUsage(workspaceId);
+    const usage = await usageService.getCurrentUsage(new mongoose.Types.ObjectId(workspaceId));
 
     // Check storage limit (unlimited = -1)
     if (limits.maxStorageMB !== -1) {
-      const newTotal = usage.storageUsedMB + sizeMB;
+      const newTotal = usage.mediaStorageUsed + sizeMB;
       
       if (newTotal > limits.maxStorageMB) {
         throw new PlanLimitError(
           `Storage limit reached (${limits.maxStorageMB} MB). Upgrade for more storage.`,
           'storage',
-          usage.storageUsedMB,
+          usage.mediaStorageUsed,
           limits.maxStorageMB
         );
       }
@@ -298,7 +299,7 @@ class PlanEnforcementService {
    * ONLY call after successful post publish
    */
   async incrementPostUsage(workspaceId: string): Promise<void> {
-    await usageService.incrementPosts(workspaceId);
+    await usageService.incrementPostsScheduled(new mongoose.Types.ObjectId(workspaceId));
   }
 
   /**
@@ -325,7 +326,7 @@ class PlanEnforcementService {
    * ONLY call after successful media upload
    */
   async incrementStorageUsage(workspaceId: string, sizeMB: number): Promise<void> {
-    await usageService.incrementStorage(workspaceId, sizeMB);
+    await usageService.incrementMediaUploads(new mongoose.Types.ObjectId(workspaceId), sizeMB);
   }
 
   /**
@@ -374,16 +375,16 @@ class PlanEnforcementService {
     }
 
     const accountCount = await SocialAccount.countDocuments({ workspaceId });
-    const usageData = await usageService.getCurrentUsage(workspaceId);
+    const usageData = await usageService.getCurrentUsage(new mongoose.Types.ObjectId(workspaceId));
 
     return {
       plan: billing.plan,
       limits: PLAN_LIMITS[billing.plan],
       usage: {
-        posts: usageData.postsUsed,
+        posts: usageData.postsScheduled,
         accounts: accountCount,
-        ai: usageData.aiUsed,
-        storage: usageData.storageUsedMB,
+        ai: usageData.aiRequests,
+        storage: usageData.mediaStorageUsed,
       },
       periodStart: usageData.periodStart,
       periodEnd: usageData.periodEnd,

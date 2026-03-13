@@ -26,6 +26,12 @@ const PLATFORM_GUIDELINES: Record<SocialPlatform, string> = {
   [SocialPlatform.LINKEDIN]: 'LinkedIn (professional, value-driven, can be longer, use line breaks)',
   [SocialPlatform.FACEBOOK]: 'Facebook (conversational, engaging, can include questions)',
   [SocialPlatform.INSTAGRAM]: 'Instagram (visual-first, use emojis, hashtags at end)',
+  [SocialPlatform.YOUTUBE]: 'YouTube (descriptive, engaging, can be longer for video descriptions)',
+  [SocialPlatform.THREADS]: 'Threads (conversational, Twitter-like, max 500 characters)',
+  [SocialPlatform.BLUESKY]: 'Bluesky (Twitter-like, max 300 characters, community-focused)',
+  [SocialPlatform.GOOGLE_BUSINESS]: 'Google Business (informative, local-focused, professional)',
+  [SocialPlatform.TIKTOK]: 'TikTok (trendy, engaging, use trending hashtags and sounds)',
+  [SocialPlatform.PINTEREST]: 'Pinterest (descriptive, keyword-rich, inspiration-focused)',
 };
 
 export function buildCaptionPrompt(input: CaptionGenerationInput): string {

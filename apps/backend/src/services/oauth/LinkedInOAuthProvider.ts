@@ -182,7 +182,6 @@ export class LinkedInOAuthProvider extends OAuthProvider {
       throw new Error(`Failed to fetch LinkedIn user profile: ${error.response?.data?.error || error.message}`);
     }
   }
-}
 
   /**
    * Discover LinkedIn accounts (PlatformAdapter interface)
@@ -298,3 +297,4 @@ export class LinkedInOAuthProvider extends OAuthProvider {
       supportedFormats: ['jpg', 'jpeg', 'png', 'gif', 'mp4'],
     };
   }
+}

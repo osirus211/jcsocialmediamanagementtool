@@ -406,13 +406,14 @@ export class GlobalRateLimitManager {
    * @returns Budget check result with admission decision
    */
   async checkPublishBudget(params: PublishBudgetCheckParams): Promise<PublishBudgetResult> {
+    // Resolve tier limits
+    const tierLimits = {
+      free: 10,
+      pro: 50,
+      enterprise: 200,
+    };
+    
     try {
-      // Resolve tier limits
-      const tierLimits = {
-        free: 10,
-        pro: 50,
-        enterprise: 200,
-      };
       const workspaceLimit = tierLimits[params.tier];
       
       // Resolve platform limits (disabled by default)

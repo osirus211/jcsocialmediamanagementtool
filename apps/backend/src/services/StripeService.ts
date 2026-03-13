@@ -119,8 +119,8 @@ export class StripeService {
       });
 
       // Calculate dates
-      const currentPeriodStart = new Date(Number(stripeSubscription.current_period_start) * 1000);
-      const currentPeriodEnd = new Date(Number(stripeSubscription.current_period_end) * 1000);
+      const currentPeriodStart = new Date((stripeSubscription as any).current_period_start * 1000);
+      const currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000);
       const renewalDate = currentPeriodEnd;
 
       // Create or update subscription
@@ -416,9 +416,9 @@ export class StripeService {
     }
 
     subscription.status = stripeSubscription.status as SubscriptionStatus;
-    subscription.currentPeriodStart = new Date(Number(stripeSubscription.current_period_start) * 1000);
-    subscription.currentPeriodEnd = new Date(Number(stripeSubscription.current_period_end) * 1000);
-    subscription.renewalDate = new Date(Number(stripeSubscription.current_period_end) * 1000);
+    subscription.currentPeriodStart = new Date((stripeSubscription as any).current_period_start * 1000);
+    subscription.currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000);
+    subscription.renewalDate = new Date((stripeSubscription as any).current_period_end * 1000);
     subscription.cancelAtPeriodEnd = stripeSubscription.cancel_at_period_end;
 
     await subscription.save();

@@ -24,9 +24,9 @@ export class CompetitorCollectionQueue {
   static getQueue(): Queue<CompetitorCollectionJobData> {
     if (!this.queue) {
       const queueManager = QueueManager.getInstance();
-      this.queue = queueManager.createQueue<CompetitorCollectionJobData>(
+      this.queue = queueManager.getQueue(
         COMPETITOR_COLLECTION_QUEUE_NAME
-      );
+      ) as Queue<CompetitorCollectionJobData>;
     }
     return this.queue;
   }

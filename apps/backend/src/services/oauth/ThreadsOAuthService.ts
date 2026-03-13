@@ -38,7 +38,7 @@ export class ThreadsOAuthService {
       logger.info('[Threads] Starting account connection', { workspaceId, userId });
 
       // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({ code, state: params.state });
+      const tokens = await this.provider.exchangeCodeForTokenLegacy({ code, state: params.state });
       
       logger.info('[Threads] Token exchange successful', { workspaceId });
 
@@ -76,7 +76,7 @@ export class ThreadsOAuthService {
         accessToken: tokens.accessToken, // Will be encrypted by pre-save hook
         refreshToken: tokens.refreshToken, // Will be encrypted by pre-save hook
         tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scope || ['threads_basic', 'threads_content_publish'],
+        scopes: (tokens as any).scope || ['threads_basic', 'threads_content_publish'],
         status: AccountStatus.ACTIVE,
         connectionVersion: 'v2',
         metadata: {

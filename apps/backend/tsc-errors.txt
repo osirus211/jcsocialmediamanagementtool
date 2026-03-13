@@ -1,0 +1,72 @@
+src/models/BulkUploadJob.ts(22,18): error TS2430: Interface 'IBulkUploadJob' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property 'errors' are incompatible.
+    Type 'BulkUploadError[]' is missing the following properties from type 'ValidationError': name, errors, addError, message
+src/services/DashboardLayoutService.ts(18,9): error TS2322: Type 'IDashboardLayout' is not assignable to type 'Document<unknown, {}, IDashboardLayout, {}, {}> & IDashboardLayout & Required<{ _id: ObjectId; }> & { __v: number; }'.
+  Type 'IDashboardLayout' is not assignable to type 'Document<unknown, {}, IDashboardLayout, {}, {}>'.
+    The types returned by 'toJSON(...)' are incompatible between these types.
+      Type 'Omit<{ [x: string]: any; }, "__v">' is missing the following properties from type 'Omit<{ _id: string; workspaceId: string; userId: string; widgets: { id: string; type: string; title: string; size: "small" | "medium" | "large"; position: number; isVisible: boolean; config: { [x: string]: {}; }; }[]; ... 59 more ...; validateSync: { ...; }; }, "__v">': schema, workspaceId, userId, _id, and 57 more.
+src/services/MediaUploadService.ts(605,9): error TS2322: Type '(FlattenMaps<IMedia> & Required<{ _id: ObjectId; }> & { __v: number; })[]' is not assignable to type 'IMedia[]'.
+  Type 'FlattenMaps<IMedia> & Required<{ _id: ObjectId; }> & { __v: number; }' is not assignable to type 'IMedia'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/NotificationService.ts(247,11): error TS2739: Type '{ post_published: NotificationType.POST_PUBLISHED; post_failed: NotificationType.POST_FAILED; post_scheduled: NotificationType.POST_SCHEDULED; approval_required: NotificationType.APPROVAL_REQUIRED; ... 19 more ...; analytics_ready: NotificationType.ANALYTICS_READY; }' is missing the following properties from type 'Record<SystemEvent, NotificationType>': comment_added, mention_in_comment
+src/services/oauth/YouTubeOAuthService.ts(94,42): error TS2554: Expected 2-3 arguments, but got 1.
+src/services/oauth/YouTubeOAuthService.ts(110,27): error TS2339: Property 'expiresIn' does not exist on type 'PlatformToken'.
+src/services/OAuthService.ts(48,20): error TS2740: Type '{ twitter: { clientId: string; clientSecret: string; redirectUri: string; scopes: string[]; authUrl: string; tokenUrl: string; }; linkedin: { clientId: string; clientSecret: string; redirectUri: string; scopes: string[]; authUrl: string; tokenUrl: string; }; facebook: { ...; }; }' is missing the following properties from type 'Record<SocialPlatform, OAuthConfig>': instagram, youtube, threads, bluesky, and 3 more.
+src/services/PermissionService.ts(3,42): error TS2305: Module '"../models/WorkspaceMember"' has no exported member 'MemberStatus'.
+src/services/PostROIService.ts(174,26): error TS2339: Property 'platform' does not exist on type 'Document<unknown, {}, IPost, {}, {}> & IPost & Required<{ _id: ObjectId; }> & { __v: number; }'.
+src/services/PostROIService.ts(270,44): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(pipeline?: PipelineStage[], options?: AggregateOptions): Aggregate<any[]>', gave the following error.
+    Argument of type '({ $match: any; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $sort?: undefined; $limit?: undefined; } | { $lookup: { from: string; localField: string; foreignField: string; as: string; }; ... 4 more ...; $limit?: undefined; } | { ...; } | { ...; } | { ...; } | { ...; })[]' is not assignable to parameter of type 'PipelineStage[]'.
+      Type '{ $match: any; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $sort?: undefined; $limit?: undefined; } | { $lookup: { from: string; localField: string; foreignField: string; as: string; }; ... 4 more ...; $limit?: undefined; } | { ...; } | { ...; } | { ...; } | { ...; }' is not assignable to type 'PipelineStage'.
+        Type '{ $sort: { [x: string]: number; }; $match?: undefined; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $limit?: undefined; }' is not assignable to type 'PipelineStage'.
+          Type '{ $sort: { [x: string]: number; }; $match?: undefined; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $limit?: undefined; }' is not assignable to type 'Unwind'.
+            Property '$unwind' is optional in type '{ $sort: { [x: string]: number; }; $match?: undefined; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $limit?: undefined; }' but required in type 'Unwind'.
+  Overload 2 of 2, '(pipeline: PipelineStage[]): Aggregate<any[]>', gave the following error.
+    Argument of type '({ $match: any; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $sort?: undefined; $limit?: undefined; } | { $lookup: { from: string; localField: string; foreignField: string; as: string; }; ... 4 more ...; $limit?: undefined; } | { ...; } | { ...; } | { ...; } | { ...; })[]' is not assignable to parameter of type 'PipelineStage[]'.
+      Type '{ $match: any; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $sort?: undefined; $limit?: undefined; } | { $lookup: { from: string; localField: string; foreignField: string; as: string; }; ... 4 more ...; $limit?: undefined; } | { ...; } | { ...; } | { ...; } | { ...; }' is not assignable to type 'PipelineStage'.
+        Type '{ $sort: { [x: string]: number; }; $match?: undefined; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $limit?: undefined; }' is not assignable to type 'PipelineStage'.
+          Type '{ $sort: { [x: string]: number; }; $match?: undefined; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $limit?: undefined; }' is not assignable to type 'Unwind'.
+            Property '$unwind' is optional in type '{ $sort: { [x: string]: number; }; $match?: undefined; $lookup?: undefined; $unwind?: undefined; $project?: undefined; $limit?: undefined; }' but required in type 'Unwind'.
+src/services/PostTemplateService.ts(99,14): error TS2352: Conversion of type '(FlattenMaps<IPostTemplate> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IPostTemplate[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IPostTemplate> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IPostTemplate'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/QueueSlotService.ts(56,14): error TS2352: Conversion of type '(FlattenMaps<IQueueSlot> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IQueueSlot[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IQueueSlot> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IQueueSlot'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/RedisMemoryMonitor.ts(266,26): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '"purge"' is not assignable to parameter of type '"STATS"'.
+src/services/SchedulerService.ts(213,50): error TS2345: Argument of type 'PostStatus.QUEUED' is not assignable to parameter of type 'PostStatus'.
+src/services/SchedulerService.ts(272,11): error TS2554: Expected 2 arguments, but got 3.
+src/services/SecurityAuditService.ts(198,14): error TS2352: Conversion of type '(FlattenMaps<ISecurityEvent> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'ISecurityEvent[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<ISecurityEvent> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'ISecurityEvent'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/ShortLinkService.ts(103,34): error TS2339: Property 'server' does not exist on type '{ readonly env: "production" | "development" | "test"; readonly port: number; readonly apiUrl: string; readonly validationMode: boolean; readonly database: { readonly uri: string; readonly testUri: string; }; ... 27 more ...; readonly sentry: { ...; }; }'.
+src/services/ShortLinkService.ts(203,16): error TS2352: Conversion of type '(FlattenMaps<IShortLink> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IShortLink[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IShortLink> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IShortLink'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/SocialAccountService.ts(271,56): error TS2345: Argument of type '{ refreshToken: string; }' is not assignable to parameter of type 'string'.
+src/services/WebhookRetryService.ts(341,7): error TS2322: Type '(FlattenMaps<IWebhookDelivery> & Required<{ _id: ObjectId; }> & { __v: number; })[]' is not assignable to type 'IWebhookDelivery[]'.
+  Type 'FlattenMaps<IWebhookDelivery> & Required<{ _id: ObjectId; }> & { __v: number; }' is not assignable to type 'IWebhookDelivery'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/WebhookRetryService.ts(356,5): error TS2322: Type '(FlattenMaps<IWebhookDelivery> & Required<{ _id: ObjectId; }> & { __v: number; })[]' is not assignable to type 'IWebhookDelivery[]'.
+  Type 'FlattenMaps<IWebhookDelivery> & Required<{ _id: ObjectId; }> & { __v: number; }' is not assignable to type 'IWebhookDelivery'.
+    The types of 'collection.conn.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/workers-standalone.ts(86,60): error TS2345: Argument of type 'TokenRefreshWorker' is not assignable to parameter of type 'IWorker'.
+  The types returned by 'stop()' are incompatible between these types.
+    Type 'void' is not assignable to type 'Promise<void>'.
+src/workers-standalone.ts(99,63): error TS2345: Argument of type 'MediaProcessingWorker' is not assignable to parameter of type 'IWorker'.
+  Property 'getStatus' is missing in type 'MediaProcessingWorker' but required in type 'IWorker'.
+src/workers/FacebookTokenRefreshWorker.ts(257,14): error TS1345: An expression of type 'void' cannot be tested for truthiness.
+src/workers/index.ts(175,66): error TS2345: Argument of type 'WorkerConfig | { enabled: true; priority: string; }' is not assignable to parameter of type 'WorkerConfig'.
+  Object literal may only specify known properties, and 'priority' does not exist in type 'WorkerConfig'.
+src/workers/index.ts(214,22): error TS2353: Object literal may only specify known properties, and 'priority' does not exist in type 'WorkerConfig'.
+src/workers/WorkflowExecutorWorker.ts(229,22): error TS2339: Property 'message' does not exist on type 'unknown'.
+src/workers/WorkflowExecutorWorker.ts(237,24): error TS2339: Property 'message' does not exist on type 'unknown'.

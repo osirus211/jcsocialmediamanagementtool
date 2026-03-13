@@ -59,7 +59,7 @@ const gracefulShutdown = async (signal: string) => {
   try {
     // Stop accepting new jobs
     if (publishingWorker) {
-      await publishingWorker.stop();
+      await (publishingWorker as any).stop();
       logger.info('Worker stopped successfully');
     }
 
@@ -111,7 +111,7 @@ const startWorker = async () => {
     // Start the worker
     console.log('About to start worker...');
     try {
-      publishingWorker.start();
+      (publishingWorker as any).start();
       console.log('✓ Worker started');
       logger.info('✅ Publishing worker started successfully');
     } catch (error: unknown) {
@@ -124,7 +124,7 @@ const startWorker = async () => {
 
     // Log worker status every 60 seconds
     setInterval(() => {
-      const status = publishingWorker.getStatus();
+      const status = (publishingWorker as any).getStatus();
       logger.info('Worker heartbeat', {
         isRunning: status.isRunning,
         uptime: process.uptime(),

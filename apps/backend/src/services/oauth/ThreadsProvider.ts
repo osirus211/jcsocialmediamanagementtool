@@ -61,7 +61,7 @@ export class ThreadsProvider extends OAuthProvider {
     }
   }
 
-  async exchangeCodeForToken(params: OAuthCallbackParams): Promise<OAuthTokens> {
+  async exchangeCodeForTokenLegacy(params: OAuthCallbackParams): Promise<OAuthTokens> {
     try {
       const response = await axios.post(
         this.tokenUrl,
@@ -99,7 +99,7 @@ export class ThreadsProvider extends OAuthProvider {
     }
   }
 
-  async refreshAccessToken(params: OAuthRefreshParams): Promise<OAuthTokens> {
+  async refreshAccessTokenLegacy(params: OAuthRefreshParams): Promise<OAuthTokens> {
     try {
       const response = await axios.post(
         this.tokenUrl,
@@ -165,5 +165,39 @@ export class ThreadsProvider extends OAuthProvider {
       });
       throw new Error(`Failed to fetch Threads user profile: ${error.response?.data?.error?.message || error.message}`);
     }
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    // Threads typically has one account per user
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    try {
+      await this.getUserProfile(accessToken);
+      return { valid: true, missingPermissions: [] };
+    } catch {
+      return { valid: false, missingPermissions: this.scopes };
+    }
+  }
+
+  async revokeToken(accessToken: string): Promise<void> {
+    logger.info('Threads token revocation not implemented', {
+      provider: 'ThreadsProvider',
+    });
+  }
+
+  getCapabilities(accountType?: string): any {
+    return {
+      supportsPublishing: true,
+      supportsScheduling: false,
+      supportsAnalytics: false,
+      maxTextLength: 500,
+      supportsImages: true,
+      supportsVideos: true,
+      maxImages: 10,
+      maxVideos: 1,
+    };
   }
 }

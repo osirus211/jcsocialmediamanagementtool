@@ -109,7 +109,7 @@ export class DashboardLayoutService {
   /**
    * Create default layout for new user
    */
-  private static async createDefaultLayout(userId: string, workspaceId: string): Promise<IDashboardLayout> {
+  private static async createDefaultLayout(userId: string, workspaceId: string): Promise<any> {
     const defaultWidgets = this.getDefaultWidgets();
 
     const layout = await DashboardLayout.create({

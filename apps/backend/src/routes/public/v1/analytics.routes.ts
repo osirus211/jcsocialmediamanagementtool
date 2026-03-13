@@ -61,12 +61,13 @@ router.get('/',
       
       // Calculate aggregates
       const totals = analytics.reduce((acc, item) => {
-        acc.impressions += item.impressions || 0;
-        acc.engagements += item.engagements || 0;
-        acc.likes += item.likes || 0;
-        acc.comments += item.comments || 0;
-        acc.shares += item.shares || 0;
-        acc.clicks += item.clicks || 0;
+        const data = item as any;
+        acc.impressions += data.impressions || 0;
+        acc.engagements += data.engagements || 0;
+        acc.likes += data.likes || 0;
+        acc.comments += data.comments || 0;
+        acc.shares += data.shares || 0;
+        acc.clicks += data.clicks || 0;
         return acc;
       }, {
         impressions: 0,
@@ -129,16 +130,19 @@ router.get('/posts/:id',
       
       res.json({
         postId: id,
-        analytics: analytics.map(item => ({
-          platform: item.platform,
-          impressions: item.impressions,
-          engagements: item.engagements,
-          likes: item.likes,
-          comments: item.comments,
-          shares: item.shares,
-          clicks: item.clicks,
-          fetchedAt: item.fetchedAt,
-        })),
+        analytics: analytics.map(item => {
+          const data = item as any;
+          return {
+            platform: data.platform,
+            impressions: data.impressions,
+            engagements: data.engagements,
+            likes: data.likes,
+            comments: data.comments,
+            shares: data.shares,
+            clicks: data.clicks,
+            fetchedAt: data.fetchedAt,
+          };
+        }),
         total: analytics.length,
       });
     } catch (error) {

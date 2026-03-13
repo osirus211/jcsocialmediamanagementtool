@@ -53,7 +53,7 @@ export class QueueSlotService {
         .sort({ dayOfWeek: 1, time: 1 })
         .lean();
 
-      return slots as IQueueSlot[];
+      return slots as unknown as IQueueSlot[];
     } catch (error: unknown) {
       const err = error as Error;
       logger.error('Failed to get queue slots', {

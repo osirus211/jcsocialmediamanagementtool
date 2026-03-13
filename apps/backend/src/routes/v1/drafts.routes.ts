@@ -8,16 +8,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Post, PostStatus } from '../../models/Post';
 import { DraftCollaborationService } from '../../services/DraftCollaborationService';
-import { authMiddleware } from '../../middleware/auth.middleware';
-import { workspaceMiddleware } from '../../middleware/workspace.middleware';
-import { validateRequest } from '../../middleware/validation.middleware';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 
 const router = Router();
 
 // Apply auth and workspace middleware to all routes
-router.use(authMiddleware);
-router.use(workspaceMiddleware);
+router.use(requireAuth);
+router.use(requireWorkspace);
 
 // Validation schemas
 const autoSaveSchema = z.object({
@@ -35,7 +35,7 @@ const autoSaveSchema = z.object({
  * GET /drafts
  * List all drafts for workspace
  */
-router.get('/', async (req, res, next) => {
+router.get('/', async (req, res, next): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
     const { limit = 50, skip = 0 } = req.query;
@@ -78,7 +78,7 @@ router.get('/', async (req, res, next) => {
  * GET /drafts/:id
  * Get single draft with lock status
  */
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async (req, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.workspace!;
@@ -94,10 +94,11 @@ router.get('/:id', async (req, res, next) => {
       .populate('socialAccountIds', 'platform accountName');
 
     if (!draft) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Draft not found',
       });
+      return;
     }
 
     res.json({
@@ -114,7 +115,7 @@ router.get('/:id', async (req, res, next) => {
  * GET /drafts/:id/status
  * Get lightweight lock and version status (for polling)
  */
-router.get('/:id/status', async (req, res, next) => {
+router.get('/:id/status', async (req, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.workspace!;
@@ -127,10 +128,11 @@ router.get('/:id/status', async (req, res, next) => {
     });
 
     if (!draft) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Draft not found',
       });
+      return;
     }
 
     const status = await DraftCollaborationService.getDraftStatus(id);
@@ -149,11 +151,11 @@ router.get('/:id/status', async (req, res, next) => {
  * POST /drafts/:id/lock
  * Acquire edit lock
  */
-router.post('/:id/lock', async (req, res, next) => {
+router.post('/:id/lock', async (req, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.workspace!;
-    const userId = req.user!._id.toString();
+    const userId = req.user!.userId;
 
     // Verify draft exists and belongs to workspace
     const draft = await Post.findOne({
@@ -163,20 +165,22 @@ router.post('/:id/lock', async (req, res, next) => {
     });
 
     if (!draft) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Draft not found',
       });
+      return;
     }
 
     const result = await DraftCollaborationService.acquireLock(id, userId);
 
     if (!result.success) {
-      return res.status(409).json({
+      res.status(409).json({
         success: false,
         error: 'Draft is currently being edited by another user',
         data: result,
       });
+      return;
     }
 
     res.json({
@@ -193,11 +197,11 @@ router.post('/:id/lock', async (req, res, next) => {
  * DELETE /drafts/:id/lock
  * Release edit lock
  */
-router.delete('/:id/lock', async (req, res, next) => {
+router.delete('/:id/lock', async (req, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.workspace!;
-    const userId = req.user!._id.toString();
+    const userId = req.user!.userId;
 
     // Verify draft exists and belongs to workspace
     const draft = await Post.findOne({
@@ -207,10 +211,11 @@ router.delete('/:id/lock', async (req, res, next) => {
     });
 
     if (!draft) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Draft not found',
       });
+      return;
     }
 
     await DraftCollaborationService.releaseLock(id, userId);
@@ -229,11 +234,11 @@ router.delete('/:id/lock', async (req, res, next) => {
  * POST /drafts/:id/lock/renew
  * Renew edit lock
  */
-router.post('/:id/lock/renew', async (req, res, next) => {
+router.post('/:id/lock/renew', async (req, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.workspace!;
-    const userId = req.user!._id.toString();
+    const userId = req.user!.userId;
 
     // Verify draft exists and belongs to workspace
     const draft = await Post.findOne({
@@ -243,10 +248,11 @@ router.post('/:id/lock/renew', async (req, res, next) => {
     });
 
     if (!draft) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Draft not found',
       });
+      return;
     }
 
     const result = await DraftCollaborationService.renewLock(id, userId);
@@ -265,11 +271,11 @@ router.post('/:id/lock/renew', async (req, res, next) => {
  * POST /drafts/:id/autosave
  * Auto-save draft content
  */
-router.post('/:id/autosave', validateRequest(autoSaveSchema), async (req, res, next) => {
+router.post('/:id/autosave', validateRequest(autoSaveSchema), async (req, res, next): Promise<void> => {
   try {
     const { id } = req.params;
     const { workspaceId } = req.workspace!;
-    const userId = req.user!._id.toString();
+    const userId = req.user!.userId;
     const { content, platformContent, version } = req.body;
 
     // Verify draft exists and belongs to workspace
@@ -280,15 +286,16 @@ router.post('/:id/autosave', validateRequest(autoSaveSchema), async (req, res, n
     });
 
     if (!draft) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Draft not found',
       });
+      return;
     }
 
     // Check version conflict if provided
     if (version && draft.version !== version) {
-      return res.status(409).json({
+      res.status(409).json({
         success: false,
         error: 'Version conflict detected',
         data: {
@@ -297,6 +304,7 @@ router.post('/:id/autosave', validateRequest(autoSaveSchema), async (req, res, n
           conflict: true,
         },
       });
+      return;
     }
 
     const result = await DraftCollaborationService.autoSaveDraft(
@@ -307,11 +315,12 @@ router.post('/:id/autosave', validateRequest(autoSaveSchema), async (req, res, n
     );
 
     if (result.conflict) {
-      return res.status(409).json({
+      res.status(409).json({
         success: false,
         error: 'Version conflict detected',
         data: result,
       });
+      return;
     }
 
     res.json({

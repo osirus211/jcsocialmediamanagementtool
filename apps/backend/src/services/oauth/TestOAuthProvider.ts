@@ -41,7 +41,7 @@ export class TestOAuthProvider extends OAuthProvider {
     return { url, state };
   }
 
-  async exchangeCodeForToken(params: OAuthCallbackParams): Promise<OAuthTokens> {
+  async exchangeCodeForTokenLegacy(params: OAuthCallbackParams): Promise<OAuthTokens> {
     logger.info('Test OAuth token exchange', { platform: this.platform });
 
     // Generate mock tokens
@@ -58,7 +58,7 @@ export class TestOAuthProvider extends OAuthProvider {
     };
   }
 
-  async refreshAccessToken(params: OAuthRefreshParams): Promise<OAuthTokens> {
+  async refreshAccessTokenLegacy(params: OAuthRefreshParams): Promise<OAuthTokens> {
     logger.info('Test OAuth token refresh', { platform: this.platform });
 
     // Generate new mock tokens
@@ -102,5 +102,25 @@ export class TestOAuthProvider extends OAuthProvider {
   async validateToken(accessToken: string): Promise<boolean> {
     // Test tokens are always valid
     return accessToken.startsWith('test_access_token_');
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    const isValid = this.validateToken(accessToken);
+    return { valid: isValid, missingPermissions: isValid ? [] : this.scopes };
+  }
+
+  getCapabilities(accountType?: string): any {
+    return {
+      supportsPublishing: true,
+      supportsScheduling: true,
+      supportsAnalytics: false,
+      maxTextLength: 280,
+      supportedMediaTypes: ['image/jpeg', 'image/png'],
+    };
   }
 }

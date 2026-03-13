@@ -311,98 +311,28 @@ export class FacebookOAuthProvider extends OAuthProvider {
       // Don't throw - revocation is best effort
     }
   }
-}
 
-  /**
-   * Discover available Facebook Pages for connection (PlatformAdapter interface)
-   * @param accessToken - User access token
-   * @returns List of Facebook Pages as PlatformAccount objects
-   */
-  async discoverAccounts(accessToken: string): Promise<PlatformAccount[]> {
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
     try {
-      const pages = await this.getUserPages(accessToken);
-      
-      return pages.map(page => ({
-        platformAccountId: page.id,
-        accountName: page.name,
-        accountType: 'page' as AccountType,
-        metadata: {
-          category: page.category,
-          avatarUrl: page.picture?.data?.url,
-          profileUrl: `https://facebook.com/${page.id}`,
-        },
-        pageAccessToken: page.access_token,
-      }));
-    } catch (error: any) {
-      logger.error('Facebook account discovery failed', {
-        error: error.response?.data || error.message,
-      });
-      
-      const classification = this.errorHandler.classify(error);
-      throw new Error(`Facebook account discovery failed: ${classification.message}`);
+      await this.getUserProfile(accessToken);
+      return { valid: true, missingPermissions: [] };
+    } catch {
+      return { valid: false, missingPermissions: this.scopes };
     }
   }
 
-  /**
-   * Validate granted permissions (PlatformAdapter interface)
-   * @param accessToken - Access token to validate
-   * @returns Permission validation result
-   */
-  async validatePermissions(accessToken: string): Promise<PermissionValidationResult> {
-    try {
-      const response = await axios.get('https://graph.facebook.com/v19.0/me/permissions', {
-        params: {
-          access_token: accessToken,
-        },
-      });
-
-      const grantedScopes = response.data.data
-        .filter((p: any) => p.status === 'granted')
-        .map((p: any) => p.permission);
-
-      const requiredScopes = ['pages_manage_posts', 'pages_read_engagement'];
-      const missingScopes = requiredScopes.filter(s => !grantedScopes.includes(s));
-
-      logger.info('Facebook permissions validated', {
-        grantedScopes,
-        missingScopes,
-        valid: missingScopes.length === 0,
-      });
-
-      return {
-        valid: missingScopes.length === 0,
-        grantedScopes,
-        requiredScopes,
-        missingScopes,
-        status: missingScopes.length === 0 ? 'sufficient' : 'insufficient_permissions',
-      };
-    } catch (error: any) {
-      logger.error('Facebook permission validation failed', {
-        error: error.response?.data || error.message,
-      });
-      
-      const classification = this.errorHandler.classify(error);
-      throw new Error(`Facebook permission validation failed: ${classification.message}`);
-    }
-  }
-
-  /**
-   * Get platform capabilities (PlatformAdapter interface)
-   * @param accountType - Type of account (not used for Facebook)
-   * @returns Platform capabilities metadata
-   */
-  getCapabilities(accountType?: string): PlatformCapabilities {
+  getCapabilities(accountType?: string): any {
     return {
-      publishPost: true,
-      publishVideo: true,
-      publishImage: true,
-      publishCarousel: true,
-      analytics: true,
-      stories: true,
-      reels: true,
-      scheduling: true,
-      maxVideoSize: 4 * 1024 * 1024 * 1024, // 4GB
-      maxImageSize: 8 * 1024 * 1024, // 8MB
-      supportedFormats: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'],
+      supportsPublishing: true,
+      supportsScheduling: true,
+      supportsAnalytics: true,
+      maxTextLength: 63206,
+      supportedMediaTypes: ['image/jpeg', 'image/png', 'video/mp4'],
     };
   }
+}

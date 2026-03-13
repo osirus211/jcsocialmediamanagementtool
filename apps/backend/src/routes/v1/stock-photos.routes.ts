@@ -6,16 +6,16 @@
 
 import { Router } from 'express';
 import { query, param, body } from 'express-validator';
-import { authenticate } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { validateRequest } from '../../middleware/validation';
+import { validateRequest } from '../../middleware/validate';
 import { StockPhotoService } from '../../services/StockPhotoService';
 import { logger } from '../../utils/logger';
 
 const router = Router();
 
 // All routes require authentication and workspace context
-router.use(authenticate);
+router.use(requireAuth);
 router.use(requireWorkspace);
 
 /**

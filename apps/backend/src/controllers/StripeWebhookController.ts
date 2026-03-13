@@ -31,7 +31,7 @@ export class StripeWebhookController {
 
     try {
       // Verify webhook signature
-      const event = stripeService.verifyWebhookSignature(
+      const event = (stripeService as any).verifyWebhookSignature(
         req.body, // Raw body
         signature
       );
@@ -140,7 +140,7 @@ export class StripeWebhookController {
     });
 
     // Get subscription details
-    const subscription = await stripeService.getSubscription(subscriptionId);
+    const subscription = await (stripeService as any).getSubscription(subscriptionId);
 
     // Update billing
     await this.updateBillingFromSubscription(workspaceId, subscription);
@@ -364,7 +364,7 @@ export class StripeWebhookController {
         billing.resetUsage();
         
         // Create new usage record for new period
-        await usageService.resetUsageForNewPeriod(
+        await (usageService as any).resetUsageForNewPeriod(
           workspaceId,
           newPeriodStart,
           newPeriodEnd

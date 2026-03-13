@@ -117,7 +117,7 @@ router.post('/', requireScope('webhooks:write'), async (req, res, next) => {
 /**
  * PATCH /v2/webhooks/:id - Update webhook
  */
-router.patch('/:id', requireScope('webhooks:write'), async (req, res, next) => {
+router.patch('/:id', requireScope('webhooks:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const webhookId = req.params.id;
@@ -130,10 +130,11 @@ router.patch('/:id', requireScope('webhooks:write'), async (req, res, next) => {
     ).select('-secret');
     
     if (!webhook) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Webhook not found',
         code: 'WEBHOOK_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Webhook updated via API v2', {
@@ -143,15 +144,17 @@ router.patch('/:id', requireScope('webhooks:write'), async (req, res, next) => {
     });
     
     res.json({ data: webhook });
+    return;
   } catch (error) {
     next(error);
+    return;
   }
 });
 
 /**
  * DELETE /v2/webhooks/:id - Delete webhook
  */
-router.delete('/:id', requireScope('webhooks:write'), async (req, res, next) => {
+router.delete('/:id', requireScope('webhooks:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const webhookId = req.params.id;
@@ -159,10 +162,11 @@ router.delete('/:id', requireScope('webhooks:write'), async (req, res, next) => 
     const webhook = await Webhook.findOneAndDelete({ _id: webhookId, workspaceId });
     
     if (!webhook) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Webhook not found',
         code: 'WEBHOOK_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Webhook deleted via API v2', {
@@ -172,15 +176,17 @@ router.delete('/:id', requireScope('webhooks:write'), async (req, res, next) => 
     });
     
     res.status(204).send();
+    return;
   } catch (error) {
     next(error);
+    return;
   }
 });
 
 /**
  * GET /v2/webhooks/:id/deliveries - Get delivery history
  */
-router.get('/:id/deliveries', requireScope('webhooks:read'), async (req, res, next) => {
+router.get('/:id/deliveries', requireScope('webhooks:read'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const webhookId = req.params.id;
@@ -188,10 +194,11 @@ router.get('/:id/deliveries', requireScope('webhooks:read'), async (req, res, ne
     const webhook = await Webhook.findOne({ _id: webhookId, workspaceId });
     
     if (!webhook) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Webhook not found',
         code: 'WEBHOOK_NOT_FOUND',
       });
+      return;
     }
     
     // Return delivery statistics
@@ -206,8 +213,10 @@ router.get('/:id/deliveries', requireScope('webhooks:read'), async (req, res, ne
     };
     
     res.json({ data: deliveryStats });
+    return;
   } catch (error) {
     next(error);
+    return;
   }
 });
 

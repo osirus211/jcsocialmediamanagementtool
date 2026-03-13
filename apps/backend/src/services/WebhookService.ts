@@ -104,7 +104,7 @@ export class WebhookService {
   /**
    * Send webhook for system event
    */
-  async sendWebhook(params: {
+  async sendWebhookEvent(params: {
     workspaceId: string;
     event: string;
     payload: Record<string, any>;

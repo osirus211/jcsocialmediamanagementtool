@@ -7,14 +7,22 @@
  * - Cloudflare R2
  * - MinIO
  * - Any S3-compatible storage
+ * 
+ * Note: Requires @aws-sdk/client-s3 to be installed
  */
 
-import {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-  PutObjectCommandInput,
-} from '@aws-sdk/client-s3';
+// Conditional import - only available if @aws-sdk/client-s3 is installed
+let S3Client: any, PutObjectCommand: any, DeleteObjectCommand: any;
+
+try {
+  const awsSdk = require('@aws-sdk/client-s3');
+  S3Client = awsSdk.S3Client;
+  PutObjectCommand = awsSdk.PutObjectCommand;
+  DeleteObjectCommand = awsSdk.DeleteObjectCommand;
+} catch (error) {
+  // AWS SDK not installed - S3StorageProvider will throw runtime error if used
+}
+
 import { StorageProvider, UploadOptions, UploadResult } from './StorageProvider';
 import { logger } from '../utils/logger';
 import { config as storageConfig } from '../config';
@@ -29,7 +37,7 @@ export interface S3StorageConfig {
 }
 
 export class S3StorageProvider implements StorageProvider {
-  private client: S3Client;
+  private client: any; // S3Client type
   private config: S3StorageConfig;
 
   constructor(config: S3StorageConfig) {
@@ -64,7 +72,7 @@ export class S3StorageProvider implements StorageProvider {
     options?: UploadOptions
   ): Promise<UploadResult> {
     try {
-      const params: PutObjectCommandInput = {
+      const params: any = { // PutObjectCommandInput type
         Bucket: this.config.bucket,
         Key: key,
         Body: buffer,

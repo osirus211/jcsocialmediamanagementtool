@@ -25,6 +25,8 @@ export interface OverviewMetrics {
   engagementRate: number;
   totalPosts: number;
   bestPerformingPost: any;
+  followerGrowth: number;
+  postsPublished: number;
   growth: {
     impressions: number;
     engagement: number;
@@ -173,6 +175,8 @@ export class AnalyticsService {
         engagementRate,
         totalPosts: latestAnalytics.length,
         bestPerformingPost: bestPerforming,
+        followerGrowth: 0, // TODO: Implement follower growth calculation
+        postsPublished: latestAnalytics.length,
         growth,
       };
     } catch (error: any) {

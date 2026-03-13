@@ -3,7 +3,7 @@
  * Handles publishing pins to Pinterest
  */
 
-import { IPublisher } from './IPublisher';
+import { IPublisher, PublishPostOptions, PublishPostResult } from './IPublisher';
 import { ISocialAccount } from '../../models/SocialAccount';
 import { IPost } from '../../models/Post';
 import { logger } from '../../utils/logger';
@@ -41,7 +41,23 @@ export interface PinterestPublishResult {
 }
 
 export class PinterestPublisher implements IPublisher {
+  readonly platform = 'pinterest';
   private readonly apiBaseUrl = 'https://api.pinterest.com/v5';
+
+  async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    // Convert options to IPost format for compatibility with existing method
+    const post = {
+      content: options.content,
+      mediaUrls: options.mediaIds || [],
+      metadata: options.metadata,
+    } as IPost;
+
+    const result = await this.publish(account, post);
+    return {
+      platformPostId: result.postId,
+      url: result.url,
+    };
+  }
 
   async publish(account: ISocialAccount, post: IPost): Promise<PinterestPublishResult> {
     return this.createPin(account, post);
@@ -113,7 +129,7 @@ export class PinterestPublisher implements IPublisher {
         throw new Error(`Pinterest pin creation failed: ${response.status} ${errorText}`);
       }
 
-      const pin: PinterestPin = await response.json();
+      const pin: PinterestPin = (await response.json()) as any;
 
       logger.info('Pinterest pin created successfully', {
         accountId: account._id,
@@ -153,7 +169,7 @@ export class PinterestPublisher implements IPublisher {
       }
 
       const data = await response.json();
-      return data.items || [];
+      return (data as any).items || [];
     } catch (error: any) {
       logger.error('Failed to fetch Pinterest boards', {
         error: error.message,
@@ -212,5 +228,19 @@ export class PinterestPublisher implements IPublisher {
     
     // If only one line, use the full content as description
     return content;
+  }
+
+  // IPublisher interface methods
+  async uploadMedia(account: ISocialAccount, mediaUrls: string[]): Promise<string[]> {
+    // Pinterest handles media during pin creation
+    return mediaUrls;
+  }
+
+  getLimits() {
+    return {
+      maxContentLength: 500,
+      maxMediaCount: 1,
+      supportedMediaTypes: ['image/jpeg', 'image/png', 'video/mp4'],
+    };
   }
 }

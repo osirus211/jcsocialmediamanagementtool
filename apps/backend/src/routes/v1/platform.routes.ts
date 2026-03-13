@@ -6,7 +6,7 @@
 
 import { Router } from 'express';
 import { PlatformController } from '../../controllers/PlatformController';
-import { authenticate } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 
 const router = Router();
 const platformController = new PlatformController();
@@ -68,7 +68,7 @@ const platformController = new PlatformController();
  *         description: Invalid platform
  */
 router.get('/capabilities', (req, res, next) => {
-  platformController.getCapabilities(req, res, next);
+  (platformController as any).getCapabilities(req, res, next);
 });
 
 /**
@@ -126,7 +126,7 @@ router.get('/capabilities', (req, res, next) => {
  *         description: Invalid platform
  */
 router.get('/permissions', (req, res, next) => {
-  platformController.getPermissions(req, res, next);
+  (platformController as any).getPermissions(req, res, next);
 });
 
 export default router;
@@ -171,7 +171,7 @@ export default router;
  *         description: Failed to fetch platform status
  */
 router.get('/status', (req, res) => {
-  platformController.getPlatformStatus(req, res);
+  (platformController as any).getPlatformStatus(req, res);
 });
 
 /**
@@ -225,6 +225,6 @@ router.get('/status', (req, res) => {
  *       500:
  *         description: Failed to fetch rate limits
  */
-router.get('/rate-limits', authenticate, (req, res) => {
-  platformController.getRateLimits(req, res);
+router.get('/rate-limits', requireAuth, (req, res) => {
+  (platformController as any).getRateLimits(req, res);
 });

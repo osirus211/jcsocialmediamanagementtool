@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
-import { WorkspaceMember, WorkspaceRole, MemberStatus } from '../models/WorkspaceMember';
+import { WorkspaceMember, MemberRole } from '../models/WorkspaceMember';
 import { Workspace } from '../models/Workspace';
 import { UnauthorizedError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { logger } from '../utils/logger';
@@ -11,7 +11,7 @@ declare global {
     interface Request {
       workspace?: {
         workspaceId: mongoose.Types.ObjectId;
-        role: WorkspaceRole;
+        role: MemberRole;
         memberId: mongoose.Types.ObjectId;
       };
     }
@@ -75,7 +75,7 @@ export const requireWorkspace = async (
     const membership = await WorkspaceMember.findOne({
       workspaceId,
       userId: req.user.userId,
-      status: MemberStatus.ACTIVE,
+      isActive: true,
     });
 
     if (!membership || !membership.workspaceId) {
@@ -120,7 +120,7 @@ export const requireWorkspace = async (
  * 
  * @param allowedRoles - Array of roles that are allowed to access the route
  */
-export const requireWorkspaceRole = (...allowedRoles: WorkspaceRole[]) => {
+export const requireWorkspaceRole = (...allowedRoles: MemberRole[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.workspace) {
@@ -151,22 +151,22 @@ export const requireWorkspaceRole = (...allowedRoles: WorkspaceRole[]) => {
  * Owner-only middleware
  * Requires user to be the workspace owner
  */
-export const requireOwner = requireWorkspaceRole(WorkspaceRole.OWNER);
+export const requireOwner = requireWorkspaceRole(MemberRole.OWNER);
 
 /**
  * Admin or Owner middleware
  * Requires user to be admin or owner
  */
-export const requireAdmin = requireWorkspaceRole(WorkspaceRole.OWNER, WorkspaceRole.ADMIN);
+export const requireAdmin = requireWorkspaceRole(MemberRole.OWNER, MemberRole.ADMIN);
 
 /**
  * Member or above middleware
  * Requires user to be at least a member (excludes viewers)
  */
 export const requireMember = requireWorkspaceRole(
-  WorkspaceRole.OWNER,
-  WorkspaceRole.ADMIN,
-  WorkspaceRole.MEMBER
+  MemberRole.OWNER,
+  MemberRole.ADMIN,
+  MemberRole.MEMBER
 );
 
 /**
@@ -198,7 +198,7 @@ export const optionalWorkspace = async (
     const membership = await WorkspaceMember.findOne({
       workspaceId,
       userId: req.user.userId,
-      status: MemberStatus.ACTIVE,
+      isActive: true,
     });
 
     if (membership) {

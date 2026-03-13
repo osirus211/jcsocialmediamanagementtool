@@ -8,6 +8,7 @@
 import mongoose from 'mongoose';
 import { Redis } from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
+import { config } from '../../../config';
 import { Workspace } from '../../../models/Workspace';
 import { User } from '../../../models/User';
 import { connectRedis as connectRedisConfig, getRedisClient } from '../../../config/redis';

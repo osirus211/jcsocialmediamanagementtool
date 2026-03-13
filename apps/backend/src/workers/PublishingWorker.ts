@@ -13,8 +13,8 @@ const publishingWorkerWrapper = {
   shutdown: () => {},
   wrapTokenRefresh: async (fn: any, ...args: any[]) => fn(...args),
   wrapAICaption: async (fn: any, ...args: any[]) => ({ success: true, result: args[0] }),
-  wrapEmail: async (fn: any, ...args: any[]) => ({ success: true }),
-  wrapAnalytics: async (fn: any, ...args: any[]) => ({ success: true }),
+  wrapEmail: async (fn: any, ...args: any[]) => ({ success: true, result: { degraded: false, reason: null, skipped: false } }),
+  wrapAnalytics: async (fn: any, ...args: any[]) => ({ success: true, result: { degraded: false, reason: null, skipped: false } }),
   wrapMediaUpload: async (fn: any, ...args: any[]) => ({ success: true, result: args[0] }),
   wrapPlatformPublish: async (fn: any, ...args: any[]) => fn(...args),
 };
@@ -113,10 +113,9 @@ export class PublishingWorker {
       await emailNotificationService.sendPostSuccess({
         to: owner.email,
         platform: account.provider,
-        postTitle: post.content.substring(0, 50) + (post.content.length > 50 ? '...' : ''),
-        platformUrl: platformPostId ? `https://${account.provider}.com/post/${platformPostId}` : undefined,
-        userId: owner._id.toString(),
-        workspaceId: post.workspaceId.toString(),
+        postId: post._id.toString(),
+        content: post.content,
+        publishedAt: new Date(),
       });
     } catch (error: any) {
       logger.error('Error sending post success email', { error: error.message });
@@ -155,10 +154,10 @@ export class PublishingWorker {
       await emailNotificationService.sendPostFailure({
         to: owner.email,
         platform,
-        postTitle: post.content.substring(0, 50) + (post.content.length > 50 ? '...' : ''),
+        postId: post._id.toString(),
+        content: post.content,
         error: errorMessage,
-        userId: owner._id.toString(),
-        workspaceId: post.workspaceId.toString(),
+        failedAt: new Date(),
       });
     } catch (error: any) {
       logger.error('Error sending post failure email', { error: error.message });
@@ -609,7 +608,7 @@ export class PublishingWorker {
       : `publish:${postId}`;
     const publishLock = await distributedLockService.acquireLock(publishLockKey, {
       ttl: 120000, // 2 minutes
-      retryAttempts: 1, // Don't retry - if another worker has it, skip
+      retryCount: 1, // Don't retry - if another worker has it, skip
     });
 
     if (!publishLock) {
@@ -678,7 +677,7 @@ export class PublishingWorker {
         });
         
         // Update status to PUBLISHED if not already (data consistency)
-        if (post.status !== PostStatus.PUBLISHED) {
+        if ((post.status as any) !== PostStatus.PUBLISHED) {
           await Post.findByIdAndUpdate(postId, {
             status: PostStatus.PUBLISHED,
             publishedAt: post.publishedAt || new Date(),
@@ -828,6 +827,16 @@ export class PublishingWorker {
       // SAFETY 4: Start heartbeat to prevent auto-repair false positives
       this.startHeartbeat(postId);
 
+      // Fetch social account with tokens first
+      const account = await SocialAccount.findOne({
+        _id: socialAccountId,
+        workspaceId,
+      }).select('+accessToken +refreshToken');
+
+      if (!account) {
+        throw new Error(`Social account not found: ${socialAccountId}`);
+      }
+
       // EXTERNAL PUBLISH IDEMPOTENCY: Generate and store publish hash BEFORE API call
       // This ensures we can detect partial publishes after crash
       const { publishHashService } = await import('../services/PublishHashService');
@@ -850,16 +859,6 @@ export class PublishingWorker {
         postId,
         publishHash: publishHash.substring(0, 16) + '...',
       });
-
-      // Fetch social account with tokens
-      const account = await SocialAccount.findOne({
-        _id: socialAccountId,
-        workspaceId,
-      }).select('+accessToken +refreshToken');
-
-      if (!account) {
-        throw new Error('Social account not found');
-      }
 
       logger.info('Publishing post', {
         accountId: account._id,
@@ -950,25 +949,25 @@ export class PublishingWorker {
         );
         
         // Update post content with AI-generated caption (or original if degraded)
-        post.content = aiResult.caption;
+        post.content = aiResult.result?.caption || post.content;
         
-        if (aiResult.degraded) {
+        if (aiResult.result?.degraded) {
           // Record AI caption degradation in metadata
           if (!post.metadata) {
             post.metadata = {};
           }
           post.metadata.aiCaptionDegraded = true;
-          post.metadata.aiDegradationReason = aiResult.reason;
+          post.metadata.aiDegradationReason = aiResult.result.reason;
           
           logger.warn('AI caption generation failed - using original caption', {
             postId: post._id,
-            reason: aiResult.reason,
-            fallbackUsed: aiResult.fallbackUsed
+            reason: aiResult.result?.reason,
+            fallbackUsed: aiResult.result?.fallbackUsed
           });
         } else {
           logger.info('AI caption generated successfully', {
             postId: post._id,
-            captionLength: aiResult.caption.length
+            captionLength: aiResult.result?.caption?.length || 0
           });
         }
       }
@@ -1083,7 +1082,7 @@ export class PublishingWorker {
       // Fire webhook event for successful publish
       try {
         const { webhookService, WebhookEventType } = await import('../services/WebhookService');
-        await webhookService.sendWebhook({
+        await webhookService.sendWebhookEvent({
           workspaceId: post.workspaceId.toString(),
           event: WebhookEventType.POST_PUBLISHED,
           payload: {
@@ -1190,7 +1189,7 @@ export class PublishingWorker {
               'post_published',
               {
                 userEmail: owner.email,
-                userName: owner.name || owner.email,
+                userName: owner.getFullName() || owner.email,
                 postTitle: post.content.substring(0, 50) + (post.content.length > 50 ? '...' : ''),
                 platforms: [account.provider],
                 platformUrl: result.platformPostId ? `https://${account.provider}.com/post/${result.platformPostId}` : undefined
@@ -1203,11 +1202,11 @@ export class PublishingWorker {
               }
             );
             
-            if (emailResult.degraded) {
+            if (emailResult.result?.degraded) {
               logger.debug('Email notification skipped due to degradation', {
                 postId,
-                reason: emailResult.reason,
-                skipped: emailResult.skipped
+                reason: emailResult.result?.reason,
+                skipped: emailResult.result?.skipped
               });
             }
           }
@@ -1245,11 +1244,11 @@ export class PublishingWorker {
             }
           );
           
-          if (analyticsResult.degraded) {
+          if (analyticsResult.result?.degraded) {
             logger.debug('Analytics recording skipped due to degradation', {
               postId,
-            reason: analyticsResult.reason,
-            skipped: analyticsResult.skipped
+            reason: analyticsResult.result?.reason,
+            skipped: analyticsResult.result?.skipped
           });
         }
         } catch (analyticsError: any) {
@@ -1321,7 +1320,7 @@ export class PublishingWorker {
           // Fire webhook event for failed publish
           try {
             const { webhookService, WebhookEventType } = await import('../services/WebhookService');
-            await webhookService.sendWebhook({
+            await webhookService.sendWebhookEvent({
               workspaceId: post.workspaceId.toString(),
               event: WebhookEventType.POST_FAILED,
               payload: {
@@ -1583,7 +1582,7 @@ export class PublishingWorker {
         }
       );
 
-      if (mediaResult.degraded) {
+      if (mediaResult.result?.degraded) {
         // Fallback to text-only publish
         finalMediaUrls = [];
         
@@ -1592,17 +1591,17 @@ export class PublishingWorker {
           post.metadata = {};
         }
         post.metadata.mediaDegraded = true;
-        post.metadata.degradationReason = mediaResult.reason;
+        post.metadata.degradationReason = mediaResult.result.reason;
         
         logger.warn('Media upload failed - degrading to text-only publish', {
           postId: post._id,
           provider: account.provider,
-          reason: mediaResult.reason,
+          reason: mediaResult.result.reason,
           originalMediaCount: mediaPrep.mediaUrls.length
         });
       } else {
         // Media upload succeeded
-        finalMediaUrls = mediaResult.mediaUrls || [];
+        finalMediaUrls = mediaResult.result?.mediaUrls || [];
         
         logger.info('Media upload succeeded (fallback)', {
           postId: post._id,
@@ -1624,8 +1623,7 @@ export class PublishingWorker {
             postId: post._id,
             accountId: account._id,
             content: post.content,
-            mediaUrls: finalMediaIds.length > 0 ? [] : finalMediaUrls,
-            mediaIds: finalMediaIds.length > 0 ? finalMediaIds : undefined,
+            mediaUrls: finalMediaUrls,
             metadata: post.metadata,
           });
         },
@@ -1640,8 +1638,7 @@ export class PublishingWorker {
         postId: post._id,
         accountId: account._id,
         content: post.content,
-        mediaUrls: finalMediaIds.length > 0 ? [] : finalMediaUrls,
-        mediaIds: finalMediaIds.length > 0 ? finalMediaIds : undefined,
+        mediaUrls: finalMediaUrls,
         metadata: post.metadata,
       });
     }

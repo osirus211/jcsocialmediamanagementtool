@@ -93,7 +93,7 @@ export class DraftService {
     ]);
 
     return {
-      drafts: drafts as IDraftPost[],
+      drafts: drafts as any,
       total,
       page,
       limit,
@@ -187,7 +187,7 @@ export class DraftService {
     draftId: string,
     workspaceId: string,
     scheduledAt: Date
-  ): Promise<ScheduledPost[]> {
+  ): Promise<any[]> {
     const draft = await this.getDraftById(draftId, workspaceId);
 
     if (!draft.platforms || draft.platforms.length === 0) {
@@ -204,7 +204,7 @@ export class DraftService {
     }
 
     // Create scheduled posts for each platform/account combination
-    const scheduledPosts: ScheduledPost[] = [];
+    const scheduledPosts: any[] = [];
 
     for (const socialAccountId of draft.socialAccountIds) {
       const post = new ScheduledPost({

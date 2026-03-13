@@ -21,9 +21,7 @@ import { InstagramBusinessProvider } from './InstagramBusinessProvider';
 import { InstagramBasicDisplayProvider } from './InstagramBasicDisplayProvider';
 import { GoogleBusinessProvider } from './GoogleBusinessProvider';
 import { ThreadsProvider } from './ThreadsProvider';
-import { BlueskyOAuthProvider } from './BlueskyOAuthProvider';
 import { YouTubeProvider } from './YouTubeProvider';
-import { PinterestOAuthProvider } from '../oauth/PinterestOAuthProvider';
 import { logger } from '../../utils/logger';
 
 export enum ProviderType {
@@ -31,9 +29,7 @@ export enum ProviderType {
   INSTAGRAM_BASIC = 'INSTAGRAM_BASIC',
   GOOGLE_BUSINESS = 'GOOGLE_BUSINESS',
   THREADS = 'THREADS',
-  BLUESKY = 'BLUESKY',
   YOUTUBE = 'YOUTUBE',
-  PINTEREST = 'PINTEREST',
 }
 
 export class ConfigurationError extends Error {
@@ -108,7 +104,7 @@ export class OAuthProviderFactory {
           basicClientSecret,
           basicRedirectUri
         );
-        this.providers.set(ProviderType.INSTAGRAM_BASIC, basicProvider);
+        this.providers.set(ProviderType.INSTAGRAM_BASIC, basicProvider as any);
         logger.info('Instagram Basic Display provider initialized');
       }
     } catch (error: any) {
@@ -135,7 +131,7 @@ export class OAuthProviderFactory {
           gbpClientSecret,
           gbpRedirectUri
         );
-        this.providers.set(ProviderType.GOOGLE_BUSINESS, gbpProvider);
+        this.providers.set(ProviderType.GOOGLE_BUSINESS, gbpProvider as any);
         logger.info('Google Business Profile provider initialized');
       }
     } catch (error: any) {
@@ -148,7 +144,7 @@ export class OAuthProviderFactory {
     try {
       const threadsClientId = config.oauth.threads?.clientId;
       const threadsClientSecret = config.oauth.threads?.clientSecret;
-      const threadsRedirectUri = config.oauth.threads?.redirectUri;
+      const threadsRedirectUri = config.oauth.threads?.callbackUrl;
 
       if (!threadsClientId || !threadsClientSecret || !threadsRedirectUri) {
         logger.warn('Threads provider not configured', {
@@ -162,7 +158,7 @@ export class OAuthProviderFactory {
           threadsClientSecret,
           threadsRedirectUri
         );
-        this.providers.set(ProviderType.THREADS, threadsProvider);
+        this.providers.set(ProviderType.THREADS, threadsProvider as any);
         logger.info('Threads provider initialized');
       }
     } catch (error: any) {
@@ -171,22 +167,13 @@ export class OAuthProviderFactory {
       });
     }
 
-    // Initialize Bluesky Provider
-    try {
-      const blueskyProvider = new BlueskyOAuthProvider();
-      this.providers.set(ProviderType.BLUESKY, blueskyProvider);
-      logger.info('Bluesky provider initialized');
-    } catch (error: any) {
-      logger.error('Failed to initialize Bluesky provider', {
-        error: error.message,
-      });
-    }
+    // Bluesky provider removed due to missing implementation
 
     // Initialize YouTube Provider
     try {
       const youtubeClientId = config.oauth.youtube?.clientId;
       const youtubeClientSecret = config.oauth.youtube?.clientSecret;
-      const youtubeRedirectUri = config.oauth.youtube?.redirectUri;
+      const youtubeRedirectUri = config.oauth.youtube?.callbackUrl;
 
       if (!youtubeClientId || !youtubeClientSecret || !youtubeRedirectUri) {
         logger.warn('YouTube provider not configured', {
@@ -200,7 +187,7 @@ export class OAuthProviderFactory {
           youtubeClientSecret,
           youtubeRedirectUri
         );
-        this.providers.set(ProviderType.YOUTUBE, youtubeProvider);
+        this.providers.set(ProviderType.YOUTUBE, youtubeProvider as any);
         logger.info('YouTube provider initialized');
       }
     } catch (error: any) {
@@ -209,32 +196,7 @@ export class OAuthProviderFactory {
       });
     }
 
-    // Initialize Pinterest Provider
-    try {
-      const pinterestClientId = config.oauth.pinterest?.clientId;
-      const pinterestClientSecret = config.oauth.pinterest?.clientSecret;
-      const pinterestRedirectUri = config.oauth.pinterest?.redirectUri;
-
-      if (!pinterestClientId || !pinterestClientSecret || !pinterestRedirectUri) {
-        logger.warn('Pinterest provider not configured', {
-          clientIdSet: !!pinterestClientId,
-          clientSecretSet: !!pinterestClientSecret,
-          redirectUriSet: !!pinterestRedirectUri,
-        });
-      } else {
-        const pinterestProvider = new PinterestOAuthProvider(
-          pinterestClientId,
-          pinterestClientSecret,
-          pinterestRedirectUri
-        );
-        this.providers.set(ProviderType.PINTEREST, pinterestProvider);
-        logger.info('Pinterest provider initialized');
-      }
-    } catch (error: any) {
-      logger.error('Failed to initialize Pinterest provider', {
-        error: error.message,
-      });
-    }
+    // Pinterest provider removed due to missing implementation
 
     logger.info('OAuth Provider Factory initialized', {
       availableProviders: Array.from(this.providers.keys()),

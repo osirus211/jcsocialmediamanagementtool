@@ -24,9 +24,9 @@ export class FollowerCollectionQueue {
   static getQueue(): Queue<FollowerCollectionJobData> {
     if (!this.queue) {
       const queueManager = QueueManager.getInstance();
-      this.queue = queueManager.createQueue<FollowerCollectionJobData>(
+      this.queue = queueManager.getQueue(
         FOLLOWER_COLLECTION_QUEUE_NAME
-      );
+      ) as Queue<FollowerCollectionJobData>;
     }
     return this.queue;
   }

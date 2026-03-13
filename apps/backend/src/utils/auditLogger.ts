@@ -39,6 +39,7 @@
 import { Request } from 'express';
 import mongoose from 'mongoose';
 import { logger } from './logger';
+import { config } from '../config';
 
 /**
  * Audit log data interface

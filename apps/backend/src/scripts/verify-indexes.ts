@@ -32,7 +32,7 @@ import '../models/WorkspaceActivityLog';
 interface IndexInfo {
   collection: string;
   name: string;
-  key: Record<string, number>;
+  key: Record<string, any>;
   unique?: boolean;
   sparse?: boolean;
   expireAfterSeconds?: number;
@@ -77,7 +77,7 @@ async function getAllIndexes(): Promise<IndexInfo[]> {
   return allIndexes;
 }
 
-function formatIndexKey(key: Record<string, number>): string {
+function formatIndexKey(key: Record<string, any>): string {
   return Object.entries(key)
     .map(([field, direction]) => `${field}:${direction}`)
     .join(', ');

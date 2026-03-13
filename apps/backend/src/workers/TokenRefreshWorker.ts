@@ -255,7 +255,7 @@ export class TokenRefreshWorker {
             result.accessToken!,
             result.refreshToken,
             result.expiresAt!,
-            account.__v // Mongoose version key for optimistic locking
+            (account as any).__v // Mongoose version key for optimistic locking
           );
 
           if (!updateSuccess) {
@@ -502,7 +502,7 @@ export class TokenRefreshWorker {
     };
 
     if (encryptedRefreshToken) {
-      update.$set.refreshToken = encryptedRefreshToken;
+      (update.$set as any).refreshToken = encryptedRefreshToken;
     }
 
     // Query with version check - only update if version matches

@@ -80,9 +80,9 @@ async function demonstrateOptimisticLocking() {
       promises.push(
         postService.updatePostStatus(
           post._id.toString(),
-          PostStatus.PUBLISHING
+          PostStatus.PUBLISHING as any
         ).then(result => {
-          console.log(`✅ Worker ${i + 1} succeeded (version: ${result.version})`);
+          console.log(`✅ Worker ${i + 1} succeeded (version: ${(result as any).version})`);
           return result;
         }).catch(error => {
           console.log(`❌ Worker ${i + 1} failed: ${error.message}`);
@@ -123,10 +123,10 @@ async function demonstrateOptimisticLocking() {
     try {
       const result = await postService.updatePostStatus(
         post._id.toString(),
-        PostStatus.PUBLISHING
+        PostStatus.PUBLISHING as any
       );
       console.log('✅ Update succeeded after retry');
-      console.log(`   New version: ${result.version}\n`);
+      console.log(`   New version: ${(result as any).version}\n`);
     } catch (error: any) {
       console.log(`❌ Update failed: ${error.message}\n`);
     }

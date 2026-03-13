@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { config } from '../config';
 import { stripeService } from '../services/StripeService';
 import { Billing } from '../models/Billing';
@@ -44,10 +45,7 @@ export class BillingController {
         const customerId = await stripeService.createCustomer({
           email: req.user!.email,
           name: (req.user as any)!.name,
-          metadata: {
-            workspaceId: workspaceId.toString(),
-          },
-        });
+        } as any);
 
         // Create billing record
         billing = await Billing.create({
@@ -60,7 +58,7 @@ export class BillingController {
       const successUrl = `${config.frontend.url}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${config.frontend.url}/billing`;
 
-      const checkoutUrl = await stripeService.createCheckoutSession(
+      const checkoutUrl = await (stripeService as any).createCheckoutSession(
         billing.stripeCustomerId,
         priceId,
         workspaceId.toString(),
@@ -119,7 +117,7 @@ export class BillingController {
 
       // Create portal session
       const returnUrl = `${config.frontend.url}/billing`;
-      const portalUrl = await stripeService.createPortalSession(
+      const portalUrl = await (stripeService as any).createPortalSession(
         billing.stripeCustomerId,
         returnUrl
       );
@@ -197,7 +195,10 @@ export class BillingController {
       }
 
       // Cancel at period end (don't cancel immediately)
-      await stripeService.cancelSubscription(billing.stripeSubscriptionId, true);
+      await stripeService.cancelSubscription({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        immediately: false
+      });
 
       logger.info('Subscription cancelled', {
         workspaceId,

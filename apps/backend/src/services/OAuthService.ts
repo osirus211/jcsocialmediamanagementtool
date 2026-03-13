@@ -45,7 +45,7 @@ interface UserProfileResult {
 }
 
 export class OAuthService {
-  private readonly configs: Record<SocialPlatform, OAuthConfig> = {
+  private readonly configs: Partial<Record<SocialPlatform, OAuthConfig>> = {
     [SocialPlatform.TWITTER]: {
       clientId: config.oauth.twitter.clientId || 'mock_twitter_client_id',
       clientSecret: config.oauth.twitter.clientSecret || 'mock_twitter_secret',

@@ -99,7 +99,7 @@ export class MetricsController {
       const circuitBreakerStates: Record<string, string> = {};
       if (circuitBreakerStats && circuitBreakerStats.services) {
         for (const [serviceName, stats] of Object.entries(circuitBreakerStats.services)) {
-          circuitBreakerStates[serviceName] = stats.state || 'CLOSED';
+          circuitBreakerStates[serviceName] = (stats as any).state || 'CLOSED';
         }
       }
 
@@ -182,7 +182,7 @@ export class MetricsController {
       prometheusMetrics += '# TYPE degradation_circuit_breaker_state gauge\n';
       if (circuitBreakerStats && circuitBreakerStats.services) {
         for (const [serviceName, stats] of Object.entries(circuitBreakerStats.services)) {
-          const state = stats.state || 'CLOSED';
+          const state = (stats as any).state || 'CLOSED';
           const stateValue = state === 'OPEN' ? 1 : state === 'HALF_OPEN' ? 0.5 : 0;
           prometheusMetrics += `degradation_circuit_breaker_state{service="${serviceName}"} ${stateValue}\n`;
         }

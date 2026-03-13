@@ -28,7 +28,7 @@ export class KeyRotationService {
     // Acquire distributed lock for key rotation
     const lock = await distributedLockService.acquireLock(this.ROTATION_LOCK_KEY, {
       ttl: this.ROTATION_LOCK_TTL,
-      retryAttempts: 0, // Don't retry - only one rotation at a time
+      retryCount: 0, // Don't retry - only one rotation at a time
     });
 
     if (!lock) {

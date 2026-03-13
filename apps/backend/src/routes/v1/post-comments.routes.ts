@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { PostCommentService } from '../../services/PostCommentService';
 import { requireAuth } from '../../middleware/auth';
-import { validateRequest } from '../../middleware/validation';
+import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -25,18 +25,19 @@ const editCommentSchema = z.object({
  * GET /posts/:postId/comments
  * Get all comments for a post
  */
-router.get('/:postId/comments', requireAuth, async (req, res) => {
+router.get('/:postId/comments', requireAuth, async (req, res): Promise<void> => {
   try {
     const { postId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
     const userId = req.user?.userId;
 
     if (!workspaceId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context required',
       });
+      return;
     }
 
     const comments = await PostCommentService.getComments(postId, workspaceId, userId);
@@ -67,7 +68,7 @@ router.post(
   '/:postId/comments',
   requireAuth,
   validateRequest(addCommentSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const { postId } = req.params;
       const { content, parentId } = req.body;
@@ -75,11 +76,12 @@ router.post(
       const authorId = req.user?.userId;
 
       if (!workspaceId || !authorId) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'BAD_REQUEST',
           message: 'Workspace context and authentication required',
         });
+        return;
       }
 
       const comment = await PostCommentService.addComment(
@@ -117,18 +119,19 @@ router.patch(
   '/:postId/comments/:commentId',
   requireAuth,
   validateRequest(editCommentSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const { commentId } = req.params;
       const { content } = req.body;
       const authorId = req.user?.userId;
 
       if (!authorId) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'UNAUTHORIZED',
           message: 'Authentication required',
         });
+        return;
       }
 
       const comment = await PostCommentService.editComment(commentId, authorId, content);
@@ -144,11 +147,12 @@ router.patch(
       });
 
       if (error.message === 'Comment not found or unauthorized') {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: 'NOT_FOUND',
           message: error.message,
         });
+        return;
       }
 
       res.status(500).json({
@@ -164,18 +168,19 @@ router.patch(
  * DELETE /posts/:postId/comments/:commentId
  * Delete a comment
  */
-router.delete('/:postId/comments/:commentId', requireAuth, async (req, res) => {
+router.delete('/:postId/comments/:commentId', requireAuth, async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
     const authorId = req.user?.userId;
 
     if (!workspaceId || !authorId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context and authentication required',
       });
+      return;
     }
 
     await PostCommentService.deleteComment(commentId, authorId, workspaceId);
@@ -191,11 +196,12 @@ router.delete('/:postId/comments/:commentId', requireAuth, async (req, res) => {
     });
 
     if (error.message === 'Comment not found' || error.message === 'Unauthorized to delete comment') {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'NOT_FOUND',
         message: error.message,
       });
+      return;
     }
 
     res.status(500).json({
@@ -210,18 +216,19 @@ router.delete('/:postId/comments/:commentId', requireAuth, async (req, res) => {
  * POST /posts/:postId/comments/:commentId/resolve
  * Resolve a comment
  */
-router.post('/:postId/comments/:commentId/resolve', requireAuth, async (req, res) => {
+router.post('/:postId/comments/:commentId/resolve', requireAuth, async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
     const userId = req.user?.userId;
 
     if (!workspaceId || !userId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context and authentication required',
       });
+      return;
     }
 
     const comment = await PostCommentService.resolveComment(commentId, userId, workspaceId);
@@ -237,11 +244,12 @@ router.post('/:postId/comments/:commentId/resolve', requireAuth, async (req, res
     });
 
     if (error.message === 'Comment not found') {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'NOT_FOUND',
         message: error.message,
       });
+      return;
     }
 
     res.status(500).json({
@@ -256,18 +264,19 @@ router.post('/:postId/comments/:commentId/resolve', requireAuth, async (req, res
  * DELETE /posts/:postId/comments/:commentId/resolve
  * Unresolve a comment
  */
-router.delete('/:postId/comments/:commentId/resolve', requireAuth, async (req, res) => {
+router.delete('/:postId/comments/:commentId/resolve', requireAuth, async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
     const userId = req.user?.userId;
 
     if (!workspaceId || !userId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context and authentication required',
       });
+      return;
     }
 
     const comment = await PostCommentService.unresolveComment(commentId, userId, workspaceId);
@@ -283,11 +292,12 @@ router.delete('/:postId/comments/:commentId/resolve', requireAuth, async (req, r
     });
 
     if (error.message === 'Comment not found') {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'NOT_FOUND',
         message: error.message,
       });
+      return;
     }
 
     res.status(500).json({

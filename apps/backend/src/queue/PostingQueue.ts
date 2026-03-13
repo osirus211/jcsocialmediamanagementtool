@@ -25,6 +25,7 @@ export interface PostingJobData {
   retryCount: number;
   scheduledAt?: string;
   forceFail?: boolean; // TEMPORARY: For retry testing
+  isReplay?: boolean; // For replay detection
 }
 
 export class PostingQueue {

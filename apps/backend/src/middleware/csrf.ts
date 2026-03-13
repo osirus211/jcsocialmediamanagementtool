@@ -9,21 +9,22 @@ import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 
 // Configure double CSRF protection
-const {
-  generateToken,
-  doubleCsrfProtection,
-} = doubleCsrf({
+const doubleCsrfOptions = {
   getSecret: () => config.jwt.secret, // Use JWT secret as CSRF secret
   cookieName: '__Host-csrf',
   cookieOptions: {
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'strict' as const,
     secure: config.env === 'production',
     path: '/',
   },
   size: 64,
-  ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
-});
+  ignoredMethods: ['GET', 'HEAD', 'OPTIONS'] as const,
+};
+
+const doubleCsrfInstance = doubleCsrf(doubleCsrfOptions as any);
+const generateToken = (doubleCsrfInstance as any).generateToken;
+const doubleCsrfProtection = doubleCsrfInstance.doubleCsrfProtection;
 
 /**
  * CSRF protection middleware

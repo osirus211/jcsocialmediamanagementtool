@@ -9,9 +9,7 @@ import { z } from 'zod';
 import { DashboardController } from '../../controllers/DashboardController';
 import { DashboardLayoutService } from '../../services/DashboardLayoutService';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/tenant';
-import { authMiddleware } from '../../middleware/auth';
-import { validateRequest } from '../../middleware/validation';
+import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -32,10 +30,9 @@ const saveLayoutSchema = z.object({
 });
 
 /**
- * All dashboard routes require authentication and workspace context
+ * All dashboard routes require authentication
  */
 router.use(requireAuth);
-router.use(requireWorkspace);
 
 /**
  * Get workspace overview dashboard
@@ -103,9 +100,10 @@ router.get('/activity', DashboardController.getActivity);
  * Get dashboard layout
  * GET /api/v1/dashboard/layout
  */
-router.get('/layout', authMiddleware, async (req, res) => {
+router.get('/layout', requireAuth, async (req, res): Promise<void> => {
   try {
-    const { userId, workspaceId } = req.user!;
+    const userId = req.user!.userId;
+    const workspaceId = req.workspace.workspaceId.toString();
 
     const layout = await DashboardLayoutService.getLayout(userId, workspaceId);
 
@@ -116,7 +114,7 @@ router.get('/layout', authMiddleware, async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to get dashboard layout', {
       userId: req.user?.userId,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
@@ -130,9 +128,10 @@ router.get('/layout', authMiddleware, async (req, res) => {
  * Save dashboard layout
  * POST /api/v1/dashboard/layout
  */
-router.post('/layout', authMiddleware, validateRequest(saveLayoutSchema), async (req, res) => {
+router.post('/layout', requireAuth, validateRequest(saveLayoutSchema), async (req, res): Promise<void> => {
   try {
-    const { userId, workspaceId } = req.user!;
+    const userId = req.user!.userId;
+    const workspaceId = req.workspace.workspaceId.toString();
     const { widgets } = req.body;
 
     const layout = await DashboardLayoutService.saveLayout(userId, workspaceId, widgets);
@@ -144,7 +143,7 @@ router.post('/layout', authMiddleware, validateRequest(saveLayoutSchema), async 
   } catch (error: any) {
     logger.error('Failed to save dashboard layout', {
       userId: req.user?.userId,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
@@ -158,9 +157,10 @@ router.post('/layout', authMiddleware, validateRequest(saveLayoutSchema), async 
  * Reset dashboard layout
  * POST /api/v1/dashboard/layout/reset
  */
-router.post('/layout/reset', authMiddleware, async (req, res) => {
+router.post('/layout/reset', requireAuth, async (req, res): Promise<void> => {
   try {
-    const { userId, workspaceId } = req.user!;
+    const userId = req.user!.userId;
+    const workspaceId = req.workspace.workspaceId.toString();
 
     const layout = await DashboardLayoutService.resetLayout(userId, workspaceId);
 
@@ -171,7 +171,7 @@ router.post('/layout/reset', authMiddleware, async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to reset dashboard layout', {
       userId: req.user?.userId,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({

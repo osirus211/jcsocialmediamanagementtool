@@ -46,6 +46,13 @@ export interface IUser extends Document {
   refreshTokens: string[];
   lastLoginAt?: Date;
   softDeletedAt?: Date;
+  
+  // Two-factor authentication
+  twoFactorEnabled: boolean;
+  twoFactorSecret?: string;
+  twoFactorBackupCodes: string[];
+  twoFactorVerifiedAt?: Date;
+  
   createdAt: Date;
   updatedAt: Date;
 
@@ -126,6 +133,10 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
       type: Date,
       default: null,
     },
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, default: null, select: false },
+    twoFactorBackupCodes: { type: [String], default: [], select: false },
+    twoFactorVerifiedAt: { type: Date, default: null },
   },
   {
     timestamps: true,

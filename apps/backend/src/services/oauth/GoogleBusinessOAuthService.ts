@@ -106,7 +106,7 @@ export class GoogleBusinessOAuthService {
       });
 
       // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({
+      const tokens = await this.provider.exchangeCodeForTokenLegacy({
         code: params.code,
         state: params.state,
       });
@@ -320,7 +320,7 @@ export class GoogleBusinessOAuthService {
       }
 
       // Refresh token
-      const tokens = await this.provider.refreshAccessToken({
+      const tokens = await this.provider.refreshAccessTokenLegacy({
         refreshToken,
       });
 

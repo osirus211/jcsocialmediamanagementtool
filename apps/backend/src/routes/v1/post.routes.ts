@@ -20,7 +20,7 @@ router.use(requireWorkspace);
 router.get('/calendar', postController.getCalendar.bind(postController));
 
 // Get post statistics
-router.get('/stats', postController.getStats.bind(postController));
+router.get('/stats', postController.getPostStats.bind(postController));
 
 // Create post
 router.post('/', checkPostLimit, postController.createPost.bind(postController));
@@ -29,7 +29,7 @@ router.post('/', checkPostLimit, postController.createPost.bind(postController))
 router.get('/', postController.getPosts.bind(postController));
 
 // Get single post
-router.get('/:id', postController.getPost.bind(postController));
+router.get('/:id', postController.getPostById.bind(postController));
 
 // Update post (requires post ownership or admin)
 router.patch('/:id', requirePostOwnershipOrAdmin, postController.updatePost.bind(postController));
@@ -38,10 +38,10 @@ router.patch('/:id', requirePostOwnershipOrAdmin, postController.updatePost.bind
 router.delete('/:id', requirePostOwnershipOrAdmin, postController.deletePost.bind(postController));
 
 // Schedule post (requires post ownership or admin)
-router.post('/:id/schedule', requirePostOwnershipOrAdmin, postController.schedulePost.bind(postController));
+// router.post('/:id/schedule', requirePostOwnershipOrAdmin, postController.schedulePost.bind(postController));
 
-// Cancel scheduled post (requires post ownership or admin)
-router.post('/:id/cancel', requirePostOwnershipOrAdmin, postController.cancelPost.bind(postController));
+// Cancel scheduled post (requires post ownership or admin)  
+// router.post('/:id/cancel', requirePostOwnershipOrAdmin, postController.cancelPost.bind(postController));
 
 // Retry failed post (requires post ownership or admin)
 router.post('/:id/retry', requirePostOwnershipOrAdmin, postController.retryPost.bind(postController));

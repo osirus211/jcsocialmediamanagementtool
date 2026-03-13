@@ -104,6 +104,16 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     // Read-only access
     Permission.VIEW_ANALYTICS,
   ],
+  
+  [MemberRole.MEMBER]: [
+    // Basic member permissions - can create and manage own content
+    Permission.CREATE_POST,
+    Permission.EDIT_OWN_POST,
+    Permission.DELETE_OWN_POST,
+    Permission.VIEW_ANALYTICS,
+    Permission.UPLOAD_MEDIA,
+    Permission.CONNECT_ACCOUNT,
+  ],
 };
 
 export class WorkspacePermissionService {

@@ -4,9 +4,9 @@
  * API documentation configuration
  */
 
-import swaggerJsdoc from 'swagger-jsdoc';
+const swaggerJsdoc = require('swagger-jsdoc');
 
-const options: swaggerJsdoc.Options = {
+const options: any = {
   definition: {
     openapi: '3.0.0',
     info: {

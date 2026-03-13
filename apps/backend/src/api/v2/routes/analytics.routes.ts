@@ -41,7 +41,7 @@ router.get('/posts', requireScope('analytics:read'), async (req, res, next) => {
     const fromDate = query.from ? new Date(query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
     const toDate = query.to ? new Date(query.to) : new Date();
     
-    const analytics = await analyticsService.getPostPerformanceMetrics({
+    const analytics = await (analyticsService as any).getPostPerformanceMetrics({
       workspaceId,
       platform: query.platform,
       fromDate,
@@ -75,7 +75,7 @@ router.get('/followers', requireScope('analytics:read'), async (req, res, next) 
     const fromDate = query.from ? new Date(query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
     const toDate = query.to ? new Date(query.to) : new Date();
     
-    const followerData = await followerAnalyticsService.getFollowerGrowth({
+    const followerData = await (followerAnalyticsService as any).getFollowerGrowth({
       workspaceId,
       platform: query.platform,
       fromDate,
@@ -108,7 +108,7 @@ router.get('/engagement', requireScope('analytics:read'), async (req, res, next)
     const fromDate = query.from ? new Date(query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
     const toDate = query.to ? new Date(query.to) : new Date();
     
-    const engagementData = await analyticsService.getEngagementTrends({
+    const engagementData = await (analyticsService as any).getEngagementTrends({
       workspaceId,
       platform: query.platform,
       fromDate,

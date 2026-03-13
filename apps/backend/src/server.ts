@@ -2,17 +2,10 @@ import dotenv from 'dotenv';
 import { Server } from 'http';
 import { loadSecrets } from './config/secrets';
 
-// Load secrets from AWS Secrets Manager FIRST (before dotenv)
-await loadSecrets();
-
-// Load environment variables
-dotenv.config();
-
 console.log('🔧 server.ts: Loading modules...');
 
 // Initialize Sentry BEFORE importing app
 import { initializeSentry } from './monitoring/sentry';
-initializeSentry();
 
 import app from './app';
 import { config } from './config';
@@ -162,6 +155,15 @@ const gracefulShutdown = async (signal: string) => {
 const startServer = async () => {
   console.log('🚀 INSIDE startServer() - START');
   try {
+    // Load secrets from AWS Secrets Manager FIRST (before dotenv)
+    await loadSecrets();
+
+    // Load environment variables
+    dotenv.config();
+
+    // Initialize Sentry
+    initializeSentry();
+
     console.log('🚀 Starting server...');
     logger.info('🚀 Starting server...');
     

@@ -37,8 +37,8 @@ export class CanvaService {
    */
   static getAuthUrl(workspaceId: string): string {
     const params = new URLSearchParams({
-      client_id: config.integrations?.canva?.clientId || '',
-      redirect_uri: config.integrations?.canva?.redirectUri || '',
+      client_id: (config as any).integrations?.canva?.clientId || '',
+      redirect_uri: (config as any).integrations?.canva?.redirectUri || '',
       response_type: 'code',
       scope: 'design:read design:content:read',
       state: workspaceId,
@@ -60,10 +60,10 @@ export class CanvaService {
       // Exchange code for tokens
       const tokenResponse = await axios.post(this.TOKEN_URL, {
         grant_type: 'authorization_code',
-        client_id: config.integrations?.canva?.clientId,
-        client_secret: config.integrations?.canva?.clientSecret,
+        client_id: (config as any).integrations?.canva?.clientId,
+        client_secret: (config as any).integrations?.canva?.clientSecret,
         code,
-        redirect_uri: config.integrations?.canva?.redirectUri,
+        redirect_uri: (config as any).integrations?.canva?.redirectUri,
       });
 
       const { access_token, refresh_token } = tokenResponse.data;
@@ -231,8 +231,8 @@ export class CanvaService {
     try {
       const response = await axios.post(this.TOKEN_URL, {
         grant_type: 'refresh_token',
-        client_id: config.integrations?.canva?.clientId,
-        client_secret: config.integrations?.canva?.clientSecret,
+        client_id: (config as any).integrations?.canva?.clientId,
+        client_secret: (config as any).integrations?.canva?.clientSecret,
         refresh_token: refreshToken,
       });
 

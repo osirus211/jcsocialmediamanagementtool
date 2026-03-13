@@ -6,9 +6,9 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../../middleware/auth.middleware';
-import { requireWorkspace } from '../../middleware/workspace.middleware';
-import { validate } from '../../middleware/validation.middleware';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
 import { ActivityController } from '../../controllers/ActivityController';
 import { ActivityAction } from '../../models/WorkspaceActivityLog';
 
@@ -34,7 +34,12 @@ router.use(requireWorkspace);
  * @desc    Get activity feed for workspace
  * @access  Private
  */
-router.get('/', validate(activityFeedQuerySchema, 'query'), ActivityController.getActivityFeed);
+// Create a schema that validates the query parameters
+const activityFeedRequestSchema = z.object({
+  query: activityFeedQuerySchema,
+});
+
+router.get('/', validateRequest(activityFeedRequestSchema), ActivityController.getActivityFeed);
 
 /**
  * @route   GET /api/v1/activity/stats

@@ -51,7 +51,6 @@ router.get('/', (_req, res) => {
       auth: '/api/v1/auth',
       workspaces: '/api/v1/workspaces',
       posts: '/api/v1/posts',
-      drafts: '/api/v1/drafts',
       templates: '/api/v1/templates',
       queueSlots: '/api/v1/queue-slots',
       links: '/api/v1/links',

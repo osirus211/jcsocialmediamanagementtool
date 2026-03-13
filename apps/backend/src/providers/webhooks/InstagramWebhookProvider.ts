@@ -7,5 +7,8 @@
 import { FacebookWebhookProvider } from './FacebookWebhookProvider';
 
 export class InstagramWebhookProvider extends FacebookWebhookProvider {
-  readonly name = 'instagram';
+  constructor() {
+    super();
+    (this as any).name = 'instagram';
+  }
 }

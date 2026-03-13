@@ -299,7 +299,7 @@ export class RSSFeedController {
       const userId = req.user?.userId.toString();
 
       if (!workspaceId || !userId) {
-        sendError(res, 'Workspace and user required', 400);
+        sendError(res, 'MISSING_REQUIRED_FIELDS', 'Workspace and user required', 400);
         return;
       }
 

@@ -194,13 +194,13 @@ export class SocialAccountController {
           error: error.message,
         });
         
-        // Return a user-friendly error with reconnect instruction
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'TOKEN_EXPIRED',
           message: 'Your account connection has expired. Please reconnect your account.',
           requiresReconnect: true,
         });
+        return;
       }
       
       next(error);
@@ -256,7 +256,7 @@ export class SocialAccountController {
       // Map to health data
       const healthData = accounts.map((account) => ({
         id: account._id.toString(),
-        platform: account.platform,
+        platform: account.provider,
         accountName: account.accountName,
         username: account.metadata?.username || account.accountName,
         healthScore: account.metadata?.healthScore || 0,

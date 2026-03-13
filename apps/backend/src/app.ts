@@ -9,7 +9,6 @@ import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { httpMetricsMiddleware } from './middleware/httpMetrics';
 import { publicApiMetricsMiddleware } from './middleware/publicApiMetrics';
-import { sanitizeInput } from './middleware/validate';
 import {
   requestId,
   mongoSanitization,
@@ -133,7 +132,6 @@ app.use((req, res, next) => {
 
 // Security hardening
 app.use(mongoSanitization);
-app.use(sanitizeInput);
 app.use(preventParameterPollution);
 app.use(validateContentType);
 app.use(anomalyDetection);

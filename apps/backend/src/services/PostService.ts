@@ -792,17 +792,17 @@ export class PostService {
    * Lock a post to prevent editing
    */
   async lockPost(postId: string, userId: string, reason?: string): Promise<{ message: string }> {
-    const post = await Post.findById(postId);
+    const post = await ScheduledPost.findById(postId);
     
     if (!post) {
       throw new Error('Post not found');
     }
 
     // Set permanent lock (no expiration)
-    post.lockedBy = userId as any;
-    post.lockedAt = new Date();
-    post.lockExpiresAt = undefined; // Permanent lock
-    post.lockedReason = reason;
+    (post as any).lockedBy = userId as any;
+    (post as any).lockedAt = new Date();
+    (post as any).lockExpiresAt = undefined; // Permanent lock
+    (post as any).lockedReason = reason;
 
     await post.save();
 
@@ -819,17 +819,17 @@ export class PostService {
    * Unlock a post
    */
   async unlockPost(postId: string): Promise<{ message: string }> {
-    const post = await Post.findById(postId);
+    const post = await ScheduledPost.findById(postId);
     
     if (!post) {
       throw new Error('Post not found');
     }
 
     // Clear lock fields
-    post.lockedBy = undefined;
-    post.lockedAt = undefined;
-    post.lockExpiresAt = undefined;
-    post.lockedReason = undefined;
+    (post as any).lockedBy = undefined;
+    (post as any).lockedAt = undefined;
+    (post as any).lockExpiresAt = undefined;
+    (post as any).lockedReason = undefined;
 
     await post.save();
 
@@ -849,22 +849,22 @@ export class PostService {
     lockedAt?: Date;
     lockedReason?: string;
   }> {
-    const post = await Post.findById(postId).populate('lockedBy', 'name avatar');
+    const post = await ScheduledPost.findById(postId).populate('lockedBy', 'name avatar');
     
     if (!post) {
       throw new Error('Post not found');
     }
 
-    const isLocked = post.isEditLocked();
+    const isLocked = (post as any).isEditLocked();
     
     return {
       isLocked,
-      lockedBy: post.lockedBy ? {
-        name: (post.lockedBy as any).name,
-        avatar: (post.lockedBy as any).avatar,
+      lockedBy: (post as any).lockedBy ? {
+        name: ((post as any).lockedBy as any).name,
+        avatar: ((post as any).lockedBy as any).avatar,
       } : undefined,
-      lockedAt: post.lockedAt,
-      lockedReason: post.lockedReason,
+      lockedAt: (post as any).lockedAt,
+      lockedReason: (post as any).lockedReason,
     };
   }
 
@@ -914,6 +914,45 @@ export class PostService {
 
     return createdPosts;
   }
+
+    /**
+     * Get eligible posts for queue processing
+     */
+    async getEligiblePostsForQueue(limit: number = 100): Promise<IScheduledPost[]> {
+      const posts = await ScheduledPost.find({
+        status: { $in: [PostStatus.SCHEDULED, PostStatus.QUEUED] },
+        scheduledAt: { $lte: new Date() },
+        isActive: true,
+      })
+      .sort({ scheduledAt: 1, priority: -1 })
+      .limit(limit)
+      .populate('workspaceId')
+      .populate('socialAccountId');
+
+      return posts;
+    }
+
+    /**
+     * Update post status
+     */
+    async updatePostStatus(postId: string, status: PostStatus): Promise<IScheduledPost> {
+      const post = await ScheduledPost.findByIdAndUpdate(
+        postId,
+        {
+          status,
+          updatedAt: new Date(),
+          ...(status === PostStatus.PUBLISHED && { publishedAt: new Date() }),
+          ...(status === PostStatus.FAILED && { failedAt: new Date() }),
+        },
+        { new: true }
+      );
+
+      if (!post) {
+        throw new Error('Post not found');
+      }
+
+      return post;
+    }
 
 }
 

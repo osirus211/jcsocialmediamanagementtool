@@ -85,7 +85,7 @@ export class FacebookOAuthService {
       });
 
       // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({
+      const tokens = await this.provider.exchangeCodeForTokenLegacy({
         code: params.code,
         state: params.state,
       });

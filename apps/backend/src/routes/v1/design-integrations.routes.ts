@@ -6,9 +6,9 @@
 
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { authenticate } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { validateRequest } from '../../middleware/validation';
+import { validateRequest } from '../../middleware/validate';
 import { CanvaService } from '../../services/CanvaService';
 import { FigmaService } from '../../services/FigmaService';
 import { Workspace } from '../../models/Workspace';
@@ -17,7 +17,7 @@ import { logger } from '../../utils/logger';
 const router = Router();
 
 // All routes require authentication and workspace context
-router.use(authenticate);
+router.use(requireAuth);
 router.use(requireWorkspace);
 
 // ============================================
@@ -28,10 +28,10 @@ router.use(requireWorkspace);
  * GET /design-integrations/canva/auth-url
  * Get Canva OAuth authorization URL
  */
-router.get('/canva/auth-url', async (req, res) => {
+router.get('/canva/auth-url', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
-    const authUrl = CanvaService.getAuthUrl(workspaceId);
+    const { workspaceId } = req.workspace!;
+    const authUrl = CanvaService.getAuthUrl(workspaceId.toString());
 
     res.json({
       success: true,
@@ -40,7 +40,7 @@ router.get('/canva/auth-url', async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to get Canva auth URL', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -58,7 +58,7 @@ router.get('/canva/callback', [
   query('code').notEmpty().withMessage('Authorization code is required'),
   query('state').notEmpty().withMessage('State parameter is required'),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
     const { code, state } = req.query as { code: string; state: string };
 
@@ -92,18 +92,19 @@ router.get('/canva/designs', [
   query('page').optional().isString(),
   query('query').optional().isString(),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
     const { page, query: searchQuery } = req.query as { page?: string; query?: string };
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
     if (!workspace?.integrations?.canva?.connected || !workspace.integrations.canva.accessToken) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Canva account not connected',
       });
+      return;
     }
 
     const result = await CanvaService.getUserDesigns(
@@ -119,7 +120,7 @@ router.get('/canva/designs', [
   } catch (error: any) {
     logger.error('Failed to get Canva designs', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -137,18 +138,19 @@ router.post('/canva/export', [
   body('designId').notEmpty().withMessage('Design ID is required'),
   body('format').optional().isIn(['png', 'jpg']).withMessage('Format must be png or jpg'),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
     const { designId, format = 'png' } = req.body;
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
     if (!workspace?.integrations?.canva?.connected || !workspace.integrations.canva.accessToken) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Canva account not connected',
       });
+      return;
     }
 
     const result = await CanvaService.exportDesign(
@@ -164,7 +166,7 @@ router.post('/canva/export', [
   } catch (error: any) {
     logger.error('Failed to export Canva design', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -181,18 +183,19 @@ router.post('/canva/export', [
 router.get('/canva/export/:jobId', [
   param('jobId').notEmpty().withMessage('Job ID is required'),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
     const { jobId } = req.params;
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
     if (!workspace?.integrations?.canva?.connected || !workspace.integrations.canva.accessToken) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Canva account not connected',
       });
+      return;
     }
 
     const result = await CanvaService.getExportStatus(
@@ -207,7 +210,7 @@ router.get('/canva/export/:jobId', [
   } catch (error: any) {
     logger.error('Failed to get Canva export status', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -221,11 +224,11 @@ router.get('/canva/export/:jobId', [
  * DELETE /design-integrations/canva/disconnect
  * Disconnect Canva integration
  */
-router.delete('/canva/disconnect', async (req, res) => {
+router.delete('/canva/disconnect', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
 
-    await CanvaService.disconnectCanva(workspaceId);
+    await CanvaService.disconnectCanva(workspaceId.toString());
 
     res.json({
       success: true,
@@ -234,7 +237,7 @@ router.delete('/canva/disconnect', async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to disconnect Canva', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -252,10 +255,10 @@ router.delete('/canva/disconnect', async (req, res) => {
  * GET /design-integrations/figma/auth-url
  * Get Figma OAuth authorization URL
  */
-router.get('/figma/auth-url', async (req, res) => {
+router.get('/figma/auth-url', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
-    const authUrl = FigmaService.getAuthUrl(workspaceId);
+    const { workspaceId } = req.workspace!;
+    const authUrl = FigmaService.getAuthUrl(workspaceId.toString());
 
     res.json({
       success: true,
@@ -264,7 +267,7 @@ router.get('/figma/auth-url', async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to get Figma auth URL', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -282,7 +285,7 @@ router.get('/figma/callback', [
   query('code').notEmpty().withMessage('Authorization code is required'),
   query('state').notEmpty().withMessage('State parameter is required'),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
     const { code, state } = req.query as { code: string; state: string };
 
@@ -312,17 +315,18 @@ router.get('/figma/callback', [
  * GET /design-integrations/figma/files
  * List user's Figma files
  */
-router.get('/figma/files', async (req, res) => {
+router.get('/figma/files', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
     if (!workspace?.integrations?.figma?.connected || !workspace.integrations.figma.accessToken) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Figma account not connected',
       });
+      return;
     }
 
     const result = await FigmaService.getUserFiles(workspace.integrations.figma.accessToken);
@@ -334,7 +338,7 @@ router.get('/figma/files', async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to get Figma files', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -351,18 +355,19 @@ router.get('/figma/files', async (req, res) => {
 router.get('/figma/files/:fileKey/frames', [
   param('fileKey').notEmpty().withMessage('File key is required'),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
     const { fileKey } = req.params;
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
     if (!workspace?.integrations?.figma?.connected || !workspace.integrations.figma.accessToken) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Figma account not connected',
       });
+      return;
     }
 
     const result = await FigmaService.getFileFrames(
@@ -377,7 +382,7 @@ router.get('/figma/files/:fileKey/frames', [
   } catch (error: any) {
     logger.error('Failed to get Figma file frames', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -396,18 +401,19 @@ router.post('/figma/export', [
   body('nodeId').notEmpty().withMessage('Node ID is required'),
   body('format').optional().isIn(['png', 'jpg']).withMessage('Format must be png or jpg'),
   validateRequest,
-], async (req, res) => {
+], async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
     const { fileKey, nodeId, format = 'png' } = req.body;
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
     if (!workspace?.integrations?.figma?.connected || !workspace.integrations.figma.accessToken) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Figma account not connected',
       });
+      return;
     }
 
     const result = await FigmaService.exportFrame(
@@ -424,7 +430,7 @@ router.post('/figma/export', [
   } catch (error: any) {
     logger.error('Failed to export Figma frame', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({
@@ -438,11 +444,11 @@ router.post('/figma/export', [
  * DELETE /design-integrations/figma/disconnect
  * Disconnect Figma integration
  */
-router.delete('/figma/disconnect', async (req, res) => {
+router.delete('/figma/disconnect', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user!.workspaceId;
+    const { workspaceId } = req.workspace!;
 
-    await FigmaService.disconnectFigma(workspaceId);
+    await FigmaService.disconnectFigma(workspaceId.toString());
 
     res.json({
       success: true,
@@ -451,7 +457,7 @@ router.delete('/figma/disconnect', async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to disconnect Figma', {
       error: error.message,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
     });
 
     res.status(500).json({

@@ -48,8 +48,8 @@ export class ReportSchedulerWorker {
         {
           connection: queueManager.getConnection(),
           concurrency: 1, // Process one at a time to avoid conflicts
-          removeOnComplete: 10,
-          removeOnFail: 50,
+          removeOnComplete: 10 as any,
+          removeOnFail: 50 as any,
         }
       );
 
@@ -121,7 +121,7 @@ export class ReportSchedulerWorker {
 
       for (const report of dueReports) {
         try {
-          await this.processReport(report);
+          await this.processReport(report as any);
           reportsProcessed++;
           this.metrics.reports_processed_total++;
           this.metrics.reports_sent_total++;
@@ -185,7 +185,7 @@ export class ReportSchedulerWorker {
       if (format === 'pdf') {
         buffer = await ReportGeneratorService.generatePDF(
           workspaceId,
-          reportType,
+          reportType as any,
           startDate,
           endDate,
           platforms
@@ -193,7 +193,7 @@ export class ReportSchedulerWorker {
       } else {
         buffer = await ReportGeneratorService.generateCSV(
           workspaceId,
-          reportType,
+          reportType as any,
           startDate,
           endDate,
           platforms
@@ -201,7 +201,7 @@ export class ReportSchedulerWorker {
       }
 
       // Send email
-      await ReportGeneratorService.sendReportEmail(report, buffer, format);
+      await ReportGeneratorService.sendReportEmail(report as any, buffer, format);
 
       // Update report timestamps
       const now = new Date();
@@ -240,7 +240,7 @@ export class ReportSchedulerWorker {
         const recipients = Array.isArray(report.recipients) ? report.recipients : [];
         const reportPlatforms = Array.isArray(report.platforms) ? report.platforms.map(p => String(p)) : [];
 
-        await webhookService.sendWebhook({
+        await webhookService.sendWebhookEvent({
           workspaceId: reportWorkspaceId,
           event: WebhookEventType.REPORT_GENERATED,
           payload: {

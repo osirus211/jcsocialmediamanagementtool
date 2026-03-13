@@ -10,7 +10,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { mediaStorageService } from '../services/MediaStorageService';
+import { mediaStorageService, StorageProvider } from '../services/MediaStorageService';
 import { mediaService } from '../services/MediaService';
 import { MediaType } from '../models/Media';
 import { logger } from '../utils/logger';
@@ -363,10 +363,11 @@ export class UploadController {
       }
 
       // Download original video
-      const originalVideoBuffer = await mediaStorageService.downloadFile(
-        originalMedia.storageKey,
-        originalMedia.storageProvider
+      const downloadUrl = await mediaStorageService.generatePresignedDownloadUrl(
+        originalMedia.storageKey
       );
+      const response = await fetch(downloadUrl);
+      const originalVideoBuffer = Buffer.from(await response.arrayBuffer());
 
       // Create temporary files
       const tempDir = path.join(process.cwd(), 'temp');
@@ -390,12 +391,17 @@ export class UploadController {
         const newFilename = `${originalName.name}_trimmed_${startTime}s-${endTime}s${originalName.ext}`;
 
         // Upload trimmed video
-        const uploadData = await mediaStorageService.uploadFile(
+        const storageKey = `media/${workspaceId}/${Date.now()}_${newFilename}`;
+        await mediaStorageService.uploadBuffer(
+          storageKey,
           trimmedVideoBuffer,
-          workspaceId,
-          newFilename,
           originalMedia.mimeType
         );
+        const uploadData = {
+          storageKey,
+          publicUrl: mediaStorageService.getPublicUrl(storageKey),
+          storageProvider: StorageProvider.S3
+        };
 
         // Create new media record
         const newMedia = await mediaService.createMedia({
@@ -472,10 +478,11 @@ export class UploadController {
       }
 
       // Download video
-      const videoBuffer = await mediaStorageService.downloadFile(
-        media.storageKey,
-        media.storageProvider
+      const downloadUrl = await mediaStorageService.generatePresignedDownloadUrl(
+        media.storageKey
       );
+      const response = await fetch(downloadUrl);
+      const videoBuffer = Buffer.from(await response.arrayBuffer());
 
       // Create temporary files
       const tempDir = path.join(process.cwd(), 'temp');
@@ -496,15 +503,19 @@ export class UploadController {
 
         // Upload thumbnail
         const thumbnailFilename = `${path.parse(media.originalFilename).name}_thumb.jpg`;
-        const uploadData = await mediaStorageService.uploadFile(
+        const storageKey = `media/${workspaceId}/${Date.now()}_${thumbnailFilename}`;
+        await mediaStorageService.uploadBuffer(
+          storageKey,
           thumbnailBuffer,
-          workspaceId,
-          thumbnailFilename,
           'image/jpeg'
         );
+        const uploadData = {
+          storageKey,
+          publicUrl: mediaStorageService.getPublicUrl(storageKey)
+        };
 
         // Update media with thumbnail URL
-        const updatedMedia = await mediaService.updateMedia(id, {
+        const updatedMedia = await (mediaService as any).updateMedia(id, {
           thumbnailUrl: uploadData.publicUrl,
         });
 

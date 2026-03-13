@@ -195,7 +195,7 @@ export class SecurityAuditService {
         .limit(limit)
         .lean();
 
-      return events as ISecurityEvent[];
+      return events as unknown as ISecurityEvent[];
     } catch (error: any) {
       logger.error('Failed to query security events', {
         error: error.message,

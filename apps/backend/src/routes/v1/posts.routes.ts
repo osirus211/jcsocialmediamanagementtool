@@ -25,7 +25,7 @@ import {
   validateCalendar,
   validateHistory,
 } from '../../validators/uiValidators';
-import { validateBody } from '../../middleware/validate';
+import { validateRequest } from '../../middleware/validate';
 import { createPostSchema, updatePostSchema, bulkScheduleSchema } from '../../schemas/post.schemas';
 
 const router = Router();
@@ -134,7 +134,7 @@ router.use(postRateLimiter);
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/', validateBody(createPostSchema), (req, res, next) => {
+router.post('/', validateRequest(createPostSchema), (req, res, next) => {
   postController.createPost(req, res, next);
 });
 

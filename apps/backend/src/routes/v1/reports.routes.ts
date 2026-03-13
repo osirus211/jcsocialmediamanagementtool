@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { ScheduledReport, ReportFrequency, ReportFormat, ReportType } from '../../models/ScheduledReport';
 import { ReportGeneratorService } from '../../services/ReportGeneratorService';
-import { authMiddleware } from '../../middleware/auth';
-import { validateRequest } from '../../middleware/validation';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
 
@@ -53,9 +54,9 @@ const downloadReportSchema = z.object({
  * GET /api/v1/reports
  * List scheduled reports for workspace
  */
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', requireAuth, requireWorkspace, async (req, res): Promise<void> => {
   try {
-    const { workspaceId } = req.user!;
+    const { workspaceId } = req.workspace!;
 
     const reports = await ScheduledReport.find({
       workspaceId: new mongoose.Types.ObjectId(workspaceId),
@@ -70,13 +71,14 @@ router.get('/', authMiddleware, async (req, res) => {
     });
   } catch (error: any) {
     logger.error('Failed to list reports', {
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
       success: false,
       error: 'Failed to list reports',
     });
+    return;
   }
 });
 
@@ -84,9 +86,10 @@ router.get('/', authMiddleware, async (req, res) => {
  * POST /api/v1/reports
  * Create scheduled report
  */
-router.post('/', authMiddleware, validateRequest(createReportSchema), async (req, res) => {
+router.post('/', requireAuth, requireWorkspace, validateRequest(createReportSchema), async (req, res): Promise<void> => {
   try {
-    const { workspaceId, userId } = req.user!;
+    const { workspaceId } = req.workspace!;
+    const { userId } = req.user!;
     const reportData = req.body;
 
     const report = await ScheduledReport.create({
@@ -111,13 +114,14 @@ router.post('/', authMiddleware, validateRequest(createReportSchema), async (req
     });
   } catch (error: any) {
     logger.error('Failed to create report', {
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
       success: false,
       error: 'Failed to create report',
     });
+    return;
   }
 });
 
@@ -125,9 +129,9 @@ router.post('/', authMiddleware, validateRequest(createReportSchema), async (req
  * PATCH /api/v1/reports/:id
  * Update scheduled report
  */
-router.patch('/:id', authMiddleware, validateRequest(updateReportSchema), async (req, res) => {
+router.patch('/:id', requireAuth, requireWorkspace, validateRequest(updateReportSchema), async (req, res): Promise<void> => {
   try {
-    const { workspaceId } = req.user!;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
     const updates = req.body;
 
@@ -141,10 +145,11 @@ router.patch('/:id', authMiddleware, validateRequest(updateReportSchema), async 
     ).populate('createdBy', 'email name');
 
     if (!report) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Report not found',
       });
+      return;
     }
 
     logger.info('Scheduled report updated', {
@@ -159,13 +164,14 @@ router.patch('/:id', authMiddleware, validateRequest(updateReportSchema), async 
   } catch (error: any) {
     logger.error('Failed to update report', {
       reportId: req.params.id,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
       success: false,
       error: 'Failed to update report',
     });
+    return;
   }
 });
 
@@ -173,9 +179,9 @@ router.patch('/:id', authMiddleware, validateRequest(updateReportSchema), async 
  * DELETE /api/v1/reports/:id
  * Delete scheduled report
  */
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', requireAuth, requireWorkspace, async (req, res): Promise<void> => {
   try {
-    const { workspaceId } = req.user!;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
 
     const report = await ScheduledReport.findOneAndDelete({
@@ -184,10 +190,11 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     });
 
     if (!report) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Report not found',
       });
+      return;
     }
 
     logger.info('Scheduled report deleted', {
@@ -202,13 +209,14 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to delete report', {
       reportId: req.params.id,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
       success: false,
       error: 'Failed to delete report',
     });
+    return;
   }
 });
 
@@ -216,9 +224,9 @@ router.delete('/:id', authMiddleware, async (req, res) => {
  * POST /api/v1/reports/:id/send-now
  * Trigger immediate report generation and email
  */
-router.post('/:id/send-now', authMiddleware, async (req, res) => {
+router.post('/:id/send-now', requireAuth, requireWorkspace, async (req, res): Promise<void> => {
   try {
-    const { workspaceId } = req.user!;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
 
     const report = await ScheduledReport.findOne({
@@ -227,10 +235,11 @@ router.post('/:id/send-now', authMiddleware, async (req, res) => {
     });
 
     if (!report) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Report not found',
       });
+      return;
     }
 
     // Calculate date range
@@ -242,7 +251,7 @@ router.post('/:id/send-now', authMiddleware, async (req, res) => {
     let buffer: Buffer;
     if (report.format === ReportFormat.PDF) {
       buffer = await ReportGeneratorService.generatePDF(
-        workspaceId,
+        workspaceId.toString(),
         report.reportType,
         startDate,
         endDate,
@@ -250,7 +259,7 @@ router.post('/:id/send-now', authMiddleware, async (req, res) => {
       );
     } else {
       buffer = await ReportGeneratorService.generateCSV(
-        workspaceId,
+        workspaceId.toString(),
         report.reportType,
         startDate,
         endDate,
@@ -273,13 +282,14 @@ router.post('/:id/send-now', authMiddleware, async (req, res) => {
   } catch (error: any) {
     logger.error('Failed to send report immediately', {
       reportId: req.params.id,
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
       success: false,
       error: 'Failed to send report',
     });
+    return;
   }
 });
 
@@ -287,9 +297,9 @@ router.post('/:id/send-now', authMiddleware, async (req, res) => {
  * GET /api/v1/reports/download
  * Download report file
  */
-router.get('/download', authMiddleware, validateRequest(downloadReportSchema), async (req, res) => {
+router.get('/download', requireAuth, requireWorkspace, validateRequest(downloadReportSchema), async (req, res): Promise<void> => {
   try {
-    const { workspaceId } = req.user!;
+    const { workspaceId } = req.workspace!;
     const { reportType, format, startDate, endDate, platforms } = req.query;
 
     const start = new Date(startDate as string);
@@ -303,7 +313,7 @@ router.get('/download', authMiddleware, validateRequest(downloadReportSchema), a
 
     if (format === ReportFormat.PDF) {
       buffer = await ReportGeneratorService.generatePDF(
-        workspaceId,
+        workspaceId.toString(),
         reportType as ReportType,
         start,
         end,
@@ -313,7 +323,7 @@ router.get('/download', authMiddleware, validateRequest(downloadReportSchema), a
       filename = `analytics-${reportType}-${start.toISOString().split('T')[0]}.pdf`;
     } else {
       buffer = await ReportGeneratorService.generateCSV(
-        workspaceId,
+        workspaceId.toString(),
         reportType as ReportType,
         start,
         end,
@@ -334,13 +344,14 @@ router.get('/download', authMiddleware, validateRequest(downloadReportSchema), a
     });
   } catch (error: any) {
     logger.error('Failed to download report', {
-      workspaceId: req.user?.workspaceId,
+      workspaceId: req.workspace?.workspaceId,
       error: error.message,
     });
     res.status(500).json({
       success: false,
       error: 'Failed to generate report',
     });
+    return;
   }
 });
 

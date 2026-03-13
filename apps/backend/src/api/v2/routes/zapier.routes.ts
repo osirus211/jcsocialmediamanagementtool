@@ -200,7 +200,7 @@ router.post('/actions/posts/create', requireScope('posts:write'), async (req, re
 /**
  * POST /v2/zapier/actions/posts/schedule - Schedule existing draft
  */
-router.post('/actions/posts/schedule', requireScope('posts:write'), async (req, res, next) => {
+router.post('/actions/posts/schedule', requireScope('posts:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const data = SchedulePostSchema.parse(req.body);
@@ -212,10 +212,11 @@ router.post('/actions/posts/schedule', requireScope('posts:write'), async (req, 
     );
     
     if (!post) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Post not found',
         code: 'POST_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Post scheduled via Zapier', {
@@ -225,6 +226,7 @@ router.post('/actions/posts/schedule', requireScope('posts:write'), async (req, 
     });
     
     res.json(AutomationService.formatPostForZapier(post));
+    return;
   } catch (error) {
     next(error);
   }

@@ -5,6 +5,7 @@
  */
 
 import crypto from 'crypto';
+import { config } from '../config';
 import { ApiKey, IApiKey, ApiKeyStatus } from '../models/ApiKey';
 import { BadRequestError, UnauthorizedError, NotFoundError } from '../utils/errors';
 import { logger } from '../utils/logger';

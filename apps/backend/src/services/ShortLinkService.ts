@@ -100,7 +100,7 @@ export class ShortLinkService {
         clicks: 0,
       });
 
-      const shortUrl = `${config.server.apiUrl}/r/${shortCode}`;
+      const shortUrl = `${config.apiUrl}/r/${shortCode}`;
 
       logger.info('Short link created', {
         shortCode,
@@ -200,7 +200,7 @@ export class ShortLinkService {
       ]);
 
       return {
-        links: links as IShortLink[],
+        links: links as unknown as IShortLink[],
         total,
         page,
         totalPages: Math.ceil(total / limit),

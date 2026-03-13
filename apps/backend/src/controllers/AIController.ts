@@ -10,6 +10,7 @@ import {
   HashtagGenerationInput,
   RewriteInput,
   SuggestionInput,
+  ContentLength,
 } from '../ai/types';
 import { logger } from '../utils/logger';
 import { usageService } from '../services/UsageService';
@@ -614,7 +615,7 @@ export class AIController {
                 topic,
                 tone: tone || 'casual',
                 platform,
-                length: 'medium',
+                length: ContentLength.MEDIUM,
               });
 
               // Generate hashtags

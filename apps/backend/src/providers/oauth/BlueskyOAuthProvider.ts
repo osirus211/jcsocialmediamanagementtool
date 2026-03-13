@@ -6,7 +6,7 @@
  */
 
 import { BskyAgent } from '@atproto/api';
-import { OAuthProvider } from './OAuthProvider';
+import { OAuthProvider } from '../../services/oauth/OAuthProvider';
 import { logger } from '../../utils/logger';
 
 export class BlueskyOAuthProvider extends OAuthProvider {
@@ -19,6 +19,37 @@ export class BlueskyOAuthProvider extends OAuthProvider {
 
   getPlatformName(): string {
     return 'bluesky';
+  }
+
+  // Required OAuth methods (not used for Bluesky)
+  async getAuthorizationUrl(): Promise<{ url: string; state: string }> {
+    throw new Error('Bluesky does not use OAuth');
+  }
+
+  async exchangeCodeForTokenLegacy(): Promise<any> {
+    throw new Error('Bluesky does not use OAuth');
+  }
+
+  async refreshAccessTokenLegacy(): Promise<any> {
+    throw new Error('Bluesky does not use OAuth');
+  }
+
+  async discoverAccounts(): Promise<any[]> {
+    throw new Error('Use getAccountInfo instead');
+  }
+
+  async validatePermissions(): Promise<any> {
+    return { valid: true, missingPermissions: [] };
+  }
+
+  getCapabilities(): any {
+    return {
+      supportsPublishing: true,
+      supportsScheduling: false,
+      supportsAnalytics: false,
+      maxTextLength: 300,
+      supportedMediaTypes: ['image/jpeg', 'image/png'],
+    };
   }
 
   /**
@@ -90,7 +121,7 @@ export class BlueskyOAuthProvider extends OAuthProvider {
         refreshJwt: refreshToken,
         did: '', // Will be populated from token
         handle: '', // Will be populated from token
-      });
+      } as any);
 
       return agent;
     } catch (error: any) {
@@ -138,8 +169,8 @@ export class BlueskyOAuthProvider extends OAuthProvider {
     }
   }
 
-  // OAuth methods (not used for Bluesky)
-  async generateAuthUrl(): Promise<{ url: string; state: string }> {
+  // OAuth methods (not used for Bluesky) - kept for compatibility
+  async generateAuthUrl(redirectUri: string, state: string, scopes: string[]): Promise<{ authUrl: string; codeVerifier?: string }> {
     throw new Error('Bluesky does not use OAuth');
   }
 

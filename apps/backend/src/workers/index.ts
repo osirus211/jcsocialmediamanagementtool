@@ -172,7 +172,7 @@ export function initializeWorkers(): WorkerManager {
   manager.registerWorker(
     'webhook-delivery-worker',
     new WorkerAdapter(new WebhookDeliveryWorker(), 'webhook-delivery-worker'),
-    workerConfigs['webhook-delivery-worker'] || { enabled: true, priority: 'high' }
+    workerConfigs['webhook-delivery-worker'] || { enabled: true, maxRestarts: 3, restartDelay: 5000 }
   );
 
   // ============================================================================
@@ -211,7 +211,7 @@ export function initializeWorkers(): WorkerManager {
   manager.registerWorker(
     'report-scheduler-worker',
     new WorkerAdapter(new ReportSchedulerWorker(), 'report-scheduler-worker'),
-    { enabled: true, priority: 'medium' }
+    { enabled: true, maxRestarts: 3, restartDelay: 5000 }
   );
 
   // ============================================================================

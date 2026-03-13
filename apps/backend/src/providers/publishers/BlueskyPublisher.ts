@@ -36,7 +36,7 @@ export class BlueskyPublisher extends BasePublisher {
         refreshJwt: refreshToken,
         did: account.providerUserId,
         handle: account.accountName,
-      });
+      } as any);
 
       // Prepare post record
       const postRecord: Record<string, any> = {

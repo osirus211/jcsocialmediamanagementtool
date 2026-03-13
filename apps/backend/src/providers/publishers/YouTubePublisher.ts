@@ -3,7 +3,7 @@
  * Handles publishing videos and Shorts to YouTube
  */
 
-import { IPublisher } from './IPublisher';
+import { IPublisher, PublishPostOptions, PublishPostResult } from './IPublisher';
 import { ISocialAccount } from '../../models/SocialAccount';
 import { IPost } from '../../models/Post';
 import { logger } from '../../utils/logger';
@@ -15,6 +15,22 @@ export interface YouTubePublishResult {
 }
 
 export class YouTubePublisher implements IPublisher {
+  readonly platform = 'youtube';
+
+  async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    // Convert options to IPost format for compatibility with existing method
+    const post = {
+      content: options.content,
+      mediaUrls: options.mediaIds || [],
+      metadata: options.metadata,
+    } as IPost;
+
+    const result = await this.publish(account, post);
+    return {
+      platformPostId: result.postId,
+      url: result.url,
+    };
+  }
   async publish(account: ISocialAccount, post: IPost): Promise<YouTubePublishResult> {
     // Route based on content type
     if (post.contentType === 'reel') {
@@ -160,7 +176,7 @@ export class YouTubePublisher implements IPublisher {
 
     if (!initiateResponse.ok) {
       const error = await initiateResponse.json();
-      throw new Error(`YouTube upload initiation failed: ${error.error?.message || 'Unknown error'}`);
+      throw new Error(`YouTube upload initiation failed: ${(error as any).error?.message || 'Unknown error'}`);
     }
 
     const uploadUrl = initiateResponse.headers.get('location');
@@ -232,5 +248,19 @@ export class YouTubePublisher implements IPublisher {
     }
 
     return tags.slice(0, 10); // YouTube allows max 10 tags
+  }
+
+  // IPublisher interface methods
+  async uploadMedia(account: ISocialAccount, mediaUrls: string[]): Promise<string[]> {
+    // YouTube handles media during video upload
+    return mediaUrls;
+  }
+
+  getLimits() {
+    return {
+      maxContentLength: 5000,
+      maxMediaCount: 1,
+      supportedMediaTypes: ['video/mp4', 'video/mov', 'video/avi'],
+    };
   }
 }

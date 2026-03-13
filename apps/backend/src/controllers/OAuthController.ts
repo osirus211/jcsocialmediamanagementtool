@@ -502,6 +502,8 @@ export class OAuthController {
         state,
         platform,
       });
+      return;
+      return;
     } catch (error) {
       // Log failure
       await securityAuditService.logEvent({
@@ -611,12 +613,13 @@ export class OAuthController {
         });
 
         // Return 409 Conflict
-        return res.status(409).json({
+        res.status(409).json({
           success: false,
           error: 'ALREADY_PROCESSED',
           message: 'This OAuth callback has already been processed',
           correlationId,
         });
+        return;
       }
 
       // Step 2: Validate Redis state
@@ -1183,6 +1186,7 @@ export class OAuthController {
           replayProtection: true,
         },
       });
+      return;
     } catch (error) {
       next(error);
     }
@@ -1978,6 +1982,7 @@ export class OAuthController {
         success: true,
         ...options,
       });
+      return;
     } catch (error) {
       next(error);
     }
@@ -2194,6 +2199,7 @@ export class OAuthController {
           displayName: account.accountName,
         },
       });
+      return;
     } catch (error: any) {
       const duration = Date.now() - startTime;
 
@@ -2246,7 +2252,7 @@ export class OAuthController {
 
       // Map to status format
       const connectionStatus = accounts.map((account) => ({
-        platform: account.platform,
+        platform: account.provider,
         accountName: account.accountName,
         status: account.status,
         isConnected: account.status === AccountStatus.ACTIVE,
@@ -2258,7 +2264,7 @@ export class OAuthController {
       }));
 
       // Get platforms that are not connected
-      const connectedPlatforms = new Set(accounts.map((a) => a.platform));
+      const connectedPlatforms = new Set(accounts.map((a) => a.provider));
       const allPlatforms = Object.values(SocialPlatform);
       const notConnected = allPlatforms.filter((p) => !connectedPlatforms.has(p));
 
@@ -2271,6 +2277,7 @@ export class OAuthController {
           totalPlatforms: allPlatforms.length,
         },
       });
+      return;
 
       logger.debug('OAuth status retrieved', {
         workspaceId,
@@ -2297,11 +2304,12 @@ export class OAuthController {
         const { sessionId } = req.query;
 
         if (!sessionId || typeof sessionId !== 'string') {
-          return res.status(400).json({
+          res.status(400).json({
             success: false,
             error: 'MISSING_SESSION_ID',
             message: 'Session ID is required',
           });
+          return;
         }
 
         // Retrieve session from Redis using the state as the key
@@ -2309,7 +2317,7 @@ export class OAuthController {
         const stateData = await oauthStateService.validateState(sessionId);
 
         if (!stateData) {
-          return res.status(404).json({
+          res.status(404).json({
             success: false,
             error: 'SESSION_NOT_FOUND',
             message: 'OAuth session not found or expired',
@@ -2318,6 +2326,7 @@ export class OAuthController {
               platform,
             },
           });
+          return;
         }
 
         // Check if session has expired
@@ -2336,9 +2345,10 @@ export class OAuthController {
             workspaceId: stateData.workspaceId,
           },
         });
+        return;
 
         logger.debug('OAuth session status retrieved', {
-          sessionId: sessionId.substring(0, 10) + '...',
+          sessionId: String(sessionId).substring(0, 10) + '...',
           platform: stateData.platform,
           status: isExpired ? 'expired' : 'pending',
         });
@@ -2369,22 +2379,24 @@ export class OAuthController {
         }
 
         if (!sessionId || typeof sessionId !== 'string') {
-          return res.status(400).json({
+          res.status(400).json({
             success: false,
             error: 'MISSING_SESSION_ID',
             message: 'Session ID is required',
           });
+          return;
         }
 
         // Retrieve session from Redis
         const stateData = await oauthStateService.validateState(sessionId);
 
         if (!stateData) {
-          return res.status(404).json({
+          res.status(404).json({
             success: false,
             error: 'SESSION_NOT_FOUND',
             message: 'OAuth session not found or expired. Please start a new connection.',
           });
+          return;
         }
 
         // Validate session hasn't expired
@@ -2392,7 +2404,7 @@ export class OAuthController {
         const expiresAt = new Date(stateData.expiresAt);
 
         if (now > expiresAt) {
-          return res.status(410).json({
+          res.status(410).json({
             success: false,
             error: 'SESSION_EXPIRED',
             message: 'OAuth session has expired. Please start a new connection.',
@@ -2400,24 +2412,27 @@ export class OAuthController {
               expiresAt: stateData.expiresAt,
             },
           });
+          return;
         }
 
         // Validate platform matches
         if (stateData.platform !== platform) {
-          return res.status(400).json({
+          res.status(400).json({
             success: false,
             error: 'PLATFORM_MISMATCH',
             message: `Session is for ${stateData.platform}, not ${platform}`,
           });
+          return;
         }
 
         // Validate user owns this session
         if (stateData.userId !== req.user.userId) {
-          return res.status(403).json({
+          res.status(403).json({
             success: false,
             error: 'UNAUTHORIZED',
             message: 'You do not have permission to resume this session',
           });
+          return;
         }
 
         // Regenerate auth URL with the same state parameter
@@ -2525,11 +2540,12 @@ export class OAuthController {
           }
 
           default:
-            return res.status(400).json({
+            res.status(400).json({
               success: false,
               error: 'UNSUPPORTED_PLATFORM',
               message: `Platform ${platform} is not supported for session resume`,
             });
+            return;
         }
 
         res.json({
@@ -2541,6 +2557,7 @@ export class OAuthController {
             expiresAt: stateData.expiresAt,
           },
         });
+        return;
 
         logger.info('OAuth session resumed', {
           sessionId: sessionId.substring(0, 10) + '...',

@@ -98,7 +98,7 @@ export const workerConfigs: Record<string, WorkerConfig> = {
   },
 
   'webhook-delivery-worker': {
-    enabled: config.workers.enableWebhooks !== false, // Default to true
+    enabled: true, // Default to true
     maxRestarts: 3,
     restartDelay: 5000,
   },

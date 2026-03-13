@@ -4,6 +4,9 @@ import { WorkspaceRole } from '../models/WorkspaceMember';
 import { logger } from '../utils/logger';
 import { getPaginationParams } from '../utils/pagination';
 import { logAudit } from '../utils/auditLogger';
+import mongoose from 'mongoose';
+
+const workspaceService = new WorkspaceService();
 
 export class WorkspaceController {
   /**
@@ -20,10 +23,9 @@ export class WorkspaceController {
         return;
       }
 
-      const workspace = await WorkspaceService.createWorkspace({
+      const workspace = await workspaceService.createWorkspace({
         name,
-        slug,
-        ownerId: userId,
+        ownerId: new mongoose.Types.ObjectId(userId),
       });
 
       res.status(201).json({
@@ -48,7 +50,7 @@ export class WorkspaceController {
         return;
       }
 
-      const workspaces = await WorkspaceService.getUserWorkspaces(userId);
+      const workspaces = await workspaceService.getUserWorkspaces(new mongoose.Types.ObjectId(userId));
 
       res.status(200).json({
         workspaces,
@@ -63,11 +65,11 @@ export class WorkspaceController {
    * Get workspace by ID
    * GET /api/v1/workspaces/:workspaceId
    */
-  static async getWorkspace(req: Request, res: Response, next: NextFunction) {
+  static async getWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { workspaceId } = req.params;
 
-      const workspace = await WorkspaceService.getWorkspaceById(workspaceId);
+      const workspace = await workspaceService.getWorkspace(new mongoose.Types.ObjectId(workspaceId));
 
       res.status(200).json({
         workspace,
@@ -81,15 +83,21 @@ export class WorkspaceController {
    * Update workspace
    * PATCH /api/v1/workspaces/:workspaceId
    */
-  static async updateWorkspace(req: Request, res: Response, next: NextFunction) {
+  static async updateWorkspace(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { workspaceId } = req.params;
-      const { name, slug, settings } = req.body;
+      const { name, settings } = req.body;
+      const userId = req.user?.userId;
 
-      const workspace = await WorkspaceService.updateWorkspace(workspaceId, {
-        name,
-        slug,
-        settings,
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const workspace = await workspaceService.updateWorkspace({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+        updates: { name, settings },
       });
 
       res.status(200).json({
@@ -115,7 +123,10 @@ export class WorkspaceController {
         return;
       }
 
-      await WorkspaceService.deleteWorkspace(workspaceId, userId);
+      await workspaceService.deleteWorkspace({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+      });
 
       // Audit log: Workspace deleted
       logAudit({
@@ -139,21 +150,16 @@ export class WorkspaceController {
    * Get workspace members
    * GET /api/v1/workspaces/:workspaceId/members
    */
-  static async getMembers(req: Request, res: Response, next: NextFunction) {
+  static async getMembers(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { workspaceId } = req.params;
 
-      // Get pagination params using utility
-      const { page, limit, skip } = getPaginationParams(req.query);
+      const members = await workspaceService.getMembers(new mongoose.Types.ObjectId(workspaceId));
 
-      const result = await WorkspaceService.getWorkspaceMembers(
-        workspaceId,
-        page,
-        limit,
-        skip
-      );
-
-      res.status(200).json(result);
+      res.status(200).json({
+        members,
+        count: members.length,
+      });
     } catch (error) {
       next(error);
     }
@@ -174,11 +180,20 @@ export class WorkspaceController {
         return;
       }
 
-      const membership = await WorkspaceService.inviteMember({
-        workspaceId,
-        email,
+      // First, find the user by email to get their ID
+      const { User } = await import('../models/User');
+      const invitedUser = await User.findOne({ email });
+      
+      if (!invitedUser) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const membership = await workspaceService.inviteMember({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        invitedBy: new mongoose.Types.ObjectId(userId),
+        userId: invitedUser._id,
         role: role || WorkspaceRole.MEMBER,
-        invitedBy: userId,
       });
 
       res.status(201).json({
@@ -204,7 +219,11 @@ export class WorkspaceController {
         return;
       }
 
-      await WorkspaceService.removeMember(workspaceId, memberUserId, userId);
+      await workspaceService.removeMember({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        removedBy: new mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(memberUserId),
+      });
 
       res.status(200).json({
         message: 'Member removed successfully',
@@ -231,11 +250,12 @@ export class WorkspaceController {
       });
       const oldRole = oldMembership?.role;
 
-      const membership = await WorkspaceService.updateMemberRole(
-        workspaceId,
-        memberUserId,
-        role
-      );
+      const membership = await workspaceService.changeMemberRole({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        changedBy: new mongoose.Types.ObjectId(req.user?.userId || ''),
+        userId: new mongoose.Types.ObjectId(memberUserId),
+        newRole: role,
+      });
 
       // Audit log: Member role changed
       logAudit({
@@ -275,7 +295,21 @@ export class WorkspaceController {
         return;
       }
 
-      await WorkspaceService.transferOwnership(workspaceId, userId, newOwnerId);
+      // Transfer ownership by changing roles
+      await workspaceService.changeMemberRole({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        changedBy: new mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(newOwnerId),
+        newRole: WorkspaceRole.OWNER,
+      });
+
+      // Change current owner to admin
+      await workspaceService.changeMemberRole({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        changedBy: new mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(userId),
+        newRole: WorkspaceRole.ADMIN,
+      });
 
       res.status(200).json({
         message: 'Ownership transferred successfully',
@@ -299,7 +333,11 @@ export class WorkspaceController {
         return;
       }
 
-      await WorkspaceService.leaveWorkspace(workspaceId, userId);
+      await workspaceService.removeMember({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        removedBy: new mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(userId),
+      });
 
       res.status(200).json({
         message: 'Left workspace successfully',

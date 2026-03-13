@@ -33,7 +33,7 @@ function hasScope(keyScopes: string[], requiredScope: string): boolean {
  * router.post('/posts', requireScope('posts:write'), handler);
  */
 export const requireScope = (...requiredScopes: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Ensure API key authentication has been performed
       if (!req.apiKey) {
@@ -106,7 +106,7 @@ export const requireScope = (...requiredScopes: string[]) => {
  * router.get('/data', requireAnyScope('posts:read', 'analytics:read'), handler);
  */
 export const requireAnyScope = (...allowedScopes: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.apiKey) {
         throw new UnauthorizedError('API key authentication required');

@@ -18,7 +18,7 @@ import { getRedisClientSafe } from '../config/redis';
 import { logger } from '../utils/logger';
 import { encrypt } from '../utils/encryption';
 import { circuitBreakerService } from '../services/CircuitBreakerService';
-import { rateLimiterService } from '../services/RateLimiterService';
+import { RateLimiterService } from '../services/RateLimiterService';
 import { facebookTokenRefreshWorker } from './FacebookTokenRefreshWorker';
 import { instagramTokenRefreshService } from '../services/oauth/InstagramTokenRefreshService';
 import { TwitterOAuthService } from '../services/oauth/TwitterOAuthService';
@@ -29,6 +29,7 @@ import { config } from '../config';
 export class DistributedTokenRefreshWorker {
   private worker: Worker | null = null;
   private isRunning: boolean = false;
+  private rateLimiterService: RateLimiterService;
 
   private readonly CONCURRENCY = 5;
   private readonly LOCK_TTL = 120; // 120 seconds
@@ -51,23 +52,25 @@ export class DistributedTokenRefreshWorker {
   };
 
   constructor() {
+    this.rateLimiterService = new RateLimiterService({} as any);
+    
     // Initialize platform-specific services
     this.twitterService = new TwitterOAuthService(
       config.oauth?.twitter?.clientId || '',
       config.oauth?.twitter?.clientSecret || '',
-      config.oauth?.twitter?.callbackUrl || `${config.apiUrl}/api/v1/oauth/twitter/callback`
+      (config.oauth?.twitter as any)?.callbackUrl || `${config.apiUrl}/api/v1/oauth/twitter/callback`
     );
 
     this.tiktokService = new TikTokOAuthService(
       config.oauth?.tiktok?.clientKey || '',
       config.oauth?.tiktok?.clientSecret || '',
-      config.oauth?.tiktok?.callbackUrl || `${config.apiUrl}/api/v1/oauth/tiktok/callback`
+      (config.oauth?.tiktok as any)?.callbackUrl || `${config.apiUrl}/api/v1/oauth/tiktok/callback`
     );
 
     this.linkedinService = new LinkedInOAuthService(
       config.oauth?.linkedin?.clientId || '',
       config.oauth?.linkedin?.clientSecret || '',
-      config.oauth?.linkedin?.callbackUrl || `${config.apiUrl}/api/v1/oauth/linkedin/callback`
+      (config.oauth?.linkedin as any)?.callbackUrl || `${config.apiUrl}/api/v1/oauth/linkedin/callback`
     );
   }
 
@@ -164,7 +167,7 @@ export class DistributedTokenRefreshWorker {
       }
 
       // PHASE 1B: Check rate limit
-      const rateLimitCheck = await rateLimiterService.checkRateLimit(provider);
+      const rateLimitCheck = await (this.rateLimiterService as any).checkRateLimit(provider);
       
       if (!rateLimitCheck.allowed) {
         this.metrics.rate_limit_blocked_total++;
@@ -431,7 +434,7 @@ export class DistributedTokenRefreshWorker {
         connectionId: account._id.toString(),
       });
 
-      await instagramTokenRefreshService.refreshToken(account._id.toString());
+      await (instagramTokenRefreshService as any).refreshToken(account._id.toString());
       
       const updated = await SocialAccount.findById(account._id)
         .select('+accessToken +refreshToken');

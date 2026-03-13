@@ -19,8 +19,7 @@ export interface BulkUploadError {
   data?: Record<string, any>;
 }
 
-export interface IBulkUploadJob extends Document {
-  _id: mongoose.Types.ObjectId;
+export interface IBulkUploadJob {
   workspaceId: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   filename: string;

@@ -244,7 +244,7 @@ export class NotificationService {
    * Map system event to notification type
    */
   private mapEventToNotificationType(eventType: SystemEvent): NotificationType {
-    const mapping: Record<SystemEvent, NotificationType> = {
+    const mapping: Partial<Record<SystemEvent, NotificationType>> = {
       [SystemEvent.POST_PUBLISHED]: NotificationType.POST_PUBLISHED,
       [SystemEvent.POST_FAILED]: NotificationType.POST_FAILED,
       [SystemEvent.POST_SCHEDULED]: NotificationType.POST_SCHEDULED,

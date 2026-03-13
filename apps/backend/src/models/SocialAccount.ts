@@ -33,6 +33,8 @@ export enum AccountStatus {
   DISCONNECTED = 'disconnected',
   PERMISSION_REVOKED = 'permission_revoked',
   REFRESH_FAILED = 'refresh_failed',
+  EXPIRED = 'expired',
+  REVOKED = 'revoked',
 }
 
 export enum ProviderType {

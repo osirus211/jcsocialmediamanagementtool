@@ -57,12 +57,14 @@ router.get('/', requireScope('posts:read'), async (req, res, next) => {
       filter._id = { $lt: query.cursor };
     }
     
-    const posts = await postService.getPosts({
+    const postsResult = await postService.getPosts({
+      workspaceId: workspaceId,
       ...filter,
       limit: query.limit + 1, // Get one extra to check if there are more
       sort: { _id: -1 }, // Sort by ID descending for cursor pagination
     });
     
+    const posts = Array.isArray(postsResult) ? postsResult : postsResult.posts;
     const hasMore = posts.length > query.limit;
     const data = hasMore ? posts.slice(0, -1) : posts;
     const nextCursor = hasMore ? data[data.length - 1]._id.toString() : null;
@@ -72,7 +74,7 @@ router.get('/', requireScope('posts:read'), async (req, res, next) => {
       meta: {
         cursor: nextCursor,
         hasMore,
-        total: await postService.getPostsCount(filter),
+        total: Array.isArray(postsResult) ? posts.length : postsResult.total,
       },
     });
   } catch (error) {
@@ -83,7 +85,7 @@ router.get('/', requireScope('posts:read'), async (req, res, next) => {
 /**
  * GET /v2/posts/:id - Get single post
  */
-router.get('/:id', requireScope('posts:read'), async (req, res, next) => {
+router.get('/:id', requireScope('posts:read'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const postId = req.params.id;
@@ -91,10 +93,11 @@ router.get('/:id', requireScope('posts:read'), async (req, res, next) => {
     const post = await postService.getPostById(postId, workspaceId);
     
     if (!post) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Post not found',
         code: 'POST_NOT_FOUND',
       });
+      return;
     }
     
     res.json({ data: post });
@@ -119,7 +122,7 @@ router.post('/', requireScope('posts:write'), async (req, res, next) => {
       mediaIds: data.mediaIds,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : new Date(),
       contentType: data.contentType,
-      createdBy: req.apiKey!.keyId, // Use API key ID as creator
+      // createdBy removed as it's not part of CreatePostInput interface
     });
     
     logger.info('Post created via API v2', {
@@ -137,7 +140,7 @@ router.post('/', requireScope('posts:write'), async (req, res, next) => {
 /**
  * PATCH /v2/posts/:id - Update post
  */
-router.patch('/:id', requireScope('posts:write'), async (req, res, next) => {
+router.patch('/:id', requireScope('posts:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const postId = req.params.id;
@@ -151,10 +154,11 @@ router.patch('/:id', requireScope('posts:write'), async (req, res, next) => {
     const post = await postService.updatePost(postId, workspaceId, updateData);
     
     if (!post) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Post not found',
         code: 'POST_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Post updated via API v2', {
@@ -172,18 +176,22 @@ router.patch('/:id', requireScope('posts:write'), async (req, res, next) => {
 /**
  * DELETE /v2/posts/:id - Delete post
  */
-router.delete('/:id', requireScope('posts:write'), async (req, res, next) => {
+router.delete('/:id', requireScope('posts:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const postId = req.params.id;
     
-    const deleted = await postService.deletePost(postId, workspaceId);
-    
-    if (!deleted) {
-      return res.status(404).json({
-        error: 'Post not found',
-        code: 'POST_NOT_FOUND',
-      });
+    try {
+      await postService.deletePost(postId, workspaceId);
+    } catch (error: any) {
+      if (error.message === 'Post not found') {
+        res.status(404).json({
+          error: 'Post not found',
+          code: 'POST_NOT_FOUND',
+        });
+        return;
+      }
+      throw error;
     }
     
     logger.info('Post deleted via API v2', {
@@ -201,18 +209,19 @@ router.delete('/:id', requireScope('posts:write'), async (req, res, next) => {
 /**
  * POST /v2/posts/:id/publish - Publish post immediately
  */
-router.post('/:id/publish', requireScope('posts:write'), async (req, res, next) => {
+router.post('/:id/publish', requireScope('posts:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const postId = req.params.id;
     
-    const post = await postService.publishPostImmediately(postId, workspaceId);
+    const post = await postService.retryPost(postId, workspaceId);
     
     if (!post) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Post not found',
         code: 'POST_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Post published immediately via API v2', {

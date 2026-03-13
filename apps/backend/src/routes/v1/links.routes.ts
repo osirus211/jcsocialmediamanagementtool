@@ -8,7 +8,7 @@ import { Router } from 'express';
 import { shortLinkController } from '../../controllers/ShortLinkController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { validateBody } from '../../middleware/validate';
+import { validateRequest } from '../../middleware/validate';
 import { shortenUrlSchema } from '../../schemas/link.schemas';
 
 const router = Router();
@@ -21,7 +21,7 @@ router.use(requireWorkspace);
 router.get('/', shortLinkController.getLinks.bind(shortLinkController));
 
 // Shorten URL
-router.post('/shorten', validateBody(shortenUrlSchema), shortLinkController.shortenUrl.bind(shortLinkController));
+router.post('/shorten', validateRequest(shortenUrlSchema), shortLinkController.shortenUrl.bind(shortLinkController));
 
 // Get link stats
 router.get('/:shortCode/stats', shortLinkController.getLinkStats.bind(shortLinkController));

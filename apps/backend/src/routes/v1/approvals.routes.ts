@@ -6,9 +6,9 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../../middleware/auth.middleware';
-import { requireWorkspace } from '../../middleware/workspace.middleware';
-import { validate } from '../../middleware/validation.middleware';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
 import { approvalQueueService } from '../../services/ApprovalQueueService';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
@@ -152,7 +152,12 @@ router.post('/:postId/approve', async (req, res, next) => {
  * @desc    Reject post
  * @access  Private
  */
-router.post('/:postId/reject', validate(rejectPostSchema), async (req, res, next) => {
+// Create a schema that validates the body
+const rejectPostRequestSchema = z.object({
+  body: rejectPostSchema,
+});
+
+router.post('/:postId/reject', validateRequest(rejectPostRequestSchema), async (req, res, next) => {
   try {
     const postId = new mongoose.Types.ObjectId(req.params.postId);
     const userId = new mongoose.Types.ObjectId(req.user!.userId);

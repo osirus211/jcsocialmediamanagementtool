@@ -1,11 +1,8 @@
 import { SocialAccount, ISocialAccount, SocialPlatform, AccountStatus } from '../models/SocialAccount';
 import { config } from '../config';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
-import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import { usageService } from './UsageService';
-import { config } from '../config';
 
 /**
  * Social Account Service
@@ -215,9 +212,7 @@ export class SocialAccountService {
       // Log security event
       if (userId && ipAddress) {
         const { securityAuditService } = await import('./SecurityAuditService');
-import { config } from '../config';
         const { SecurityEventType } = await import('../models/SecurityEvent');
-import { config } from '../config';
         
         await securityAuditService.logEvent({
           type: SecurityEventType.ACCOUNT_DISCONNECTED,
@@ -262,9 +257,7 @@ import { config } from '../config';
       }
 
       // Import OAuth manager dynamically to avoid circular dependencies
-import { config } from '../config';
       const { oauthManager } = await import('./oauth/OAuthManager');
-import { config } from '../config';
 
       // Get OAuth provider for platform
       const provider = oauthManager.getProvider(account.provider);
@@ -275,9 +268,7 @@ import { config } from '../config';
         throw new BadRequestError('Failed to decrypt refresh token');
       }
 
-      const tokens = await provider.refreshAccessToken({
-        refreshToken: decryptedRefreshToken,
-      });
+      const tokens = await provider.refreshAccessToken(decryptedRefreshToken);
 
       // Update account with new tokens
       account.accessToken = tokens.accessToken;
@@ -373,9 +364,7 @@ import { config } from '../config';
       if (account.provider === SocialPlatform.FACEBOOK) {
         // For Facebook pages, fetch page info directly
         const { FacebookOAuthProvider } = await import('./oauth/FacebookOAuthProvider');
-import { config } from '../config';
         const { config } = await import('../config');
-import { config } from '../config';
         
         const provider = new FacebookOAuthProvider(
           config.oauth?.facebook?.appId!,
@@ -409,9 +398,7 @@ import { config } from '../config';
       if (account.provider === SocialPlatform.INSTAGRAM) {
         // For Instagram, fetch account info using page token
         const { InstagramBusinessProvider } = await import('./oauth/InstagramBusinessProvider');
-import { config } from '../config';
         const { config } = await import('../config');
-import { config } from '../config';
         
         const provider = new InstagramBusinessProvider(
           config.oauth?.instagram?.clientId!,
@@ -452,7 +439,6 @@ import { config } from '../config';
 
       // For other platforms (Twitter, LinkedIn, etc.), use OAuth manager
       const { oauthManager } = await import('./oauth/OAuthManager');
-import { config } from '../config';
       const provider = oauthManager.getProvider(account.provider);
 
       // Fetch user profile using OAuth provider with retry logic for 503 errors
@@ -563,11 +549,8 @@ import { config } from '../config';
   private async sendOAuthExpiredEmail(accountId: string, workspaceId: string): Promise<void> {
     try {
       const { emailNotificationService } = await import('./EmailNotificationService');
-import { config } from '../config';
       const { User } = await import('../models/User');
-import { config } from '../config';
       const { Workspace } = await import('../models/Workspace');
-import { config } from '../config';
 
       // Get account
       const account = await this.getAccountById(accountId, workspaceId);

@@ -563,6 +563,13 @@ export class QueueManager {
   isShutdown(): boolean {
     return this.isShuttingDown;
   }
+
+  /**
+   * Get Redis connection (for compatibility)
+   */
+  getConnection() {
+    return (this as any).redisConnection;
+  }
 }
 
 // Singleton should be created after Redis is connected

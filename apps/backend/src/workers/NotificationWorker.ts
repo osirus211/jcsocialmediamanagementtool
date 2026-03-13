@@ -80,7 +80,7 @@ export class NotificationWorker {
       }
 
       // Send webhook notification
-      await webhookService.sendWebhook({
+      await webhookService.sendWebhookEvent({
         workspaceId,
         event: eventType,
         payload,

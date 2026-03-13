@@ -121,7 +121,7 @@ export class ClientPortalService {
     }).populate('socialAccountId', 'platform username profilePicture');
 
     // Get workspace branding
-    const workspace = review.workspaceId as IWorkspace;
+    const workspace = review.workspaceId as unknown as IWorkspace;
     const branding = workspace.clientPortal;
 
     // Increment view count if first view
@@ -247,7 +247,7 @@ export class ClientPortalService {
     // Hash password if provided
     if (portalPassword) {
       const hashedPassword = await bcrypt.hash(portalPassword, 10);
-      updates.portalPassword = hashedPassword;
+      (updates as any).portalPassword = hashedPassword;
     }
 
     // Update branding settings

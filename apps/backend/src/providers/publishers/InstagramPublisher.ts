@@ -18,7 +18,8 @@ export class InstagramPublisher extends BasePublisher {
   readonly platform = 'instagram';
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
-    const { content, mediaIds = [], post } = options;
+    const { content, mediaIds = [] } = options;
+    const post = (options as any).post;
 
     // Route based on content type
     if (post && 'contentType' in post) {
@@ -77,9 +78,10 @@ export class InstagramPublisher extends BasePublisher {
   }
 
   async publishStory(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
-    const { content, mediaIds = [], post } = options;
+    const { content, mediaIds = [] } = options;
+    const post = (options as any).post;
 
-    this.validateMediaCount(mediaIds, 1, 'Stories require exactly 1 media item');
+    this.validateMediaCount(mediaIds, 1);
 
     const accessToken = this.getAccessToken(account);
     const instagramAccountId = account.providerUserId;
@@ -142,9 +144,10 @@ export class InstagramPublisher extends BasePublisher {
   }
 
   async publishReel(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
-    const { content, mediaIds = [], post } = options;
+    const { content, mediaIds = [] } = options;
+    const post = (options as any).post;
 
-    this.validateMediaCount(mediaIds, 1, 'Reels require exactly 1 video');
+    this.validateMediaCount(mediaIds, 1);
 
     const accessToken = this.getAccessToken(account);
     const instagramAccountId = account.providerUserId;

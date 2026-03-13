@@ -93,7 +93,7 @@ export class FollowerAnalyticsService {
         .limit(limit)
         .lean();
 
-      return history as IFollowerHistory[];
+      return history as unknown as IFollowerHistory[];
     } catch (error: any) {
       logger.error('Get follower history error:', error);
       throw new Error(`Failed to get follower history: ${error.message}`);

@@ -1,9 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 import { logger } from '../utils/logger';
-import { config } from '../config';
 import { AppError } from '../utils/errors';
-import { config } from '../config';
 
 export const errorHandler = (
   err: Error,
@@ -96,4 +94,3 @@ export const errorHandler = (
     ...(!isProduction && { stack: err.stack }),
   });
 };
-

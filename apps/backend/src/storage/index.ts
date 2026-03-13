@@ -4,6 +4,8 @@
  * Exports storage providers and factory functions
  */
 
+import { config } from '../config';
+
 export { StorageProvider, UploadOptions, UploadResult } from './StorageProvider';
 export { LocalStorageProvider, createLocalStorageFromEnv } from './LocalStorageProvider';
 

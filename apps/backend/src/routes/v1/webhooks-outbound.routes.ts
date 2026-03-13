@@ -6,15 +6,17 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { authMiddleware } from '../../middleware/auth';
-import { validateRequest } from '../../middleware/validateRequest';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
 import { WebhookManagementService } from '../../services/WebhookManagementService';
 import { WebhookEventType } from '../../services/WebhookService';
 
 const router = Router();
 
-// Apply auth middleware to all routes
-router.use(authMiddleware);
+// Apply auth and workspace middleware to all routes
+router.use(requireAuth);
+router.use(requireWorkspace);
 
 // Validation schemas
 const createWebhookSchema = z.object({
@@ -23,7 +25,6 @@ const createWebhookSchema = z.object({
       message: 'URL must use HTTPS',
     }),
     events: z.array(z.nativeEnum(WebhookEventType)).min(1, 'At least one event must be selected'),
-    description: z.string().optional(),
   }),
 });
 
@@ -36,7 +37,6 @@ const updateWebhookSchema = z.object({
       message: 'URL must use HTTPS',
     }).optional(),
     events: z.array(z.nativeEnum(WebhookEventType)).min(1, 'At least one event must be selected').optional(),
-    description: z.string().optional(),
     enabled: z.boolean().optional(),
   }),
 });
@@ -51,10 +51,10 @@ const webhookParamsSchema = z.object({
  * GET /webhooks/outbound
  * List all outbound webhook endpoints for workspace
  */
-router.get('/', async (req, res) => {
+router.get('/', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
-    const webhooks = await WebhookManagementService.listEndpoints(workspaceId);
+    const { workspaceId } = req.workspace!;
+    const webhooks = await WebhookManagementService.listEndpoints(workspaceId.toString());
 
     // Don't expose secrets in list response
     const safeWebhooks = webhooks.map(webhook => ({
@@ -62,7 +62,6 @@ router.get('/', async (req, res) => {
       workspaceId: webhook.workspaceId,
       url: webhook.url,
       events: webhook.events,
-      description: webhook.description,
       enabled: webhook.enabled,
       lastTriggeredAt: webhook.lastTriggeredAt,
       successCount: webhook.successCount,
@@ -88,16 +87,15 @@ router.get('/', async (req, res) => {
  * POST /webhooks/outbound
  * Create new webhook endpoint
  */
-router.post('/', validateRequest(createWebhookSchema), async (req, res) => {
+router.post('/', validateRequest(createWebhookSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
-    const { url, events, description } = req.body;
+    const { workspaceId } = req.workspace!;
+    const { url, events } = req.body;
 
     const webhook = await WebhookManagementService.createEndpoint(
-      workspaceId,
+      workspaceId.toString(),
       url,
-      events,
-      description
+      events
     );
 
     res.status(201).json({
@@ -108,7 +106,6 @@ router.post('/', validateRequest(createWebhookSchema), async (req, res) => {
         url: webhook.url,
         secret: webhook.secret, // Include secret only on creation
         events: webhook.events,
-        description: webhook.description,
         enabled: webhook.enabled,
         successCount: webhook.successCount,
         failureCount: webhook.failureCount,
@@ -129,13 +126,13 @@ router.post('/', validateRequest(createWebhookSchema), async (req, res) => {
  * PATCH /webhooks/outbound/:id
  * Update webhook endpoint
  */
-router.patch('/:id', validateRequest(updateWebhookSchema), async (req, res) => {
+router.patch('/:id', validateRequest(updateWebhookSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
     const updates = req.body;
 
-    const webhook = await WebhookManagementService.updateEndpoint(id, workspaceId, updates);
+    const webhook = await WebhookManagementService.updateEndpoint(id, workspaceId.toString(), updates);
 
     res.json({
       success: true,
@@ -144,7 +141,6 @@ router.patch('/:id', validateRequest(updateWebhookSchema), async (req, res) => {
         workspaceId: webhook.workspaceId,
         url: webhook.url,
         events: webhook.events,
-        description: webhook.description,
         enabled: webhook.enabled,
         lastTriggeredAt: webhook.lastTriggeredAt,
         successCount: webhook.successCount,
@@ -167,12 +163,12 @@ router.patch('/:id', validateRequest(updateWebhookSchema), async (req, res) => {
  * DELETE /webhooks/outbound/:id
  * Delete webhook endpoint
  */
-router.delete('/:id', validateRequest(webhookParamsSchema), async (req, res) => {
+router.delete('/:id', validateRequest(webhookParamsSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
 
-    await WebhookManagementService.deleteEndpoint(id, workspaceId);
+    await WebhookManagementService.deleteEndpoint(id, workspaceId.toString());
 
     res.json({
       success: true,
@@ -192,12 +188,12 @@ router.delete('/:id', validateRequest(webhookParamsSchema), async (req, res) => 
  * POST /webhooks/outbound/:id/rotate-secret
  * Rotate webhook signing secret
  */
-router.post('/:id/rotate-secret', validateRequest(webhookParamsSchema), async (req, res) => {
+router.post('/:id/rotate-secret', validateRequest(webhookParamsSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
 
-    const result = await WebhookManagementService.rotateSecret(id, workspaceId);
+    const result = await WebhookManagementService.rotateSecret(id, workspaceId.toString());
 
     res.json({
       success: true,
@@ -217,12 +213,12 @@ router.post('/:id/rotate-secret', validateRequest(webhookParamsSchema), async (r
  * POST /webhooks/outbound/:id/test
  * Send test ping to webhook endpoint
  */
-router.post('/:id/test', validateRequest(webhookParamsSchema), async (req, res) => {
+router.post('/:id/test', validateRequest(webhookParamsSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
 
-    const result = await WebhookManagementService.testEndpoint(id, workspaceId);
+    const result = await WebhookManagementService.testEndpoint(id, workspaceId.toString());
 
     res.json({
       success: true,
@@ -242,16 +238,16 @@ router.post('/:id/test', validateRequest(webhookParamsSchema), async (req, res) 
  * GET /webhooks/outbound/:id/deliveries
  * Get delivery history for webhook endpoint
  */
-router.get('/:id/deliveries', validateRequest(webhookParamsSchema), async (req, res) => {
+router.get('/:id/deliveries', validateRequest(webhookParamsSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
     const { limit = 50, skip = 0, event, status } = req.query;
 
     // Import WebhookRetryService dynamically
     const { WebhookRetryService } = await import('../../services/WebhookRetryService');
 
-    const result = await WebhookRetryService.getDeliveryHistory(id, workspaceId, {
+    const result = await WebhookRetryService.getDeliveryHistory(id, workspaceId.toString(), {
       limit: parseInt(limit as string),
       skip: parseInt(skip as string),
       event: event as string,
@@ -284,20 +280,21 @@ router.get('/:id/deliveries', validateRequest(webhookParamsSchema), async (req, 
  * POST /webhooks/outbound/:id/retry
  * Retry failed webhook deliveries
  */
-router.post('/:id/retry', validateRequest(webhookParamsSchema), async (req, res) => {
+router.post('/:id/retry', validateRequest(webhookParamsSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.user.currentWorkspaceId;
+    const { workspaceId } = req.workspace!;
     const { id } = req.params;
 
     // Verify webhook exists and belongs to workspace
-    const webhook = await WebhookManagementService.listEndpoints(workspaceId);
+    const webhook = await WebhookManagementService.listEndpoints(workspaceId.toString());
     const targetWebhook = webhook.find(w => w._id.toString() === id);
 
     if (!targetWebhook) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: 'Webhook not found',
       });
+      return;
     }
 
     // Import services dynamically
@@ -318,7 +315,7 @@ router.post('/:id/retry', validateRequest(webhookParamsSchema), async (req, res)
       // Reset delivery for retry
       await queue.addDelivery({
         webhookId: id,
-        workspaceId,
+        workspaceId: workspaceId.toString(),
         event: delivery.event,
         payload: delivery.payload,
         url: delivery.url,

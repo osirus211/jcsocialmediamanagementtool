@@ -145,12 +145,12 @@ export class MediaProcessingWorker {
 
       // Mark processing as completed with processed data
       await mediaService.markProcessingCompleted(mediaId, {
-        width: processedData.width,
-        height: processedData.height,
-        duration: processedData.duration,
-        thumbnailUrl: processedData.thumbnailUrl,
+        width: (processedData.width as number) || 0,
+        height: (processedData.height as number) || 0,
+        duration: (processedData.duration as number) || 0,
+        thumbnailUrl: (processedData.thumbnailUrl as string) || '',
         metadata: {
-          ...processedData.metadata,
+          ...(processedData.metadata as Record<string, any> || {}),
           processedAt: new Date(),
           processingDuration: Date.now() - startTime,
         },
@@ -175,7 +175,7 @@ export class MediaProcessingWorker {
       const { mediaService } = await import('../services/MediaService');
 
       // Mark processing as failed
-      await mediaService.markProcessingFailed(mediaId, error.message);
+      await mediaService.markProcessingFailed(mediaId, error instanceof Error ? error.message : 'Unknown error');
 
       throw error;
     }
@@ -208,7 +208,7 @@ export class MediaProcessingWorker {
         fileUrl,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
-      throw new Error(`Failed to fetch media file: ${error.message}`);
+      throw new Error(`Failed to fetch media file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

@@ -135,7 +135,7 @@ router.get('/followers/workspace', async (req, res) => {
     });
 
     const { startDate, endDate } = schema.parse(req.query);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const growth = await FollowerAnalyticsService.getWorkspaceFollowerGrowth(workspaceId, startDate, endDate);
     
@@ -160,7 +160,7 @@ router.get('/hashtags', async (req, res) => {
     });
 
     const { startDate, endDate, limit } = schema.parse(req.query);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const hashtags = await HashtagAnalyticsService.getHashtagPerformance(workspaceId, startDate, endDate, limit);
     
@@ -185,7 +185,7 @@ router.get('/hashtags/trends', async (req, res) => {
     });
 
     const { hashtag, startDate, endDate } = schema.parse(req.query);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const trends = await HashtagAnalyticsService.getHashtagTrends(workspaceId, hashtag, startDate, endDate);
     
@@ -209,7 +209,7 @@ router.get('/hashtags/by-platform', async (req, res) => {
     });
 
     const { platform, limit } = schema.parse(req.query);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const hashtags = await HashtagAnalyticsService.getTopHashtagsByPlatform(workspaceId, platform, limit);
     
@@ -232,7 +232,7 @@ router.get('/hashtags/suggestions', async (req, res) => {
     });
 
     const { limit } = schema.parse(req.query);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const suggestions = await HashtagAnalyticsService.getHashtagSuggestions(workspaceId, limit);
     
@@ -254,7 +254,7 @@ router.get('/post/:postId/performance', async (req, res) => {
     });
 
     const { postId } = schema.parse(req.params);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const performance = await PostROIService.getPostPerformanceSummary(postId, workspaceId);
     
@@ -308,7 +308,7 @@ router.get('/posts/top', async (req, res) => {
     });
 
     const { sortBy, limit, startDate, endDate } = schema.parse(req.query);
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const posts = await PostROIService.getTopPerformingPosts(workspaceId, startDate, endDate, sortBy, limit);
     

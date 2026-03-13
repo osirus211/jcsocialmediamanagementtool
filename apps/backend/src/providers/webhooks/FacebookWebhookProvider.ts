@@ -7,11 +7,8 @@
 import { IncomingHttpHeaders } from 'http';
 import { config } from '../../config';
 import crypto from 'crypto';
-import { config } from '../../config';
 import { BaseWebhookProvider } from './BaseWebhookProvider';
-import { config } from '../../config';
 import { 
-import { config } from '../../config';
   WebhookEvent, 
   NormalizedWebhookEvent, 
   WebhookEventType,
@@ -19,9 +16,7 @@ import { config } from '../../config';
   WebhookPayloadError 
 } from '../../types/webhook.types';
 import { WebhookVerificationCache } from '../../services/WebhookVerificationCache';
-import { config } from '../../config';
 import { logger } from '../../utils/logger';
-import { config } from '../../config';
 
 export class FacebookWebhookProvider extends BaseWebhookProvider {
   readonly name = 'facebook';

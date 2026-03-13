@@ -11,7 +11,11 @@ export enum MemberRole {
   ADMIN = 'admin',
   EDITOR = 'editor',
   VIEWER = 'viewer',
+  MEMBER = 'member', // Add missing MEMBER role
 }
+
+// Alias for compatibility
+export const WorkspaceRole = MemberRole;
 
 export interface IWorkspaceMember extends Document {
   _id: mongoose.Types.ObjectId;

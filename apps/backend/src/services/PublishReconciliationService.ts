@@ -294,15 +294,15 @@ export class PublishReconciliationService {
       }
 
       // Query platform for post
-      const result = await provider.lookupPost({
+      const result = await (provider as any).lookupPost({
         accountId: account._id.toString(),
-        content: post.content,
+        platformPostId: post.platformPostId,
         publishedAfter: post.metadata?.publishAttemptedAt,
       });
 
       return {
-        exists: result.exists,
-        platformPostId: result.platformPostId,
+        exists: result.found,
+        platformPostId: result.post?.platformPostId,
       };
     } catch (error: any) {
       logger.error('Error querying platform for post', {

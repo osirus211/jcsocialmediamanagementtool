@@ -4,19 +4,14 @@
  * This file shows how to integrate Sentry into your Express application
  * 
  * IMPORTANT: This is an example file. Apply these changes to your actual server.ts
-import { config } from '../config';
  */
 
 import express, { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 import cors from 'cors';
-import { config } from '../config';
 import helmet from 'helmet';
-import { config } from '../config';
 import compression from 'compression';
-import { config } from '../config';
 import {
-import { config } from '../config';
   initializeSentry,
   sentryRequestHandler,
   sentryTracingHandler,

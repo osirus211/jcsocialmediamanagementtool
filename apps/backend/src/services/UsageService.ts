@@ -105,6 +105,18 @@ export class UsageService {
   }
 
   /**
+   * Increment accounts connected counter
+   */
+  async incrementAccounts(workspaceId: string | mongoose.Types.ObjectId): Promise<void> {
+    const objectId = typeof workspaceId === 'string' 
+      ? new mongoose.Types.ObjectId(workspaceId) 
+      : workspaceId;
+    const usage = await this.getCurrentUsage(objectId);
+    usage.channelsConnected += 1;
+    await usage.save();
+  }
+
+  /**
    * Increment API requests counter
    */
   async incrementApiRequests(workspaceId: mongoose.Types.ObjectId): Promise<void> {
@@ -295,6 +307,7 @@ export class UsageService {
       percentages,
     };
   }
+
 }
 
 export const usageService = new UsageService();

@@ -4,107 +4,101 @@
  * Request validation for draft endpoints
  */
 
-import Joi from 'joi';
+import { z } from 'zod';
 import { SocialPlatform } from '../models/ScheduledPost';
+
+export const createDraftSchema = z.object({
+  title: z.string().max(200).optional(),
+  content: z.string().max(10000),
+  platforms: z.array(z.nativeEnum(SocialPlatform)).optional(),
+  socialAccountIds: z.array(z.string()).optional(),
+  mediaUrls: z.array(z.string().url()).optional(),
+  mediaIds: z.array(z.string()).optional(),
+  scheduledAt: z.string().datetime().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const updateDraftSchema = z.object({
+  title: z.string().max(200).optional(),
+  content: z.string().max(10000).optional(),
+  platforms: z.array(z.nativeEnum(SocialPlatform)).optional(),
+  socialAccountIds: z.array(z.string()).optional(),
+  mediaUrls: z.array(z.string().url()).optional(),
+  mediaIds: z.array(z.string()).optional(),
+  scheduledAt: z.string().datetime().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const getDraftsSchema = z.object({
+  userId: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  sortBy: z.enum(['createdAt', 'updatedAt']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+});
+
+export const scheduleFromDraftSchema = z.object({
+  scheduledAt: z.string().datetime().refine((date) => new Date(date) > new Date(), {
+    message: "Scheduled date must be in the future"
+  }),
+});
 
 export const validateCreateDraft = [
   (req: any, res: any, next: any) => {
-    const schema = Joi.object({
-      title: Joi.string().max(200).optional(),
-      content: Joi.string().max(10000).required(),
-      platforms: Joi.array()
-        .items(Joi.string().valid(...Object.values(SocialPlatform)))
-        .optional(),
-      socialAccountIds: Joi.array().items(Joi.string()).optional(),
-      mediaUrls: Joi.array().items(Joi.string().uri()).optional(),
-      mediaIds: Joi.array().items(Joi.string()).optional(),
-      scheduledAt: Joi.date().iso().optional(),
-      metadata: Joi.object().optional(),
-    });
-
-    const { error } = schema.validate(req.body);
-
-    if (error) {
+    try {
+      createDraftSchema.parse(req.body);
+      next();
+    } catch (error: any) {
       return res.status(400).json({
         success: false,
         error: 'VALIDATION_ERROR',
-        message: error.details[0].message,
+        message: error.errors?.[0]?.message || 'Validation failed',
       });
     }
-
-    next();
   },
 ];
 
 export const validateUpdateDraft = [
   (req: any, res: any, next: any) => {
-    const schema = Joi.object({
-      title: Joi.string().max(200).optional(),
-      content: Joi.string().max(10000).optional(),
-      platforms: Joi.array()
-        .items(Joi.string().valid(...Object.values(SocialPlatform)))
-        .optional(),
-      socialAccountIds: Joi.array().items(Joi.string()).optional(),
-      mediaUrls: Joi.array().items(Joi.string().uri()).optional(),
-      mediaIds: Joi.array().items(Joi.string()).optional(),
-      scheduledAt: Joi.date().iso().optional(),
-      metadata: Joi.object().optional(),
-    });
-
-    const { error } = schema.validate(req.body);
-
-    if (error) {
+    try {
+      updateDraftSchema.parse(req.body);
+      next();
+    } catch (error: any) {
       return res.status(400).json({
         success: false,
         error: 'VALIDATION_ERROR',
-        message: error.details[0].message,
+        message: error.errors?.[0]?.message || 'Validation failed',
       });
     }
-
-    next();
   },
 ];
 
 export const validateGetDrafts = [
   (req: any, res: any, next: any) => {
-    const schema = Joi.object({
-      userId: Joi.string().optional(),
-      page: Joi.number().integer().min(1).optional(),
-      limit: Joi.number().integer().min(1).max(100).optional(),
-      sortBy: Joi.string().valid('createdAt', 'updatedAt').optional(),
-      sortOrder: Joi.string().valid('asc', 'desc').optional(),
-    });
-
-    const { error } = schema.validate(req.query);
-
-    if (error) {
+    try {
+      getDraftsSchema.parse(req.query);
+      next();
+    } catch (error: any) {
       return res.status(400).json({
         success: false,
         error: 'VALIDATION_ERROR',
-        message: error.details[0].message,
+        message: error.errors?.[0]?.message || 'Validation failed',
       });
     }
-
-    next();
   },
 ];
 
 export const validateScheduleFromDraft = [
   (req: any, res: any, next: any) => {
-    const schema = Joi.object({
-      scheduledAt: Joi.date().iso().greater('now').required(),
-    });
-
-    const { error } = schema.validate(req.body);
-
-    if (error) {
+    try {
+      scheduleFromDraftSchema.parse(req.body);
+      next();
+    } catch (error: any) {
       return res.status(400).json({
         success: false,
         error: 'VALIDATION_ERROR',
-        message: error.details[0].message,
+        message: error.errors?.[0]?.message || 'Validation failed',
       });
     }
-
-    next();
   },
 ];

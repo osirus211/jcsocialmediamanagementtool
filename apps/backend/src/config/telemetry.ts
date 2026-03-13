@@ -10,7 +10,7 @@
 
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { Resource } from '@opentelemetry/resources';
+import * as Resources from '@opentelemetry/resources';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
@@ -39,7 +39,7 @@ export function initTelemetry(): NodeSDK | null {
     });
 
     const sdk = new NodeSDK({
-      resource: new Resource({
+      resource: new (Resources as any).Resource({
         [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
         [SemanticResourceAttributes.SERVICE_VERSION]: SERVICE_VERSION,
         [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: config.env,

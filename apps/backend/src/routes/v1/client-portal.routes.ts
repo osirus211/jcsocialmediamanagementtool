@@ -10,7 +10,7 @@ import { ClientPortalService } from '../../services/ClientPortalService';
 import { ClientReviewStatus } from '../../models/ClientReview';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { sendSuccess, sendValidationError } from '../../utils/response';
+import { sendSuccess, sendValidationError } from '../../utils/apiResponse';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
 
@@ -140,12 +140,12 @@ router.post('/reviews', requireAuth, requireWorkspace, validateCreateReview, asy
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return sendValidationError(res, errors.array());
+      return sendValidationError(res, errors.array() as any);
     }
 
     const { name, postIds, clientEmail, clientName, expiresInDays } = req.body;
-    const workspaceId = req.workspace!._id;
-    const createdBy = req.user!._id;
+    const workspaceId = req.workspace!.workspaceId;
+    const createdBy = (req.user as any).userId;
 
     const review = await clientPortalService.createReview({
       workspaceId,
@@ -198,7 +198,7 @@ router.post('/reviews', requireAuth, requireWorkspace, validateCreateReview, asy
 router.get('/reviews', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const { status, page, limit } = req.query;
-    const workspaceId = req.workspace!._id;
+    const workspaceId = req.workspace!.workspaceId;
 
     const result = await clientPortalService.listReviews({
       workspaceId,
@@ -235,7 +235,7 @@ router.get('/reviews', requireAuth, requireWorkspace, async (req, res, next) => 
 router.delete('/reviews/:id', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const reviewId = new mongoose.Types.ObjectId(req.params.id);
-    const workspaceId = req.workspace!._id;
+    const workspaceId = req.workspace!.workspaceId;
 
     await clientPortalService.deleteReview({ reviewId, workspaceId });
 
@@ -261,7 +261,7 @@ router.delete('/reviews/:id', requireAuth, requireWorkspace, async (req, res, ne
 router.get('/branding', requireAuth, requireWorkspace, async (req, res, next) => {
   try {
     const workspace = req.workspace!;
-    sendSuccess(res, { branding: workspace.clientPortal });
+    sendSuccess(res, { branding: (workspace as any).clientPortal });
   } catch (error: any) {
     logger.error('Get branding error:', error);
     next(error);
@@ -307,10 +307,10 @@ router.patch('/branding', requireAuth, requireWorkspace, validateBranding, async
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return sendValidationError(res, errors.array());
+      return sendValidationError(res, errors.array() as any);
     }
 
-    const workspaceId = req.workspace!._id;
+    const workspaceId = req.workspace!.workspaceId;
     const updates = req.body;
 
     const workspace = await clientPortalService.updateBranding({
@@ -389,7 +389,7 @@ router.post('/review/:token/feedback', validateFeedback, async (req, res, next) 
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return sendValidationError(res, errors.array());
+      return sendValidationError(res, errors.array() as any);
     }
 
     const { token } = req.params;

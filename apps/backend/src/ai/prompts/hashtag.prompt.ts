@@ -9,6 +9,12 @@ const PLATFORM_HASHTAG_GUIDELINES: Record<SocialPlatform, string> = {
   [SocialPlatform.LINKEDIN]: '3-5 professional hashtags (LinkedIn favors quality over quantity)',
   [SocialPlatform.FACEBOOK]: '2-3 hashtags (Facebook posts work well with minimal hashtags)',
   [SocialPlatform.INSTAGRAM]: '10-15 hashtags (Instagram allows and benefits from more hashtags)',
+  [SocialPlatform.YOUTUBE]: '5-8 hashtags (YouTube supports hashtags in descriptions)',
+  [SocialPlatform.THREADS]: '2-4 hashtags (Threads follows Twitter-like conventions)',
+  [SocialPlatform.BLUESKY]: '2-3 hashtags (Bluesky prefers minimal hashtag usage)',
+  [SocialPlatform.GOOGLE_BUSINESS]: '3-5 hashtags (Google Business posts benefit from local hashtags)',
+  [SocialPlatform.TIKTOK]: '5-10 hashtags (TikTok thrives on trending and niche hashtags)',
+  [SocialPlatform.PINTEREST]: '8-12 hashtags (Pinterest benefits from descriptive hashtags)',
 };
 
 export function buildHashtagPrompt(input: HashtagGenerationInput): string {
@@ -49,6 +55,18 @@ function getDefaultHashtagCount(platform: SocialPlatform): number {
       return 3;
     case SocialPlatform.INSTAGRAM:
       return 12;
+    case SocialPlatform.YOUTUBE:
+      return 6;
+    case SocialPlatform.THREADS:
+      return 3;
+    case SocialPlatform.BLUESKY:
+      return 3;
+    case SocialPlatform.GOOGLE_BUSINESS:
+      return 4;
+    case SocialPlatform.TIKTOK:
+      return 7;
+    case SocialPlatform.PINTEREST:
+      return 10;
     default:
       return 5;
   }

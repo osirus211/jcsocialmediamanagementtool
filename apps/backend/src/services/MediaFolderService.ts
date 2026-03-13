@@ -113,7 +113,7 @@ export class MediaFolderService {
         .sort({ name: 1 })
         .lean();
 
-      return folders as IMediaFolder[];
+      return folders as unknown as IMediaFolder[];
     } catch (error: any) {
       logger.error('Failed to get media folders', {
         workspaceId,

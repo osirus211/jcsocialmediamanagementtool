@@ -38,6 +38,7 @@ import { assertNoDuplicateAccount } from '../../utils/duplicateAccountPrevention
 import { validateTokenExpiration } from '../../utils/expirationGuard';
 import { distributedLockService } from '../DistributedLockService';
 import { logger } from '../../utils/logger';
+import { config } from '../../config';
 import mongoose from 'mongoose';
 
 export interface TikTokConnectParams {
@@ -105,10 +106,11 @@ export class TikTokOAuthService {
       });
 
       // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({
-        code: params.code,
-        state: params.state,
-      });
+      const tokens = await this.provider.exchangeCodeForToken(
+        params.code,
+        `${config.frontend.url}/api/v1/channels/oauth/callback/tiktok`,
+        params.state
+      );
 
       // Validate token expiration
       validateTokenExpiration(tokens.expiresAt, 'TikTok token exchange');
@@ -121,7 +123,7 @@ export class TikTokOAuthService {
 
       logger.info('TikTok token exchange successful', {
         hasRefreshToken: !!tokens.refreshToken,
-        expiresIn: tokens.expiresIn,
+        expiresAt: tokens.expiresAt,
       });
 
       // Step 2: Get TikTok user profile
@@ -247,7 +249,7 @@ export class TikTokOAuthService {
       logger.info('Refreshing TikTok token', { accountId });
 
       // Acquire distributed lock
-      const lockAcquired = await distributedLockService.acquireLock(lockKey, 300); // 5 min TTL
+      const lockAcquired = await distributedLockService.acquireLock(lockKey, { ttl: 300 } as any); // 5 min TTL
       
       if (!lockAcquired) {
         logger.warn('Failed to acquire lock - another worker processing', {
@@ -275,9 +277,7 @@ export class TikTokOAuthService {
         }
 
         // Refresh token
-        const tokens = await this.provider.refreshAccessToken({
-          refreshToken,
-        });
+        const tokens = await this.provider.refreshAccessToken(refreshToken);
 
         // Update account
         account.accessToken = tokens.accessToken; // Will be encrypted by pre-save hook
@@ -307,7 +307,7 @@ export class TikTokOAuthService {
         });
       } finally {
         // Release lock
-        await distributedLockService.releaseLock(lockKey);
+        await distributedLockService.releaseLock(lockKey as any);
       }
     } catch (error: any) {
       logger.error('Failed to refresh TikTok token', {
@@ -316,7 +316,7 @@ export class TikTokOAuthService {
       });
 
       // Release lock on error
-      await distributedLockService.releaseLock(lockKey);
+      await distributedLockService.releaseLock(lockKey as any);
 
       // Update account status
       const account = await SocialAccount.findById(accountId);

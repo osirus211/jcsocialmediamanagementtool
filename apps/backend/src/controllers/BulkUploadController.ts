@@ -40,7 +40,7 @@ export class BulkUploadController {
 
       res.status(201).json({
         success: true,
-        data: job.toJSON(),
+        data: (job as any).toJSON(),
       });
     } catch (error) {
       next(error);
@@ -68,7 +68,7 @@ export class BulkUploadController {
 
       res.status(200).json({
         success: true,
-        data: job.toJSON(),
+        data: (job as any).toJSON(),
       });
     } catch (error) {
       next(error);
@@ -91,7 +91,7 @@ export class BulkUploadController {
 
       res.status(200).json({
         success: true,
-        data: jobs.map(j => j.toJSON()),
+        data: jobs.map(j => (j as any).toJSON()),
       });
     } catch (error) {
       next(error);

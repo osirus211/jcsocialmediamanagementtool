@@ -7,6 +7,7 @@
 import mongoose from 'mongoose';
 import { SystemEvent } from './EventService';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 // Email service interface (can be implemented with SendGrid, AWS SES, etc.)
 interface EmailProvider {
@@ -214,6 +215,110 @@ export class EmailNotificationService {
     // TODO: Query user email from database
     // For now, return placeholder
     return 'user@example.com';
+  }
+
+  /**
+   * Send OAuth expired notification
+   */
+  async sendOAuthExpired(params: {
+    to: string;
+    platform: string;
+    reconnectUrl: string;
+    userId: string;
+    workspaceId: string;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: `${params.platform} Connection Expired`,
+        html: `
+          <h2>Connection Expired</h2>
+          <p>Your <strong>${params.platform}</strong> connection has expired.</p>
+          <p>Please reconnect your account to continue publishing posts.</p>
+          <a href="${params.reconnectUrl}" style="background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reconnect Account</a>
+        `,
+        text: `Your ${params.platform} connection has expired. Please reconnect your account to continue publishing. Visit: ${params.reconnectUrl}`,
+      });
+
+      logger.info('OAuth expired email sent', {
+        to: params.to,
+        platform: params.platform,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send OAuth expired email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send post success notification
+   */
+  async sendPostSuccess(params: {
+    to: string;
+    platform: string;
+    postId: string;
+    content: string;
+    publishedAt: Date;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: `Post Published Successfully to ${params.platform}`,
+        html: `
+          <h2>Post Published Successfully</h2>
+          <p>Your post has been published to <strong>${params.platform}</strong>.</p>
+          <p><strong>Content:</strong> ${params.content.substring(0, 200)}${params.content.length > 200 ? '...' : ''}</p>
+          <p><strong>Published at:</strong> ${params.publishedAt.toLocaleString()}</p>
+        `,
+        text: `Your post has been published successfully to ${params.platform}. Content: ${params.content}`,
+      });
+
+      logger.info('Post success email sent', {
+        to: params.to,
+        platform: params.platform,
+        postId: params.postId,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send post success email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send post failure notification
+   */
+  async sendPostFailure(params: {
+    to: string;
+    platform: string;
+    postId: string;
+    content: string;
+    error: string;
+    failedAt: Date;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: `Post Failed to Publish to ${params.platform}`,
+        html: `
+          <h2>Post Publishing Failed</h2>
+          <p>Your post failed to publish to <strong>${params.platform}</strong>.</p>
+          <p><strong>Content:</strong> ${params.content.substring(0, 200)}${params.content.length > 200 ? '...' : ''}</p>
+          <p><strong>Error:</strong> ${params.error}</p>
+          <p><strong>Failed at:</strong> ${params.failedAt.toLocaleString()}</p>
+          <p>Please check your connection and try again.</p>
+        `,
+        text: `Your post failed to publish to ${params.platform}. Error: ${params.error}. Please check your connection and try again.`,
+      });
+
+      logger.info('Post failure email sent', {
+        to: params.to,
+        platform: params.platform,
+        postId: params.postId,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send post failure email:', error);
+      throw error;
+    }
   }
 }
 

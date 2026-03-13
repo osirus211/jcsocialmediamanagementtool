@@ -31,6 +31,7 @@
  */
 
 import { getRedisClientSafe, recordCircuitBreakerSuccess, recordCircuitBreakerError } from '../config/redis';
+import { config } from '../config';
 import { logger } from '../utils/logger';
 import { randomBytes } from 'crypto';
 import {
@@ -50,6 +51,7 @@ export interface Lock {
   value: string;
   acquiredAt: Date;
   ttl: number;
+  expiresAt: Date;
 }
 
 export interface LockMetrics {
@@ -142,6 +144,7 @@ export class DistributedLockService {
         value: 'disabled',
         acquiredAt: new Date(),
         ttl,
+        expiresAt: new Date(Date.now() + ttl),
       };
       this.metrics.acquisitions.success++;
       return dummyLock;
@@ -205,6 +208,7 @@ export class DistributedLockService {
             value: 'fallback',
             acquiredAt: new Date(),
             ttl,
+            expiresAt: new Date(Date.now() + ttl),
           };
           this.metrics.acquisitions.success++;
           return fallbackLock;
@@ -248,6 +252,7 @@ export class DistributedLockService {
           value,
           acquiredAt: new Date(),
           ttl,
+          expiresAt: new Date(Date.now() + ttl),
         };
       }
       
@@ -417,6 +422,44 @@ export class DistributedLockService {
         holdDurationMs: [],
       },
     };
+  }
+
+  /**
+   * Alias for acquire method (for compatibility)
+   */
+  async acquireLock(key: string, options?: LockOptions): Promise<Lock> {
+    return this.acquire(key, options);
+  }
+
+  /**
+   * Alias for release method (for compatibility)
+   */
+  async releaseLock(lock: Lock): Promise<void> {
+    return this.release(lock);
+  }
+
+  /**
+   * Renew lock TTL (extend expiration)
+   */
+  async renewLock(lock: Lock, ttl: number): Promise<boolean> {
+    try {
+      const redisClient = getRedisClientSafe();
+      if (!redisClient) {
+        logger.warn('Redis client not available for lock renewal', { key: lock.key });
+        return false;
+      }
+      
+      const result = await redisClient.expire(lock.key, Math.ceil(ttl / 1000));
+      if (result === 1) {
+        lock.expiresAt = new Date(Date.now() + ttl);
+        logger.debug('Lock renewed', { key: lock.key, ttl });
+        return true;
+      }
+      return false;
+    } catch (error: any) {
+      logger.error('Failed to renew lock', { key: lock.key, error: error.message });
+      return false;
+    }
   }
 }
 

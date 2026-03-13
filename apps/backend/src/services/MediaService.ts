@@ -277,7 +277,7 @@ export class MediaService {
       });
 
       return {
-        media: media as IMedia[],
+        media: media as unknown as IMedia[],
         total,
         hasMore,
       };
@@ -658,7 +658,7 @@ export class MediaService {
         requestedIds: mediaIds?.length || 0,
       });
 
-      return media as IMedia[];
+      return media as unknown as IMedia[];
     } catch (error: any) {
       logger.error('Failed to get ready media', {
         workspaceId,
@@ -667,10 +667,6 @@ export class MediaService {
       throw new Error(`Failed to get ready media: ${error.message}`);
     }
   }
-}
-
-// Export singleton instance
-export const mediaService = MediaService.getInstance();
 
   /**
    * Move media to folder (Phase-2)
@@ -770,3 +766,7 @@ export const mediaService = MediaService.getInstance();
       throw new Error(`Failed to update media tags: ${error.message}`);
     }
   }
+}
+
+// Export singleton instance
+export const mediaService = MediaService.getInstance();

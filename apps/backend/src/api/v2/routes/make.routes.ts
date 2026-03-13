@@ -100,7 +100,7 @@ router.post('/hooks/register', requireScope('webhooks:write'), async (req, res, 
 /**
  * DELETE /v2/make/hooks/:hookId - Unregister webhook
  */
-router.delete('/hooks/:hookId', requireScope('webhooks:write'), async (req, res, next) => {
+router.delete('/hooks/:hookId', requireScope('webhooks:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const hookId = req.params.hookId;
@@ -111,10 +111,11 @@ router.delete('/hooks/:hookId', requireScope('webhooks:write'), async (req, res,
     });
     
     if (!webhook) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Webhook not found',
         code: 'WEBHOOK_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Make.com webhook unregistered', {
@@ -127,6 +128,7 @@ router.delete('/hooks/:hookId', requireScope('webhooks:write'), async (req, res,
       hookId,
       status: 'unregistered',
     });
+    return;
   } catch (error) {
     next(error);
   }
@@ -241,7 +243,7 @@ router.post('/actions/upload-media', requireScope('media:write'), async (req, re
 /**
  * POST /v2/make/actions/approve-post - Approve a pending post
  */
-router.post('/actions/approve-post', requireScope('posts:write'), async (req, res, next) => {
+router.post('/actions/approve-post', requireScope('posts:write'), async (req, res, next): Promise<void> => {
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const data = ApprovePostSchema.parse(req.body);
@@ -249,10 +251,11 @@ router.post('/actions/approve-post', requireScope('posts:write'), async (req, re
     const post = await AutomationService.approvePost(workspaceId, data.postId);
     
     if (!post) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Post not found',
         code: 'POST_NOT_FOUND',
       });
+      return;
     }
     
     logger.info('Post approved via Make.com', {
@@ -265,6 +268,7 @@ router.post('/actions/approve-post', requireScope('posts:write'), async (req, re
       approved: true,
       approvedAt: new Date().toISOString(),
     });
+    return;
   } catch (error) {
     next(error);
   }

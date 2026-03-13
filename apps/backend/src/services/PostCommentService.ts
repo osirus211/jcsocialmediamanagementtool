@@ -45,12 +45,12 @@ export class PostCommentService {
           ...comment,
           authorId: {
             _id: comment.authorId._id.toString(),
-            firstName: comment.authorId.firstName,
-            lastName: comment.authorId.lastName,
-            avatar: comment.authorId.avatar,
+            firstName: (comment.authorId as any).firstName,
+            lastName: (comment.authorId as any).lastName,
+            avatar: (comment.authorId as any).avatar,
           },
           replies: [],
-        };
+        } as unknown as PopulatedComment;
         commentMap.set(comment._id.toString(), populatedComment);
       }
 
@@ -135,7 +135,7 @@ export class PostCommentService {
       // Send mention notifications
       for (const mentionedUserId of mentionUserIds) {
         if (mentionedUserId.toString() !== authorId) {
-          await notificationQueue.add('notification', {
+          await (notificationQueue as any).add('notification', {
             eventType: SystemEvent.MENTION_IN_COMMENT,
             workspaceId,
             userId: mentionedUserId.toString(),
@@ -150,7 +150,7 @@ export class PostCommentService {
       }
 
       // Send comment notification to post author (if different from comment author)
-      await notificationQueue.add('notification', {
+      await (notificationQueue as any).add('notification', {
         eventType: SystemEvent.COMMENT_ADDED,
         workspaceId,
         userId: authorId, // This will be filtered out in notification service if same as author

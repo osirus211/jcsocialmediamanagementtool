@@ -196,7 +196,7 @@ export class FacebookTokenRefreshWorker {
       // Acquire distributed lock (only one worker per workspace)
       lock = await distributedLockService.acquireLock(lockResource, {
         ttl: this.LOCK_TTL,
-        retryAttempts: 3,
+        retryCount: 3,
         retryDelay: 100,
       });
 
@@ -253,17 +253,18 @@ export class FacebookTokenRefreshWorker {
 
       // Release lock with ownership verification
       if (lock) {
-        const released = await distributedLockService.releaseLock(lock);
-        if (!released) {
-          logger.error('Failed to release lock (ownership verification failed)', {
-            accountId: account._id,
-            workspaceId: account.workspaceId,
-            lockResource,
-          });
-        } else {
+        try {
+          await distributedLockService.releaseLock(lock);
           logger.info('Lock released for Facebook refresh', {
             accountId: account._id,
             workspaceId: account.workspaceId,
+          });
+        } catch (error: any) {
+          logger.error('Failed to release lock', {
+            accountId: account._id,
+            workspaceId: account.workspaceId,
+            lockResource,
+            error: error.message,
           });
         }
       }

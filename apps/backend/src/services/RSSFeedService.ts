@@ -440,9 +440,9 @@ export class RSSFeedService {
           
           const result = await aiModule.caption.generateCaption({
             topic: context,
-            tone: options.tone || 'professional',
-            platform: 'linkedin', // Default platform for content generation
-            length: 'medium',
+            tone: (options.tone || 'professional') as any,
+            platform: 'linkedin' as any,
+            length: 'medium' as any,
             context: `RSS article: ${feedItem.title}`,
           });
 
@@ -472,7 +472,7 @@ export class RSSFeedService {
         contentType: 'post' as const,
       };
 
-      const draft = await PostService.prototype.createPost(draftInput);
+      const draft = await PostService.prototype.createPost(draftInput as any);
 
       logger.info('RSS item converted to draft successfully', {
         itemId: feedItem._id,

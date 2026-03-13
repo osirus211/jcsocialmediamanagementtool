@@ -117,7 +117,7 @@ export class CompetitorAnalyticsService {
         .sort({ createdAt: -1 })
         .lean();
 
-      return competitors as ICompetitorAccount[];
+      return competitors as unknown as ICompetitorAccount[];
     } catch (error: any) {
       logger.error('Get competitors error:', error);
       throw new Error(`Failed to get competitors: ${error.message}`);
@@ -167,7 +167,7 @@ export class CompetitorAnalyticsService {
       // Fire webhook event for competitor metrics update
       try {
         const { webhookService, WebhookEventType } = await import('./WebhookService');
-        await webhookService.sendWebhook({
+        await webhookService.sendWebhookEvent({
           workspaceId,
           event: WebhookEventType.COMPETITOR_UPDATED,
           payload: {
@@ -222,7 +222,7 @@ export class CompetitorAnalyticsService {
         .limit(limit)
         .lean();
 
-      return metrics as ICompetitorMetrics[];
+      return metrics as unknown as ICompetitorMetrics[];
     } catch (error: any) {
       logger.error('Get competitor metrics error:', error);
       throw new Error(`Failed to get competitor metrics: ${error.message}`);
@@ -240,7 +240,7 @@ export class CompetitorAnalyticsService {
         .sort({ collectedAt: -1 })
         .lean();
 
-      return latest as ICompetitorMetrics | null;
+      return latest as unknown as ICompetitorMetrics | null;
     } catch (error: any) {
       logger.error('Get latest competitor metrics error:', error);
       return null;

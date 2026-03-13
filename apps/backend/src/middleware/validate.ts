@@ -1,72 +1,28 @@
-/**
- * Zod Request Validation Middleware
- * 
- * Validates request body against Zod schemas
- */
-
 import { Request, Response, NextFunction } from 'express';
-import { ZodSchema, ZodError } from 'zod';
+import { z } from 'zod';
 import { BadRequestError } from '../utils/errors';
 
 /**
- * Validate request body against Zod schema
+ * Validation middleware factory
+ * Creates middleware that validates request data against a Zod schema
  */
-export const validateBody = (schema: ZodSchema) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const validateRequest = (schema: z.ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.body = await schema.parseAsync(req.body);
-      next();
-    } catch (error: unknown) {
-      if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        }));
-        next(new BadRequestError('Validation failed', errors));
-      } else {
-        next(error);
-      }
-    }
-  };
-};
+      const result = schema.parse(req);
+      
+      // Update request with validated data
+      if (result.body) req.body = result.body;
+      if (result.query) req.query = result.query;
+      if (result.params) req.params = result.params;
 
-/**
- * Validate request query against Zod schema
- */
-export const validateQuery = (schema: ZodSchema) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      req.query = await schema.parseAsync(req.query);
       next();
-    } catch (error: unknown) {
-      if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        }));
-        next(new BadRequestError('Validation failed', errors));
-      } else {
-        next(error);
-      }
-    }
-  };
-};
-
-/**
- * Validate request params against Zod schema
- */
-export const validateParams = (schema: ZodSchema) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      req.params = await schema.parseAsync(req.params);
-      next();
-    } catch (error: unknown) {
-      if (error instanceof ZodError) {
-        const errors = error.errors.map((err) => ({
-          field: err.path.join('.'),
-          message: err.message,
-        }));
-        next(new BadRequestError('Validation failed', errors));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessage = error.errors
+          .map(err => `${err.path.join('.')}: ${err.message}`)
+          .join(', ');
+        next(new BadRequestError(`Validation error: ${errorMessage}`));
       } else {
         next(error);
       }

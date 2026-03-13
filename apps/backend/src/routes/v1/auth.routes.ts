@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from '../../controllers/AuthController';
 import { requireAuth } from '../../middleware/auth';
-import { validate, sanitizeInput } from '../../middleware/validate';
+import { validateRequest } from '../../middleware/validate';
 import { getCsrfToken } from '../../middleware/csrf';
 import {
   authRateLimiter,
@@ -31,8 +31,7 @@ router.get('/csrf-token', getCsrfToken);
 router.post(
   '/register',
   registrationRateLimiter,
-  sanitizeInput,
-  validate(registerSchema),
+  validateRequest(registerSchema),
   AuthController.register
 );
 
@@ -40,16 +39,14 @@ router.post(
 router.post(
   '/login',
   authRateLimiter,
-  sanitizeInput,
-  validate(loginSchema),
+  validateRequest(loginSchema),
   AuthController.login
 );
 
 // Refresh access token
 router.post(
   '/refresh',
-  sanitizeInput,
-  validate(refreshTokenSchema),
+  validateRequest(refreshTokenSchema),
   AuthController.refreshToken
 );
 
@@ -57,8 +54,7 @@ router.post(
 router.post(
   '/forgot-password',
   passwordResetRateLimiter,
-  sanitizeInput,
-  validate(requestPasswordResetSchema),
+  validateRequest(requestPasswordResetSchema),
   AuthController.requestPasswordReset
 );
 
@@ -66,8 +62,7 @@ router.post(
 router.post(
   '/reset-password',
   passwordResetRateLimiter,
-  sanitizeInput,
-  validate(resetPasswordSchema),
+  validateRequest(resetPasswordSchema),
   AuthController.resetPassword
 );
 
@@ -88,8 +83,7 @@ router.post('/logout-all', requireAuth, AuthController.logoutAll);
 router.post(
   '/change-password',
   requireAuth,
-  sanitizeInput,
-  validate(changePasswordSchema),
+  validateRequest(changePasswordSchema),
   AuthController.changePassword
 );
 
@@ -97,8 +91,7 @@ router.post(
 router.post(
   '/verify-email',
   requireAuth,
-  sanitizeInput,
-  validate(verifyEmailSchema),
+  validateRequest(verifyEmailSchema),
   AuthController.verifyEmail
 );
 

@@ -92,7 +92,7 @@ export class GoogleBusinessProvider extends OAuthProvider {
     }
   }
 
-  async exchangeCodeForToken(params: OAuthCallbackParams): Promise<OAuthTokens> {
+  async exchangeCodeForTokenLegacy(params: OAuthCallbackParams): Promise<OAuthTokens> {
     try {
       logger.debug('Exchanging code for Google Business Profile token', {
         step: 'token-exchange',
@@ -160,7 +160,7 @@ export class GoogleBusinessProvider extends OAuthProvider {
     }
   }
 
-  async refreshAccessToken(params: OAuthRefreshParams): Promise<OAuthTokens> {
+  async refreshAccessTokenLegacy(params: OAuthRefreshParams): Promise<OAuthTokens> {
     try {
       logger.debug('Refreshing Google Business Profile token', {
         step: 'token-refresh',
@@ -435,5 +435,29 @@ export class GoogleBusinessProvider extends OAuthProvider {
         provider: 'GoogleBusinessProvider',
       });
     }
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    try {
+      await this.getUserProfile(accessToken);
+      return { valid: true, missingPermissions: [] };
+    } catch {
+      return { valid: false, missingPermissions: this.scopes };
+    }
+  }
+
+  getCapabilities(accountType?: string): any {
+    return {
+      supportsPublishing: true,
+      supportsScheduling: false,
+      supportsAnalytics: true,
+      maxTextLength: 1500,
+      supportedMediaTypes: ['image/jpeg', 'image/png'],
+    };
   }
 }

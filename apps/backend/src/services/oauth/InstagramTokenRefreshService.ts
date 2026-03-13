@@ -54,7 +54,7 @@ export class InstagramTokenRefreshService {
       const currentToken = account.getDecryptedAccessToken();
 
       // Refresh token
-      const tokens = await provider.refreshAccessToken({
+      const tokens = await provider.refreshAccessTokenLegacy({
         refreshToken: currentToken, // Instagram uses current token for refresh
       });
 
@@ -113,7 +113,7 @@ export class InstagramTokenRefreshService {
       const currentToken = account.getDecryptedAccessToken();
 
       // Refresh token
-      const tokens = await provider.refreshAccessToken({
+      const tokens = await provider.refreshAccessTokenLegacy({
         refreshToken: currentToken, // Instagram uses current token for refresh
       });
 

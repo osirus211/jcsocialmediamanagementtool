@@ -421,7 +421,6 @@ export class TikTokProvider extends OAuthProvider {
 
     return error.message || 'Unknown error';
   }
-}
 
   /**
    * Discover TikTok creator account (PlatformAdapter interface)

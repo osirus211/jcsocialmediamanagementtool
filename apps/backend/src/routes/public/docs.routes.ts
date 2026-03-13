@@ -6,7 +6,7 @@
 
 import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
-import YAML from 'yamljs';
+const YAML = require('yamljs');
 import path from 'path';
 import { fileURLToPath } from 'url';
 

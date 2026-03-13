@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { AccountPermissionService } from '../../services/AccountPermissionService';
 import { requireAdminOrOwner } from '../../middleware/rbac';
-import { validateRequest } from '../../middleware/validation';
+import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 
 const router = Router();
@@ -33,17 +33,18 @@ const bulkSetPermissionsSchema = z.object({
  * GET /account-permissions/:userId
  * Get all account permissions for a member
  */
-router.get('/:userId', requireAdminOrOwner, async (req, res) => {
+router.get('/:userId', requireAdminOrOwner, async (req, res): Promise<void> => {
   try {
     const { userId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
 
     if (!workspaceId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context required',
       });
+      return;
     }
 
     const permissions = await AccountPermissionService.getAccountPermissions(
@@ -77,26 +78,28 @@ router.put(
   '/:userId/:socialAccountId',
   requireAdminOrOwner,
   validateRequest(setPermissionSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const { userId, socialAccountId } = req.params;
       const workspaceId = req.workspace?.workspaceId?.toString();
       const grantedBy = req.user?.userId;
 
       if (!workspaceId) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'BAD_REQUEST',
           message: 'Workspace context required',
         });
+        return;
       }
 
       if (!grantedBy) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'UNAUTHORIZED',
           message: 'Authentication required',
         });
+        return;
       }
 
       const permission = await AccountPermissionService.setAccountPermission(
@@ -131,17 +134,18 @@ router.put(
  * DELETE /account-permissions/:userId/:socialAccountId
  * Remove custom permissions (revert to default)
  */
-router.delete('/:userId/:socialAccountId', requireAdminOrOwner, async (req, res) => {
+router.delete('/:userId/:socialAccountId', requireAdminOrOwner, async (req, res): Promise<void> => {
   try {
     const { userId, socialAccountId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
 
     if (!workspaceId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context required',
       });
+      return;
     }
 
     await AccountPermissionService.removeAccountPermission(
@@ -173,17 +177,18 @@ router.delete('/:userId/:socialAccountId', requireAdminOrOwner, async (req, res)
  * GET /account-permissions/:userId/effective
  * Get effective permissions summary
  */
-router.get('/:userId/effective', requireAdminOrOwner, async (req, res) => {
+router.get('/:userId/effective', requireAdminOrOwner, async (req, res): Promise<void> => {
   try {
     const { userId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
 
     if (!workspaceId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'BAD_REQUEST',
         message: 'Workspace context required',
       });
+      return;
     }
 
     const permissions = await AccountPermissionService.getWorkspaceMemberPermissions(
@@ -192,11 +197,12 @@ router.get('/:userId/effective', requireAdminOrOwner, async (req, res) => {
     );
 
     if (!permissions) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'NOT_FOUND',
         message: 'Member not found in workspace',
       });
+      return;
     }
 
     res.json({
@@ -225,7 +231,7 @@ router.post(
   '/:userId/bulk',
   requireAdminOrOwner,
   validateRequest(bulkSetPermissionsSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const { userId } = req.params;
       const { permissions } = req.body;
@@ -233,19 +239,21 @@ router.post(
       const grantedBy = req.user?.userId;
 
       if (!workspaceId) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'BAD_REQUEST',
           message: 'Workspace context required',
         });
+        return;
       }
 
       if (!grantedBy) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'UNAUTHORIZED',
           message: 'Authentication required',
         });
+        return;
       }
 
       const results = await AccountPermissionService.bulkSetPermissions(

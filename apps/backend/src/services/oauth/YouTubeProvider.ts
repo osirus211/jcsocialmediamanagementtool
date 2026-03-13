@@ -68,7 +68,7 @@ export class YouTubeProvider extends OAuthProvider {
     }
   }
 
-  async exchangeCodeForToken(params: OAuthCallbackParams): Promise<OAuthTokens> {
+  async exchangeCodeForTokenLegacy(params: OAuthCallbackParams): Promise<OAuthTokens> {
     try {
       logger.debug('Exchanging code for YouTube token', {
         step: 'token-exchange',
@@ -130,7 +130,7 @@ export class YouTubeProvider extends OAuthProvider {
     }
   }
 
-  async refreshAccessToken(params: OAuthRefreshParams): Promise<OAuthTokens> {
+  async refreshAccessTokenLegacy(params: OAuthRefreshParams): Promise<OAuthTokens> {
     try {
       logger.debug('Refreshing YouTube token', {
         step: 'token-refresh',
@@ -276,5 +276,29 @@ export class YouTubeProvider extends OAuthProvider {
         provider: 'YouTubeProvider',
       });
     }
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    try {
+      await this.getUserProfile(accessToken);
+      return { valid: true, missingPermissions: [] };
+    } catch {
+      return { valid: false, missingPermissions: this.scopes };
+    }
+  }
+
+  getCapabilities(accountType?: string): any {
+    return {
+      supportsPublishing: false,
+      supportsScheduling: false,
+      supportsAnalytics: true,
+      maxTextLength: 0,
+      supportedMediaTypes: [],
+    };
   }
 }

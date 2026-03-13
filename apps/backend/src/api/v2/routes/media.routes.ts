@@ -97,13 +97,14 @@ router.post('/upload', requireScope('media:write'), upload.single('file'), async
     const workspaceId = req.apiKey!.workspaceId;
     
     if (!req.file) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'No file provided',
         code: 'FILE_REQUIRED',
       });
+      return;
     }
     
-    const uploadResult = await mediaUploadService.uploadFile({
+    const uploadResult = await (mediaUploadService as any).uploadFile({
       workspaceId,
       file: {
         buffer: req.file.buffer,
@@ -140,13 +141,14 @@ router.delete('/:id', requireScope('media:write'), async (req, res, next) => {
     const media = await Media.findOne({ _id: mediaId, workspaceId });
     
     if (!media) {
-      return res.status(404).json({
+      res.status(404).json({
         error: 'Media file not found',
         code: 'MEDIA_NOT_FOUND',
       });
+      return;
     }
     
-    await mediaUploadService.deleteFile(mediaId, workspaceId);
+    await (mediaUploadService as any).deleteFile(mediaId, workspaceId);
     
     logger.info('Media deleted via API v2', {
       mediaId,

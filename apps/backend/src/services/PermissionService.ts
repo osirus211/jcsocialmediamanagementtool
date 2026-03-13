@@ -1,6 +1,6 @@
 import { Post } from '../models/Post';
 import { Workspace } from '../models/Workspace';
-import { WorkspaceMember, WorkspaceRole, MemberStatus } from '../models/WorkspaceMember';
+import { WorkspaceMember, WorkspaceRole } from '../models/WorkspaceMember';
 import { logger } from '../utils/logger';
 
 export interface PermissionContext {
@@ -55,7 +55,7 @@ export class PermissionService {
       const member = await WorkspaceMember.findOne({
         workspaceId,
         userId,
-        status: MemberStatus.ACTIVE,
+        isActive: true,
       });
 
       return member?.role === WorkspaceRole.ADMIN;
@@ -101,7 +101,7 @@ export class PermissionService {
       const member = await WorkspaceMember.findOne({
         workspaceId: post.workspaceId,
         userId,
-        status: MemberStatus.ACTIVE,
+        isActive: true,
       });
 
       return member?.role === WorkspaceRole.ADMIN;

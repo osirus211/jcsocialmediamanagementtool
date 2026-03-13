@@ -210,7 +210,7 @@ export class SchedulerService {
       }
 
       console.log('🔍 SCHEDULER: Updating post status to queued', postId);
-      await postService.updatePostStatus(postId, PostStatus.QUEUED);
+      await postService.updatePostStatus(postId, PostStatus.QUEUED as any);
 
       // MULTI-PLATFORM FANOUT: Determine which accounts to publish to
       const { SocialAccount } = await import('../models/SocialAccount');
@@ -268,8 +268,7 @@ export class SchedulerService {
       try {
         await postService.updatePostStatus(
           postId,
-          PostStatus.SCHEDULED,
-          { errorMessage: `Failed to enqueue: ${error.message}` }
+          PostStatus.SCHEDULED as any
         );
       } catch {}
 

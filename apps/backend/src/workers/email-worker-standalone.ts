@@ -9,7 +9,7 @@
  *   tsx src/workers/email-worker-standalone.ts
  */
 
-import { connectDB } from '../config/database';
+import { connectDatabase } from '../config/database';
 import { connectRedis } from '../config/redis';
 import { EmailWorker } from './EmailWorker';
 import { logger } from '../utils/logger';
@@ -19,7 +19,7 @@ async function main() {
     logger.info('Starting email worker process...');
 
     // Connect to MongoDB
-    await connectDB();
+    await connectDatabase();
     logger.info('MongoDB connected');
 
     // Connect to Redis

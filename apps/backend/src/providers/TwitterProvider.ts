@@ -543,4 +543,23 @@ export class TwitterProvider extends SocialPlatformProvider {
   ): Promise<boolean> {
     return await this.oauthService.needsRefresh(accountId);
   }
+
+  /**
+   * Lookup post by platform post ID
+   */
+  async lookupPost(request: {
+    accountId: mongoose.Types.ObjectId | string;
+    platformPostId: string;
+  }): Promise<{
+    found: boolean;
+    post?: any;
+    error?: string;
+  }> {
+    // TODO: Implement post lookup
+    logger.warn('Post lookup not yet implemented', {
+      accountId: request.accountId,
+      platformPostId: request.platformPostId,
+    });
+    return { found: false, error: 'Not implemented' };
+  }
 }

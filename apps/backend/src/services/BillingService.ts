@@ -4,7 +4,7 @@
  */
 
 import Stripe from 'stripe';
-import { Subscription } from '../models/Subscription';
+import { Subscription, SubscriptionStatus } from '../models/Subscription';
 import { Plan } from '../models/Plan';
 import { Workspace } from '../models/Workspace';
 import { config } from '../config';
@@ -360,7 +360,7 @@ export class BillingService {
 
       // Update local subscription
       subscription.cancelAtPeriodEnd = false;
-      subscription.status = 'active';
+      subscription.status = SubscriptionStatus.ACTIVE;
       await subscription.save();
 
       logger.info('Subscription reactivated', { workspaceId });
@@ -502,7 +502,7 @@ export class BillingService {
       const freePlan = await Plan.findOne({ name: 'free' });
       if (freePlan) {
         subscription.planId = freePlan._id as any;
-        subscription.status = 'canceled';
+        subscription.status = SubscriptionStatus.CANCELED;
         await subscription.save();
 
         logger.info('Subscription moved to free plan', {
@@ -528,7 +528,7 @@ export class BillingService {
         return;
       }
 
-      subscription.status = 'past_due';
+      subscription.status = SubscriptionStatus.PAST_DUE;
       await subscription.save();
 
       logger.warn('Payment failed for subscription', {
@@ -537,7 +537,7 @@ export class BillingService {
       });
 
       // Send payment failed email (non-blocking)
-      this.sendPaymentFailedEmail(subscription.workspaceId, invoice).catch(err => {
+      this.sendPaymentFailedEmail(subscription.workspaceId.toString(), invoice).catch(err => {
         logger.warn('Failed to send payment failed email', { workspaceId: subscription.workspaceId, error: err.message });
       });
     } catch (error) {
@@ -561,12 +561,16 @@ export class BillingService {
       const owner = await User.findById(workspace.ownerId);
       if (!owner) return;
 
-      await emailNotificationService.sendSubscriptionCreated({
-        to: owner.email,
-        planName,
-        billingPeriod: 'monthly',
-        userId: owner._id.toString(),
+      // Use generic notification instead of specific method
+      await emailNotificationService.sendNotification({
+        eventType: 'subscription_created' as any,
         workspaceId,
+        userId: owner._id.toString(),
+        payload: {
+          to: owner.email,
+          planName,
+          billingPeriod: 'monthly',
+        },
       });
     } catch (error: any) {
       logger.error('Error sending subscription created email', { error: error.message });
@@ -588,11 +592,15 @@ export class BillingService {
       const owner = await User.findById(workspace.ownerId);
       if (!owner) return;
 
-      await emailNotificationService.sendSubscriptionCancelled({
-        to: owner.email,
-        endDate: endDate.toLocaleDateString(),
-        userId: owner._id.toString(),
+      // Use generic notification instead of specific method
+      await emailNotificationService.sendNotification({
+        eventType: 'subscription_cancelled' as any,
         workspaceId,
+        userId: owner._id.toString(),
+        payload: {
+          to: owner.email,
+          endDate: endDate.toLocaleDateString(),
+        },
       });
     } catch (error: any) {
       logger.error('Error sending subscription cancelled email', { error: error.message });
@@ -616,12 +624,16 @@ export class BillingService {
 
       const amount = invoice.amount_due ? `$${(invoice.amount_due / 100).toFixed(2)}` : 'your subscription';
 
-      await emailNotificationService.sendPaymentFailed({
-        to: owner.email,
-        amount,
-        updatePaymentUrl: `${config.frontend.url}/workspace/${workspaceId}/billing`,
-        userId: owner._id.toString(),
+      // Use generic notification instead of specific method
+      await emailNotificationService.sendNotification({
+        eventType: 'payment_failed' as any,
         workspaceId,
+        userId: owner._id.toString(),
+        payload: {
+          to: owner.email,
+          amount,
+          updatePaymentUrl: `${config.frontend.url}/workspace/${workspaceId}/billing`,
+        },
       });
     } catch (error: any) {
       logger.error('Error sending payment failed email', { error: error.message });

@@ -171,7 +171,7 @@ export class PostROIService {
         post: {
           _id: post._id.toString(),
           content: post.content,
-          platform: post.platform,
+          platform: (post as any).platform || (post.platformContent && post.platformContent.length > 0 ? post.platformContent[0].platform : 'unknown'),
           publishedAt: post.publishedAt || new Date(),
           status: post.status,
         },
@@ -232,7 +232,7 @@ export class PostROIService {
         sortField = 'analytics.roi';
       }
 
-      const pipeline = [
+      const pipeline: any[] = [
         { $match: matchStage },
         {
           $lookup: {
@@ -252,7 +252,7 @@ export class PostROIService {
           $project: {
             postId: { $toString: '$_id' },
             content: 1,
-            platform: 1,
+            platform: { $ifNull: [{ $arrayElemAt: ['$platformContent.platform', 0] }, 'unknown'] },
             publishedAt: 1,
             impressions: '$analytics.impressions',
             engagementRate: '$analytics.engagementRate',

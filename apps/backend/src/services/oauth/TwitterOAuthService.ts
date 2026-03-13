@@ -94,19 +94,19 @@ export class TwitterOAuthService {
         userId: params.userId,
       });
 
-      // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({
+      // Step 1: Exchange code for tokens (using legacy method to get scope)
+      const legacyTokens = await this.provider.exchangeCodeForTokenLegacy({
         code: params.code,
         state: params.state,
         codeVerifier: params.codeVerifier,
       });
 
       // Step 2: Detect scope downgrade
-      const scopeDowngrade = this.detectScopeDowngrade(tokens.scope || []);
+      const scopeDowngrade = this.detectScopeDowngrade(legacyTokens.scope || []);
       if (scopeDowngrade.detected) {
         logger.warn('Twitter scope downgrade detected', {
           expected: this.REQUIRED_SCOPES,
-          received: tokens.scope,
+          received: legacyTokens.scope,
           missing: scopeDowngrade.missingScopes,
         });
 
@@ -121,7 +121,7 @@ export class TwitterOAuthService {
           errorMessage: `Scope downgrade: missing ${scopeDowngrade.missingScopes.join(', ')}`,
           metadata: {
             expectedScopes: this.REQUIRED_SCOPES,
-            receivedScopes: tokens.scope,
+            receivedScopes: legacyTokens.scope,
           },
         });
 
@@ -129,7 +129,7 @@ export class TwitterOAuthService {
       }
 
       // Step 3: Fetch user profile
-      const profile = await this.provider.getUserProfile(tokens.accessToken);
+      const profile = await this.provider.getUserProfile(legacyTokens.accessToken);
 
       // Step 4: Check if account already exists
       const existingAccount = await SocialAccount.findOne({
@@ -142,7 +142,7 @@ export class TwitterOAuthService {
         // Update existing account
         return await this.updateExistingAccount(
           existingAccount,
-          tokens,
+          legacyTokens,
           profile,
           params
         );
@@ -154,10 +154,10 @@ export class TwitterOAuthService {
         provider: SocialPlatform.TWITTER,
         providerUserId: profile.id,
         accountName: profile.displayName,
-        accessToken: tokens.accessToken, // Will be encrypted by pre-save hook
-        refreshToken: tokens.refreshToken,
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scope || this.REQUIRED_SCOPES,
+        accessToken: legacyTokens.accessToken, // Will be encrypted by pre-save hook
+        refreshToken: legacyTokens.refreshToken,
+        tokenExpiresAt: legacyTokens.expiresAt,
+        scopes: legacyTokens.scope || this.REQUIRED_SCOPES,
         status: AccountStatus.ACTIVE,
         metadata: {
           username: profile.username,
@@ -173,7 +173,7 @@ export class TwitterOAuthService {
         accessToken: account.accessToken, // Encrypted
         refreshToken: account.refreshToken,
         expiresAt: account.tokenExpiresAt!,
-        scope: tokens.scope?.join(' '),
+        scope: legacyTokens.scope?.join(' '),
       };
 
       await tokenSafetyService.storeTokenMetadata(
@@ -194,7 +194,7 @@ export class TwitterOAuthService {
         metadata: {
           provider: SocialPlatform.TWITTER,
           username: profile.username,
-          scopes: tokens.scope,
+          scopes: legacyTokens.scope,
         },
       });
 
@@ -379,8 +379,8 @@ export class TwitterOAuthService {
         };
       }
 
-      // Step 4: Refresh token via Twitter API
-      const tokens = await this.provider.refreshAccessToken({
+      // Step 4: Refresh token via Twitter API (using legacy method to get scope)
+      const tokens = await this.provider.refreshAccessTokenLegacy({
         refreshToken: decryptedRefreshToken!,
       });
 

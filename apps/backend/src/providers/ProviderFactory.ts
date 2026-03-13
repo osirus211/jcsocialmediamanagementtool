@@ -115,7 +115,7 @@ export class ProviderFactory {
           config.clientId,
           config.clientSecret,
           config.redirectUri
-        );
+        ) as any;
 
       // TODO: Add other platforms
       case SocialPlatform.LINKEDIN:

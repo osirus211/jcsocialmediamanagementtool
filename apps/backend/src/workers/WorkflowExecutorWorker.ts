@@ -226,7 +226,7 @@ export class WorkflowExecutorWorker {
       logger.error('Workflow execution failed', {
         workflowId,
         runId,
-        error: error.message,
+        error: (error as any).message,
         duration,
       });
 
@@ -234,7 +234,7 @@ export class WorkflowExecutorWorker {
       try {
         await WorkflowRun.findByIdAndUpdate(runId, {
           status: WorkflowRunStatus.FAILED,
-          error: error.message,
+          error: (error as any).message,
           completedAt: new Date(),
         });
       } catch (updateError: unknown) {

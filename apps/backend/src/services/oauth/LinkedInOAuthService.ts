@@ -38,7 +38,7 @@ export class LinkedInOAuthService {
       logger.info('[LinkedIn] Starting account connection', { workspaceId, userId });
 
       // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({ code, state: params.state });
+      const tokens = await this.provider.exchangeCodeForTokenLegacy({ code, state: '' });
       
       logger.info('[LinkedIn] Token exchange successful', { workspaceId });
 
@@ -76,7 +76,7 @@ export class LinkedInOAuthService {
         accessToken: tokens.accessToken, // Will be encrypted by pre-save hook
         refreshToken: tokens.refreshToken, // Will be encrypted by pre-save hook
         tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scope || ['openid', 'profile', 'email', 'w_member_social'],
+        scopes: (tokens as any).scope || ['openid', 'profile', 'email', 'w_member_social'],
         status: AccountStatus.ACTIVE,
         connectionVersion: 'v2',
         metadata: {
@@ -147,9 +147,7 @@ export class LinkedInOAuthService {
       }
 
       // Refresh token via LinkedIn API
-      const tokens = await this.provider.refreshAccessToken({
-        refreshToken,
-      });
+      const tokens = await this.provider.refreshAccessToken(refreshToken);
 
       // Update account
       account.accessToken = tokens.accessToken; // Will be encrypted by pre-save hook

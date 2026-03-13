@@ -6,7 +6,7 @@ import {
   requireAdmin,
   requireOwner,
 } from '../../middleware/tenant';
-import { validate } from '../../middleware/validate';
+import { validateRequest } from '../../middleware/validate';
 import {
   createWorkspaceSchema,
   updateWorkspaceSchema,
@@ -27,7 +27,7 @@ const router = Router();
 router.post(
   '/',
   requireAuth,
-  validate(createWorkspaceSchema),
+  validateRequest(createWorkspaceSchema),
   WorkspaceController.createWorkspace
 );
 
@@ -48,7 +48,7 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
-  validate(updateWorkspaceSchema),
+  validateRequest(updateWorkspaceSchema),
   WorkspaceController.updateWorkspace
 );
 
@@ -76,7 +76,7 @@ router.post(
   requireWorkspace,
   requireAdmin,
   checkMemberLimit,
-  validate(inviteMemberSchema),
+  validateRequest(inviteMemberSchema),
   WorkspaceController.inviteMember
 );
 
@@ -95,7 +95,7 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
-  validate(updateMemberRoleSchema),
+  validateRequest(updateMemberRoleSchema),
   WorkspaceController.updateMemberRole
 );
 
@@ -105,7 +105,7 @@ router.post(
   requireAuth,
   requireWorkspace,
   requireOwner,
-  validate(transferOwnershipSchema),
+  validateRequest(transferOwnershipSchema),
   WorkspaceController.transferOwnership
 );
 

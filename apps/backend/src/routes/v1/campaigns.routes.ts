@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/workspace';
-import { validateBody } from '../../middleware/validation';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
 import { CampaignService } from '../../services/CampaignService';
 import { CampaignStatus } from '../../models/Campaign';
 
@@ -41,9 +41,9 @@ const updateCampaignSchema = z.object({
  * @access  Private (requires auth + workspace)
  * @query   status (optional)
  */
-router.get('/', async (req, res) => {
+router.get('/', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace!.workspaceId.toString();
     const { status } = req.query;
     
     const filters = status ? { status: status as CampaignStatus } : undefined;
@@ -60,10 +60,10 @@ router.get('/', async (req, res) => {
  * @desc    Create a new campaign
  * @access  Private (requires auth + workspace)
  */
-router.post('/', validateBody(createCampaignSchema), async (req, res) => {
+router.post('/', validateRequest(createCampaignSchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.workspace._id.toString();
-    const userId = req.user._id.toString();
+    const workspaceId = req.workspace!.workspaceId.toString();
+    const userId = req.user!.userId.toString();
     
     const campaign = await CampaignService.createCampaign(workspaceId, userId, req.body);
     
@@ -78,10 +78,10 @@ router.post('/', validateBody(createCampaignSchema), async (req, res) => {
  * @desc    Get campaign with stats
  * @access  Private (requires auth + workspace)
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace!.workspaceId.toString();
     
     const [campaign, stats] = await Promise.all([
       CampaignService.getCampaign(id, workspaceId),
@@ -89,7 +89,8 @@ router.get('/:id', async (req, res) => {
     ]);
     
     if (!campaign) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
+      res.status(404).json({ success: false, error: 'Campaign not found' });
+      return;
     }
     
     res.json({ success: true, data: { ...campaign.toJSON(), stats } });
@@ -103,15 +104,16 @@ router.get('/:id', async (req, res) => {
  * @desc    Update a campaign
  * @access  Private (requires auth + workspace)
  */
-router.patch('/:id', validateBody(updateCampaignSchema), async (req, res) => {
+router.patch('/:id', validateRequest(updateCampaignSchema), async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace!.workspaceId.toString();
     
     const campaign = await CampaignService.updateCampaign(id, workspaceId, req.body);
     
     if (!campaign) {
-      return res.status(404).json({ success: false, error: 'Campaign not found' });
+      res.status(404).json({ success: false, error: 'Campaign not found' });
+      return;
     }
     
     res.json({ success: true, data: campaign });
@@ -125,10 +127,10 @@ router.patch('/:id', validateBody(updateCampaignSchema), async (req, res) => {
  * @desc    Delete a campaign
  * @access  Private (requires auth + workspace)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace!.workspaceId.toString();
     
     await CampaignService.deleteCampaign(id, workspaceId);
     
@@ -143,10 +145,10 @@ router.delete('/:id', async (req, res) => {
  * @desc    Get all posts for a campaign
  * @access  Private (requires auth + workspace)
  */
-router.get('/:id/posts', async (req, res) => {
+router.get('/:id/posts', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace!.workspaceId.toString();
     
     const posts = await CampaignService.getCampaignPosts(id, workspaceId);
     

@@ -1,31 +1,33 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/workspace';
-import { validateBody } from '../../middleware/validation';
+import { validateRequest } from '../../middleware/validate';
 import { CategoryService } from '../../services/CategoryService';
 
 const router = Router();
 
-// Apply auth and workspace middleware to all routes
+// Apply auth middleware to all routes
 router.use(requireAuth);
-router.use(requireWorkspace);
 
 /**
  * Validation schemas
  */
-const createCategorySchema = z.object({
-  name: z.string().min(1).max(50),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  description: z.string().max(200).optional(),
-  icon: z.string().max(50).optional(),
+const createCategoryBodySchema = z.object({
+  body: z.object({
+    name: z.string().min(1).max(50),
+    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    description: z.string().max(200).optional(),
+    icon: z.string().max(50).optional(),
+  }),
 });
 
-const updateCategorySchema = z.object({
-  name: z.string().min(1).max(50).optional(),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  description: z.string().max(200).optional(),
-  icon: z.string().max(50).optional(),
+const updateCategoryBodySchema = z.object({
+  body: z.object({
+    name: z.string().min(1).max(50).optional(),
+    color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    description: z.string().max(200).optional(),
+    icon: z.string().max(50).optional(),
+  }),
 });
 
 /**
@@ -33,9 +35,9 @@ const updateCategorySchema = z.object({
  * @desc    Get all categories for workspace
  * @access  Private (requires auth + workspace)
  */
-router.get('/', async (req, res) => {
+router.get('/', async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     const categories = await CategoryService.getCategories(workspaceId);
     
     res.json({ success: true, data: categories });
@@ -49,10 +51,10 @@ router.get('/', async (req, res) => {
  * @desc    Create a new category
  * @access  Private (requires auth + workspace)
  */
-router.post('/', validateBody(createCategorySchema), async (req, res) => {
+router.post('/', validateRequest(createCategoryBodySchema), async (req, res): Promise<void> => {
   try {
-    const workspaceId = req.workspace._id.toString();
-    const userId = req.user._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
+    const userId = req.user.userId;
     
     const category = await CategoryService.createCategory(workspaceId, userId, req.body);
     
@@ -71,15 +73,16 @@ router.post('/', validateBody(createCategorySchema), async (req, res) => {
  * @desc    Update a category
  * @access  Private (requires auth + workspace)
  */
-router.patch('/:id', validateBody(updateCategorySchema), async (req, res) => {
+router.patch('/:id', validateRequest(updateCategoryBodySchema), async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     const category = await CategoryService.updateCategory(id, workspaceId, req.body);
     
     if (!category) {
-      return res.status(404).json({ success: false, error: 'Category not found' });
+      res.status(404).json({ success: false, error: 'Category not found' });
+      return;
     }
     
     res.json({ success: true, data: category });
@@ -97,10 +100,10 @@ router.patch('/:id', validateBody(updateCategorySchema), async (req, res) => {
  * @desc    Delete a category
  * @access  Private (requires auth + workspace)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspace._id.toString();
+    const workspaceId = req.workspace.workspaceId.toString();
     
     await CategoryService.deleteCategory(id, workspaceId);
     

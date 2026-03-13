@@ -9,7 +9,7 @@ import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
 import { aiRateLimiter } from '../../middleware/rateLimiter';
 import { checkAILimit } from '../../middleware/planLimit';
-import { validateBody } from '../../middleware/validate';
+import { validateRequest } from '../../middleware/validate';
 import { generateContentSchema, improveContentSchema, generateCalendarSchema } from '../../schemas/ai.schemas';
 
 const router = Router();
@@ -28,27 +28,27 @@ router.use(aiRateLimiter);
 /**
  * @route   POST /api/v1/ai/caption
  */
-router.post('/caption', checkAILimit, validateBody(generateContentSchema), AIController.generateCaption);
+router.post('/caption', checkAILimit, validateRequest(generateContentSchema), AIController.generateCaption);
 
 /**
  * @route   POST /api/v1/ai/hashtags
  */
-router.post('/hashtags', checkAILimit, validateBody(generateContentSchema), AIController.generateHashtags);
+router.post('/hashtags', checkAILimit, validateRequest(generateContentSchema), AIController.generateHashtags);
 
 /**
  * @route   POST /api/v1/ai/rewrite
  */
-router.post('/rewrite', checkAILimit, validateBody(improveContentSchema), AIController.rewriteContent);
+router.post('/rewrite', checkAILimit, validateRequest(improveContentSchema), AIController.rewriteContent);
 
 /**
  * @route   POST /api/v1/ai/improve
  */
-router.post('/improve', checkAILimit, validateBody(improveContentSchema), AIController.improveContent);
+router.post('/improve', checkAILimit, validateRequest(improveContentSchema), AIController.improveContent);
 
 /**
  * @route   POST /api/v1/ai/suggestions
  */
-router.post('/suggestions', checkAILimit, validateBody(generateContentSchema), AIController.generateSuggestions);
+router.post('/suggestions', checkAILimit, validateRequest(generateContentSchema), AIController.generateSuggestions);
 
 /**
  * @route   POST /api/v1/ai/repurpose
@@ -88,7 +88,7 @@ router.post('/analyze-sentiment', AIController.analyzeSentiment);
 /**
  * @route   POST /api/v1/ai/generate-calendar
  */
-router.post('/generate-calendar', checkAILimit, validateBody(generateCalendarSchema), AIController.generateCalendarPosts);
+router.post('/generate-calendar', checkAILimit, validateRequest(generateCalendarSchema), AIController.generateCalendarPosts);
 
 /**
  * @route   POST /api/v1/ai/moderate-content

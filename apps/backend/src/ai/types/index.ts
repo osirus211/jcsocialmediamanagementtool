@@ -30,6 +30,12 @@ export enum SocialPlatform {
   LINKEDIN = 'linkedin',
   FACEBOOK = 'facebook',
   INSTAGRAM = 'instagram',
+  YOUTUBE = 'youtube',
+  THREADS = 'threads',
+  BLUESKY = 'bluesky',
+  GOOGLE_BUSINESS = 'google-business',
+  TIKTOK = 'tiktok',
+  PINTEREST = 'pinterest',
 }
 
 export interface AIProviderConfig {

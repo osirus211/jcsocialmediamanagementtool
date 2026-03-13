@@ -233,7 +233,6 @@ export class TwitterOAuthProvider extends OAuthProvider {
       // Don't throw - revocation is best effort
     }
   }
-}
 
   /**
    * Discover Twitter account (PlatformAdapter interface)
@@ -314,3 +313,4 @@ export class TwitterOAuthProvider extends OAuthProvider {
       supportedFormats: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov'],
     };
   }
+}

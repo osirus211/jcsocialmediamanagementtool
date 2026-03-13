@@ -86,7 +86,7 @@ export class InstagramProfessionalProvider extends OAuthProvider {
     }
   }
 
-  async exchangeCodeForToken(params: OAuthCallbackParams): Promise<OAuthTokens> {
+  async exchangeCodeForTokenLegacy(params: OAuthCallbackParams): Promise<OAuthTokens> {
     try {
       logger.debug('Exchanging code for Instagram Professional token', {
         step: 'token-exchange',
@@ -145,7 +145,7 @@ export class InstagramProfessionalProvider extends OAuthProvider {
     }
   }
 
-  async refreshAccessToken(params: OAuthRefreshParams): Promise<OAuthTokens> {
+  async refreshAccessTokenLegacy(params: OAuthRefreshParams): Promise<OAuthTokens> {
     try {
       logger.debug('Refreshing Instagram Professional token', {
         step: 'token-refresh',
@@ -254,5 +254,29 @@ export class InstagramProfessionalProvider extends OAuthProvider {
       note: 'Tokens expire after 60 days or can be revoked by user in Instagram settings',
       provider: 'InstagramProfessionalProvider',
     });
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    try {
+      await this.getUserProfile(accessToken);
+      return { valid: true, missingPermissions: [] };
+    } catch {
+      return { valid: false, missingPermissions: this.scopes };
+    }
+  }
+
+  getCapabilities(accountType?: string): any {
+    return {
+      supportsPublishing: true,
+      supportsScheduling: true,
+      supportsAnalytics: true,
+      maxTextLength: 2200,
+      supportedMediaTypes: ['image/jpeg', 'image/png', 'video/mp4'],
+    };
   }
 }

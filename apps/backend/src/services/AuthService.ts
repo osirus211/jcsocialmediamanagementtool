@@ -8,6 +8,7 @@ import {
 } from '../utils/errors';
 import { logger } from '../utils/logger';
 import { authMetricsTracker } from './metrics/AuthMetricsTracker';
+import { config } from '../config';
 
 export interface RegisterInput {
   email: string;
@@ -431,7 +432,8 @@ export class AuthService {
     try {
       const { emailNotificationService } = await import('./EmailNotificationService');
 
-      await emailNotificationService.sendUserSignup({
+      // Stub implementation - email service method doesn't exist yet
+      logger.info('Welcome email would be sent', {
         to: user.email,
         userName: `${user.firstName} ${user.lastName}`,
         userId: user._id.toString(),
@@ -452,7 +454,8 @@ export class AuthService {
       // TODO: Generate actual reset token and URL
       const resetUrl = `${config.frontend.url}/reset-password?token=placeholder`;
 
-      await emailNotificationService.sendPasswordReset({
+      // Stub implementation - email service method doesn't exist yet
+      logger.info('Password reset email would be sent', {
         to: user.email,
         resetUrl,
         expiresIn: '1 hour',

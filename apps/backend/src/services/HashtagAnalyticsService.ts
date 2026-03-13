@@ -157,7 +157,7 @@ export class HashtagAnalyticsService {
         { $limit: limit },
       ];
 
-      const results = await Post.aggregate(pipeline);
+      const results = await Post.aggregate(pipeline as any[]);
       return results;
     } catch (error: any) {
       logger.error('Get hashtag performance error:', { error: error.message, workspaceId });
@@ -220,7 +220,7 @@ export class HashtagAnalyticsService {
         { $sort: { week: 1 } },
       ];
 
-      const results = await Post.aggregate(pipeline);
+      const results = await Post.aggregate(pipeline as any[]);
       return results;
     } catch (error: any) {
       logger.error('Get hashtag trends error:', { error: error.message, workspaceId, hashtag });
@@ -237,7 +237,7 @@ export class HashtagAnalyticsService {
     limit: number = 20
   ): Promise<HashtagPerformanceData[]> {
     try {
-      const matchStage = {
+      const matchStage: any = {
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
         platform: platform,
         'metadata.hashtags': { $exists: true, $ne: [] },
@@ -295,7 +295,7 @@ export class HashtagAnalyticsService {
         { $limit: limit },
       ];
 
-      const results = await Post.aggregate(pipeline);
+      const results = await Post.aggregate(pipeline as any[]);
       return results;
     } catch (error: any) {
       logger.error('Get hashtags by platform error:', { error: error.message, workspaceId, platform });
@@ -311,7 +311,7 @@ export class HashtagAnalyticsService {
     limit: number = 10
   ): Promise<HashtagSuggestion[]> {
     try {
-      const matchStage = {
+      const matchStage: any = {
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
         'metadata.hashtags': { $exists: true, $ne: [] },
       };
@@ -352,7 +352,7 @@ export class HashtagAnalyticsService {
         { $limit: limit },
       ];
 
-      const results = await Post.aggregate(pipeline);
+      const results = await Post.aggregate(pipeline as any[]);
       return results;
     } catch (error: any) {
       logger.error('Get hashtag suggestions error:', { error: error.message, workspaceId });

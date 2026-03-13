@@ -8,14 +8,14 @@ import { Router } from 'express';
 import { body, param } from 'express-validator';
 import { uploadController } from '../../controllers/UploadController';
 import { mediaFolderController } from '../../controllers/MediaFolderController';
-import { authenticate } from '../../middleware/auth';
+import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { validate } from '../../middleware/validate';
+import { validateRequest } from '../../middleware/validate';
 
 const router = Router();
 
 // All media routes require authentication and workspace context
-router.use(authenticate);
+router.use(requireAuth);
 router.use(requireWorkspace);
 
 // Generate presigned upload URL
@@ -53,7 +53,6 @@ router.post(
     param('id').isMongoId().withMessage('Invalid media ID'),
     body('startTime').isNumeric().withMessage('startTime must be a number'),
     body('endTime').isNumeric().withMessage('endTime must be a number'),
-    validate,
   ],
   uploadController.trimVideo.bind(uploadController)
 );
@@ -63,7 +62,6 @@ router.post(
   [
     param('id').isMongoId().withMessage('Invalid media ID'),
     body('timeOffset').optional().isNumeric().withMessage('timeOffset must be a number'),
-    validate,
   ],
   uploadController.generateVideoThumbnail.bind(uploadController)
 );

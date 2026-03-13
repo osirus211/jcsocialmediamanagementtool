@@ -8,6 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { postService, PostService } from '../services/PostService';
 import { logger } from '../utils/logger';
+import { MemberRole } from '../models/WorkspaceMember';
 import {
   sendSuccess,
   sendValidationError,
@@ -622,17 +623,19 @@ export class PostController {
     try {
       const { id } = req.params;
       const { reason } = req.body;
-      const userId = req.user?.id;
+      const userId = req.user?.userId;
       const userRole = req.user?.role;
 
       if (!userId || !userRole) {
-        return sendError(res, 'User information not found', 401);
+        sendError(res, 'UNAUTHORIZED', 'User information not found', 401);
+        return;
       }
 
       // Check LOCK_POST permission
       const { workspacePermissionService, Permission } = await import('../services/WorkspacePermissionService');
-      if (!workspacePermissionService.hasPermission(userRole, Permission.LOCK_POST)) {
-        return sendError(res, 'Insufficient permissions to lock posts', 403);
+      if (!workspacePermissionService.hasPermission(userRole as unknown as MemberRole, Permission.LOCK_POST)) {
+        sendError(res, 'FORBIDDEN', 'Insufficient permissions to lock posts', 403);
+        return;
       }
 
       const result = await postService.lockPost(id, userId, reason);
@@ -641,7 +644,7 @@ export class PostController {
       logger.error('Failed to lock post', {
         error: error.message,
         postId: req.params.id,
-        userId: req.user?.id,
+        userId: req.user?.userId,
       });
       next(error);
     }
@@ -654,17 +657,19 @@ export class PostController {
   async unlockPost(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const userId = req.user?.id;
+      const userId = req.user?.userId;
       const userRole = req.user?.role;
 
       if (!userId || !userRole) {
-        return sendError(res, 'User information not found', 401);
+        sendError(res, 'UNAUTHORIZED', 'User information not found', 401);
+        return;
       }
 
       // Check LOCK_POST permission
       const { workspacePermissionService, Permission } = await import('../services/WorkspacePermissionService');
-      if (!workspacePermissionService.hasPermission(userRole, Permission.LOCK_POST)) {
-        return sendError(res, 'Insufficient permissions to unlock posts', 403);
+      if (!workspacePermissionService.hasPermission(userRole as unknown as MemberRole, Permission.LOCK_POST)) {
+        sendError(res, 'FORBIDDEN', 'Insufficient permissions to unlock posts', 403);
+        return;
       }
 
       const result = await postService.unlockPost(id);
@@ -673,7 +678,7 @@ export class PostController {
       logger.error('Failed to unlock post', {
         error: error.message,
         postId: req.params.id,
-        userId: req.user?.id,
+        userId: req.user?.userId,
       });
       next(error);
     }
@@ -716,15 +721,15 @@ export class PostController {
 
       const { posts } = req.body;
       const workspaceId = req.workspace?.workspaceId.toString();
-      const userId = req.user?.userId.toString();
+      const userId = req.user?.userId;
 
       if (!workspaceId || !userId) {
-        sendError(res, 'Workspace and user required', 400);
+        sendError(res, 'BAD_REQUEST', 'Workspace and user required', 400);
         return;
       }
 
       if (!Array.isArray(posts) || posts.length === 0) {
-        sendError(res, 'Posts array is required and cannot be empty', 400);
+        sendError(res, 'BAD_REQUEST', 'Posts array is required and cannot be empty', 400);
         return;
       }
 

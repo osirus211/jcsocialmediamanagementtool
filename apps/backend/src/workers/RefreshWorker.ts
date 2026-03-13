@@ -164,7 +164,7 @@ export class RefreshWorker {
     const { distributedLockService } = await import('../services/DistributedLockService');
     const refreshLock = await distributedLockService.acquireLock(`refresh:${accountId}`, {
       ttl: 60000, // 1 minute
-      retryAttempts: 1,
+      retryCount: 1,
     });
 
     if (!refreshLock) {

@@ -3,8 +3,8 @@
  * Handles YouTube-specific platform capabilities and publishing
  */
 
-import { BasePlatformAdapter } from './BasePlatformAdapter';
-import { PlatformCapabilities } from './IPlatformAdapter';
+import { BasePlatformAdapter } from '../BasePlatformAdapter';
+import { PlatformCapabilities } from './PlatformAdapter';
 import { YouTubePublisher } from '../../providers/publishers/YouTubePublisher';
 import { ISocialAccount } from '../../models/SocialAccount';
 import { IPost } from '../../models/Post';
@@ -13,8 +13,28 @@ export class YouTubeAdapter extends BasePlatformAdapter {
   private publisher: YouTubePublisher;
 
   constructor() {
-    super();
+    super('youtube', '', ''); // YouTube adapter doesn't need OAuth credentials for basic functionality
     this.publisher = new YouTubePublisher();
+  }
+
+  async generateAuthUrl(redirectUri: string, state: string, scopes: string[]): Promise<any> {
+    throw new Error('YouTube OAuth not implemented');
+  }
+
+  async exchangeCodeForToken(code: string, redirectUri: string, codeVerifier?: string): Promise<any> {
+    throw new Error('YouTube OAuth not implemented');
+  }
+
+  async refreshAccessToken(refreshToken: string): Promise<any> {
+    throw new Error('YouTube OAuth not implemented');
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    throw new Error('YouTube account discovery not implemented');
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    throw new Error('YouTube permission validation not implemented');
   }
 
   getPlatformName(): string {
@@ -23,12 +43,16 @@ export class YouTubeAdapter extends BasePlatformAdapter {
 
   getCapabilities(): PlatformCapabilities {
     return {
-      maxImages: 0,
-      maxVideos: 1,
-      hasStories: false,
-      hasReels: true,
-      maxChars: 5000,
-      requiresVideo: true,
+      publishPost: true,
+      publishVideo: true,
+      publishImage: false,
+      publishCarousel: false,
+      analytics: true,
+      stories: false,
+      reels: true,
+      scheduling: true,
+      maxVideoSize: 128 * 1024 * 1024, // 128MB
+      supportedFormats: ['video/mp4', 'video/mov', 'video/avi'],
     };
   }
 

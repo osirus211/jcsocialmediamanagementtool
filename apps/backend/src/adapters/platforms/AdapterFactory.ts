@@ -46,16 +46,16 @@ export class AdapterFactory {
         return new TikTokProvider(clientId, clientSecret, redirectUri);
       
       case 'threads':
-        return new ThreadsAdapter(clientId, clientSecret);
+        return new ThreadsAdapter(clientId, clientSecret) as any;
       
       case 'bluesky':
-        return new BlueskyAdapter();
+        return new BlueskyAdapter() as any;
       
       case 'youtube':
-        return new YouTubeAdapter();
+        return new YouTubeAdapter() as any;
       
       case 'pinterest':
-        return new PinterestAdapter();
+        return new PinterestAdapter() as any;
       
       default:
         throw new Error(`Unsupported platform: ${platform}`);
@@ -72,6 +72,10 @@ export class AdapterFactory {
       twitter: config.oauth.twitter.clientId,
       linkedin: config.oauth.linkedin.clientId,
       tiktok: config.oauth.tiktok.clientKey,
+      threads: config.oauth.facebook.appId, // Threads uses Facebook OAuth
+      bluesky: undefined, // No OAuth config needed
+      youtube: undefined, // No OAuth config needed
+      pinterest: undefined, // No OAuth config needed
     };
 
     const value = configMap[platform];
@@ -93,6 +97,10 @@ export class AdapterFactory {
       twitter: config.oauth.twitter.clientSecret,
       linkedin: config.oauth.linkedin.clientSecret,
       tiktok: config.oauth.tiktok.clientSecret,
+      threads: config.oauth.facebook.appSecret, // Threads uses Facebook OAuth
+      bluesky: undefined, // No OAuth config needed
+      youtube: undefined, // No OAuth config needed
+      pinterest: undefined, // No OAuth config needed
     };
 
     const value = configMap[platform];
@@ -123,6 +131,16 @@ export class AdapterFactory {
    * Get all supported platforms
    */
   static getSupportedPlatforms(): SocialPlatform[] {
-    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky', 'youtube', 'pinterest'];
+    return [
+      'facebook', 
+      'instagram', 
+      'twitter', 
+      'linkedin', 
+      'tiktok', 
+      'threads', 
+      'bluesky', 
+      'youtube', 
+      'pinterest'
+    ];
   }
 }

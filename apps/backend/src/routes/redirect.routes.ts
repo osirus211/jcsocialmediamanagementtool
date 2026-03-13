@@ -14,7 +14,7 @@ const router = Router();
  * Redirect short link
  * GET /r/:shortCode
  */
-router.get('/:shortCode', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:shortCode', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { shortCode } = req.params;
 
@@ -22,10 +22,11 @@ router.get('/:shortCode', async (req: Request, res: Response, next: NextFunction
     const link = await shortLinkService.getShortLink(shortCode);
 
     if (!link) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         message: 'Link not found or expired',
       });
+      return;
     }
 
     // Record click (async, don't wait)

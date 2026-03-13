@@ -77,7 +77,7 @@ export class InstagramBasicDisplayProvider extends OAuthProvider {
     }
   }
 
-  async exchangeCodeForToken(params: OAuthCallbackParams): Promise<OAuthTokens> {
+  async exchangeCodeForTokenLegacy(params: OAuthCallbackParams): Promise<OAuthTokens> {
     try {
       // Step 1: Exchange code for short-lived token
       const formData = new URLSearchParams({
@@ -159,7 +159,7 @@ export class InstagramBasicDisplayProvider extends OAuthProvider {
     }
   }
 
-  async refreshAccessToken(params: OAuthRefreshParams): Promise<OAuthTokens> {
+  async refreshAccessTokenLegacy(params: OAuthRefreshParams): Promise<OAuthTokens> {
     // Instagram Basic Display long-lived tokens can be refreshed
     // by exchanging them for new long-lived tokens
     try {
@@ -256,5 +256,29 @@ export class InstagramBasicDisplayProvider extends OAuthProvider {
     logger.info('Instagram Basic Display token revocation not supported by API', {
       note: 'Tokens expire after 60 days or can be revoked by user in Instagram settings',
     });
+  }
+
+  async discoverAccounts(accessToken: string): Promise<any[]> {
+    const profile = await this.getUserProfile(accessToken);
+    return [profile];
+  }
+
+  async validatePermissions(accessToken: string): Promise<any> {
+    try {
+      await this.getUserProfile(accessToken);
+      return { valid: true, missingPermissions: [] };
+    } catch {
+      return { valid: false, missingPermissions: ['user_profile', 'user_media'] };
+    }
+  }
+
+  getCapabilities(accountType?: string): any {
+    return {
+      supportsPublishing: false,
+      supportsScheduling: false,
+      supportsAnalytics: false,
+      maxTextLength: 0,
+      supportedMediaTypes: [],
+    };
   }
 }

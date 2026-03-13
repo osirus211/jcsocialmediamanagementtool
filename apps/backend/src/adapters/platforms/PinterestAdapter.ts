@@ -3,17 +3,15 @@
  * Handles Pinterest-specific platform capabilities and publishing
  */
 
-import { BasePlatformAdapter } from './BasePlatformAdapter';
-import { PlatformCapabilities } from './IPlatformAdapter';
+import { PlatformAdapter, PlatformCapabilities } from './PlatformAdapter';
 import { PinterestPublisher } from '../../providers/publishers/PinterestPublisher';
 import { ISocialAccount } from '../../models/SocialAccount';
 import { IPost } from '../../models/Post';
 
-export class PinterestAdapter extends BasePlatformAdapter {
+export class PinterestAdapter {
   private publisher: PinterestPublisher;
 
   constructor() {
-    super();
     this.publisher = new PinterestPublisher();
   }
 
@@ -23,13 +21,13 @@ export class PinterestAdapter extends BasePlatformAdapter {
 
   getCapabilities(): PlatformCapabilities {
     return {
-      maxImages: 1,
+      maxImageSize: 1,
       maxVideos: 1,
       hasStories: false,
       hasReels: false,
       maxChars: 500,
       requiresVideo: false,
-    };
+    } as any;
   }
 
   async publish(account: ISocialAccount, post: IPost): Promise<any> {

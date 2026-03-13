@@ -96,7 +96,7 @@ export class PostTemplateService {
         .sort({ usageCount: -1, createdAt: -1 })
         .lean();
 
-      return templates as IPostTemplate[];
+      return templates as unknown as IPostTemplate[];
     } catch (error: any) {
       logger.error('Failed to get post templates', {
         workspaceId,

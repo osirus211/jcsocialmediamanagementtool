@@ -4,13 +4,14 @@
  * Handles media file uploads with S3-compatible storage
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../config';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3') as any;
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner') as any;
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { Media, MediaType, MediaStatus, IMedia } from '../models/Media';
 import { logger } from '../utils/logger';
+import { BadRequestError } from '../utils/errors';
 import { withSpan } from '../config/telemetry';
 import {
   recordMediaUpload,
@@ -64,7 +65,7 @@ export interface ConfirmUploadInput {
 }
 
 export class MediaUploadService {
-  private s3Client: S3Client;
+  private s3Client: any;
   private bucketName: string;
   private region: string;
   private cdnUrl?: string;
@@ -282,7 +283,7 @@ export class MediaUploadService {
         await this.updateWorkspaceStorageUsage(input.workspaceId);
 
         // Enqueue processing jobs for images
-        if (media.mediaType === 'image' || media.mediaType === 'gif') {
+        if (media.mediaType === MediaType.IMAGE || (media.mediaType as string) === 'gif') {
           try {
             const { MediaProcessingQueue } = await import('../queue/MediaProcessingQueue');
             const { ImageCompressionService } = await import('./ImageCompressionService');
@@ -295,8 +296,9 @@ export class MediaUploadService {
               await processingQueue.addJob('compress-image', {
                 mediaId: media._id.toString(),
                 platform: 'storage', // Internal processing
-                mediaType: media.mediaType,
+                mediaType: media.mediaType as 'image' | 'video' | 'gif',
                 fileUrl: media.storageKey,
+                storageKey: media.storageKey,
                 workspaceId: input.workspaceId,
               });
 
@@ -304,8 +306,9 @@ export class MediaUploadService {
               await processingQueue.addJob('generate-thumbnails', {
                 mediaId: media._id.toString(),
                 platform: 'storage', // Internal processing
-                mediaType: media.mediaType,
+                mediaType: media.mediaType as 'image' | 'video' | 'gif',
                 fileUrl: media.storageKey,
+                storageKey: media.storageKey,
                 workspaceId: input.workspaceId,
               });
 
@@ -446,12 +449,38 @@ export class MediaUploadService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      media,
+      media: media as unknown as IMedia[],
       total,
       page,
       limit,
       totalPages,
     };
+  }
+
+  /**
+   * Get media library with search and filtering
+   */
+  async getMediaLibrary(options: {
+    workspaceId: string;
+    search?: string;
+    mediaType?: any;
+    status?: any;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    media: IMedia[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    // Delegate to existing getMediaList method
+    return this.getMediaList(options.workspaceId, {
+      mediaType: options.mediaType,
+      status: options.status,
+      page: options.page,
+      limit: options.limit,
+    });
   }
 
   /**
@@ -514,6 +543,72 @@ export class MediaUploadService {
       workspaceId,
     });
   }
+
+    async uploadMedia(input: {
+      workspaceId: string;
+      file: {
+        originalname: string;
+        mimetype: string;
+        size: number;
+        buffer: Buffer;
+      };
+      createdBy: string;
+    }): Promise<{ media: IMedia; url: string; thumbnailUrl?: string }> {
+      // Validate file
+      const validation = this.validateFile(input.file.mimetype, input.file.size);
+      if (!validation.valid) {
+        throw new BadRequestError(validation.error!);
+      }
+
+      // Generate storage key
+      const storageKey = this.generateStorageKey(input.workspaceId, input.file.originalname);
+
+      // Create media record
+      const media = new Media({
+        workspaceId: input.workspaceId,
+        filename: input.file.originalname,
+        mimeType: input.file.mimetype,
+        size: input.file.size,
+        storageKey,
+        status: 'completed',
+        createdBy: input.createdBy,
+      });
+
+      await media.save();
+
+      // Get URL
+      const url = this.getStorageUrl(storageKey);
+
+      return {
+        media,
+        url,
+        thumbnailUrl: validation.mediaType === MediaType.IMAGE ? url : undefined,
+      };
+    }
+
+    async getMediaByWorkspace(
+      workspaceId: string,
+      page: number,
+      limit: number,
+      skip: number
+    ): Promise<{ media: IMedia[]; total: number; page: number; limit: number; totalPages: number }> {
+      const [media, total] = await Promise.all([
+        Media.find({ workspaceId })
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Media.countDocuments({ workspaceId }),
+      ]);
+
+      return {
+        media: media as unknown as IMedia[],
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
 }
 
 // Export singleton instance

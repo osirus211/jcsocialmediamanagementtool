@@ -49,9 +49,11 @@ export interface YouTubeConnectResult {
 
 export class YouTubeOAuthService {
   private provider: YouTubeProvider;
+  private redirectUri: string;
 
   constructor(clientId: string, clientSecret: string, redirectUri: string) {
     this.provider = new YouTubeProvider(clientId, clientSecret, redirectUri);
+    this.redirectUri = redirectUri;
   }
 
   /**
@@ -91,10 +93,11 @@ export class YouTubeOAuthService {
       });
 
       // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken({
-        code: params.code,
-        state: params.state,
-      });
+      const tokens = await this.provider.exchangeCodeForToken(
+        params.code,
+        this.redirectUri,
+        undefined
+      );
 
       // Validate token expiration
       validateTokenExpiration(tokens.expiresAt, 'YouTube token exchange');
@@ -107,7 +110,7 @@ export class YouTubeOAuthService {
 
       logger.info('YouTube token exchange successful', {
         hasRefreshToken: !!tokens.refreshToken,
-        expiresIn: tokens.expiresIn,
+        expiresAt: tokens.expiresAt,
       });
 
       // Step 2: Get channel information
@@ -138,7 +141,7 @@ export class YouTubeOAuthService {
         accountType: 'CHANNEL',
         accessToken: tokens.accessToken, // Encrypted by pre-save hook
         refreshToken: tokens.refreshToken, // Encrypted by pre-save hook
-        tokenExpiresAt: tokens.expiresAt,
+        tokenExpiresAt: tokens.expiresAt || undefined,
         scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
         status: AccountStatus.ACTIVE,
         connectionVersion: 'v2',

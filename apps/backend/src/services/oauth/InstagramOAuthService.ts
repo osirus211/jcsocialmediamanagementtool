@@ -192,18 +192,19 @@ export class InstagramOAuthService {
       const provider = oauthProviderFactory.getProvider(params.providerType);
 
       // Step 1: Exchange code for long-lived token
-      const tokens = await provider.exchangeCodeForToken({
-        code: params.code,
-        state: params.state,
-      });
+      const tokens = await provider.exchangeCodeForToken(
+        params.code,
+        `${config.frontend.url}/api/v1/channels/oauth/callback/instagram`,
+        params.state
+      );
 
       // Validate token expiration
       validateTokenExpiration(tokens.expiresAt, `Instagram ${params.providerType} token exchange`);
 
       logger.info('Instagram token exchange successful', {
         providerType: params.providerType,
-        expiresIn: tokens.expiresIn,
-        expiresInDays: tokens.expiresIn ? Math.floor(tokens.expiresIn / 86400) : undefined,
+        expiresAt: tokens.expiresAt,
+        expiresInDays: tokens.expiresAt ? Math.floor((tokens.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined,
       });
 
       const saved: ISocialAccount[] = [];
@@ -390,7 +391,7 @@ export class InstagramOAuthService {
   ): Promise<void> {
     try {
       // Get Basic Display provider
-      const basicProvider = oauthProviderFactory.getProvider(ProviderType.INSTAGRAM_BASIC) as InstagramBasicDisplayProvider;
+      const basicProvider = oauthProviderFactory.getProvider(ProviderType.INSTAGRAM_BASIC) as unknown as InstagramBasicDisplayProvider;
 
       // Get user profile
       const profile = await basicProvider.getUserProfile(tokens.accessToken);
@@ -489,7 +490,7 @@ export class InstagramOAuthService {
       );
 
       // Step 1: Exchange code for token
-      const tokens = await professionalProvider.exchangeCodeForToken({
+      const tokens = await professionalProvider.exchangeCodeForTokenLegacy({
         code: params.code,
         state: params.state,
       });
@@ -608,9 +609,7 @@ export class InstagramOAuthService {
       const decryptedToken = account.getDecryptedAccessToken();
 
       // Refresh token by exchanging current token for new long-lived token
-      const tokens = await this.provider.refreshAccessToken({
-        refreshToken: decryptedToken, // Instagram uses current token for refresh
-      });
+      const tokens = await this.provider.refreshAccessToken(decryptedToken);
 
       // Update account with new token
       account.accessToken = tokens.accessToken;
@@ -622,7 +621,7 @@ export class InstagramOAuthService {
 
       logger.info('Instagram token refreshed', {
         accountId,
-        expiresIn: tokens.expiresIn,
+        expiresAt: tokens.expiresAt,
       });
 
       return account;

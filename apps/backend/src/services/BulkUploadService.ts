@@ -183,10 +183,9 @@ export class BulkUploadService {
           for (const platform of platforms) {
             await postService.createPost({
               workspaceId,
-              userId,
+              socialAccountId: '', // TODO: Get appropriate social account ID
+              platform,
               content: row.text,
-              platforms: [platform],
-              socialAccountIds: [], // Will be resolved by PostService
               mediaIds,
               scheduledAt,
             });
@@ -348,7 +347,7 @@ export class BulkUploadService {
         .limit(50)
         .lean();
 
-      return jobs as IBulkUploadJob[];
+      return jobs as unknown as IBulkUploadJob[];
     } catch (error: any) {
       logger.error('Failed to list upload jobs', {
         workspaceId,

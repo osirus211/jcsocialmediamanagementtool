@@ -7,5 +7,8 @@
 import { FacebookWebhookProvider } from './FacebookWebhookProvider';
 
 export class ThreadsWebhookProvider extends FacebookWebhookProvider {
-  readonly name = 'threads';
+  constructor() {
+    super();
+    (this as any).name = 'threads';
+  }
 }

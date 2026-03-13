@@ -341,7 +341,6 @@ export class InstagramBusinessProvider extends OAuthProvider {
       // Don't throw - revocation is best effort
     }
   }
-}
 
   /**
    * Discover Instagram Business accounts (PlatformAdapter interface)
@@ -440,3 +439,4 @@ export class InstagramBusinessProvider extends OAuthProvider {
       supportedFormats: ['jpg', 'jpeg', 'png', 'mp4', 'mov'],
     };
   }
+}

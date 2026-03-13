@@ -74,11 +74,11 @@ export class PlatformController {
   async getRateLimits(req: Request, res: Response): Promise<void> {
     try {
       // Verify user is authenticated
-      if (!req.user || !req.user.workspaceId) {
+      if (!req.user || !(req as any).workspace?.workspaceId) {
         throw new UnauthorizedError('Authentication required');
       }
 
-      const workspaceId = req.user.workspaceId;
+      const workspaceId = (req as any).workspace.workspaceId.toString();
 
       logger.debug('Fetching rate limits for workspace', { workspaceId });
 
@@ -136,7 +136,7 @@ export class PlatformController {
       logger.error('Failed to fetch rate limits', {
         error: error.message,
         stack: error.stack,
-        workspaceId: req.user?.workspaceId,
+        workspaceId: (req as any).workspace?.workspaceId?.toString(),
       });
 
       // Handle authentication errors

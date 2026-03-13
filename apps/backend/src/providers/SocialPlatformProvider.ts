@@ -282,6 +282,20 @@ export abstract class SocialPlatformProvider extends EventEmitter {
     thresholdMinutes?: number
   ): Promise<boolean>;
 
+  /**
+   * Lookup post by platform post ID
+   * 
+   * Retrieves post information from the platform
+   */
+  abstract lookupPost(request: {
+    accountId: mongoose.Types.ObjectId | string;
+    platformPostId: string;
+  }): Promise<{
+    found: boolean;
+    post?: any;
+    error?: string;
+  }>;
+
   // ============================================================================
   // Event Emitters (protected helpers for subclasses)
   // ============================================================================

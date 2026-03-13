@@ -82,7 +82,7 @@ export function initializeSentry(): void {
       // Integrations
       integrations: [
         // Capture unhandled exceptions
-        new Sentry.Integrations.OnUncaughtException({
+        Sentry.onUncaughtExceptionIntegration({
           onFatalError: async (err) => {
             logger.error('Uncaught exception - shutting down', { error: err.message });
             process.exit(1);
@@ -90,7 +90,7 @@ export function initializeSentry(): void {
         }),
 
         // Capture unhandled promise rejections
-        new Sentry.Integrations.OnUnhandledRejection({
+        Sentry.onUnhandledRejectionIntegration({
           mode: 'warn',
         }),
       ],
@@ -120,11 +120,17 @@ export function sentryRequestHandler() {
     return (req: Request, res: Response, next: NextFunction) => next();
   }
   
-  return Sentry.Handlers.requestHandler({
-    user: ['id', 'email', 'userId'],
-    request: true,
-    transaction: 'methodPath',
-  });
+  return (req: Request, res: Response, next: NextFunction) => {
+    // Set user context if available
+    if (req.user) {
+      const user = req.user as any;
+      Sentry.setUser({
+        id: user.userId || user.id,
+        email: user.email,
+      });
+    }
+    next();
+  };
 }
 
 /**
@@ -141,7 +147,7 @@ export function sentryTracingHandler() {
     return (req: Request, res: Response, next: NextFunction) => next();
   }
   
-  return Sentry.Handlers.tracingHandler();
+  return (req: Request, res: Response, next: NextFunction) => next();
 }
 
 /**
@@ -158,16 +164,19 @@ export function sentryErrorHandler() {
     return (err: any, req: Request, res: Response, next: NextFunction) => next(err);
   }
   
-  return Sentry.Handlers.errorHandler({
-    shouldHandleError(error) {
-      // Only handle 5xx errors
-      if (error && typeof error === 'object' && 'statusCode' in error) {
-        const statusCode = (error as any).statusCode;
-        return statusCode >= 500;
+  return (err: any, req: Request, res: Response, next: NextFunction) => {
+    // Only handle 5xx errors
+    if (err && typeof err === 'object' && 'statusCode' in err) {
+      const statusCode = (err as any).statusCode;
+      if (statusCode >= 400 && statusCode < 500) {
+        return next(err); // Don't send 4xx errors to Sentry
       }
-      return true;
-    },
-  });
+    }
+    
+    // Capture the error in Sentry
+    Sentry.captureException(err);
+    next(err);
+  };
 }
 
 /**

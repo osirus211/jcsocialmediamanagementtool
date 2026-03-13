@@ -81,8 +81,9 @@ async function startWorkers() {
     
     // Token Refresh Worker (if exists)
     try {
-      const { tokenRefreshWorker } = await import('./workers/TokenRefreshWorker');
-      workerManager.registerWorker('token-refresh-worker', tokenRefreshWorker, {
+      const { TokenRefreshWorker } = await import('./workers/TokenRefreshWorker');
+      const tokenRefreshWorker = new TokenRefreshWorker();
+      workerManager.registerWorker('token-refresh-worker', tokenRefreshWorker as any, {
         enabled: true,
         maxRestarts: 3,
         restartDelay: 5000,
@@ -93,8 +94,9 @@ async function startWorkers() {
     
     // Media Processing Worker (if exists)
     try {
-      const { mediaProcessingWorker } = await import('./workers/MediaProcessingWorker');
-      workerManager.registerWorker('media-processing-worker', mediaProcessingWorker, {
+      const { MediaProcessingWorker } = await import('./workers/MediaProcessingWorker');
+      const mediaProcessingWorker = new MediaProcessingWorker();
+      workerManager.registerWorker('media-processing-worker', mediaProcessingWorker as any, {
         enabled: true,
         maxRestarts: 3,
         restartDelay: 5000,

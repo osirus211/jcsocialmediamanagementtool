@@ -338,13 +338,13 @@ export class WebhookRetryService {
     }, {});
 
     return {
-      deliveries,
+      deliveries: deliveries as unknown as IWebhookDelivery[],
       total,
       stats: {
         totalDeliveries: total,
-        successfulDeliveries: statsMap.success || 0,
-        failedDeliveries: statsMap.failed || 0,
-        deadLetterDeliveries: statsMap.dead_letter || 0,
+        successfulDeliveries: (statsMap as any).success || 0,
+        failedDeliveries: (statsMap as any).failed || 0,
+        deadLetterDeliveries: (statsMap as any).dead_letter || 0,
       },
     };
   }
@@ -353,13 +353,15 @@ export class WebhookRetryService {
    * Get pending retries that are ready to be processed
    */
   static async getPendingRetries(limit: number = 100): Promise<IWebhookDelivery[]> {
-    return WebhookDelivery.find({
+    const deliveries = await WebhookDelivery.find({
       status: 'failed',
       nextRetryAt: { $lte: new Date() },
     })
       .sort({ nextRetryAt: 1 })
       .limit(limit)
       .lean();
+    
+    return deliveries as unknown as IWebhookDelivery[];
   }
 
   /**

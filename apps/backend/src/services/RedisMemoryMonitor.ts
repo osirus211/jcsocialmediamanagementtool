@@ -263,7 +263,7 @@ export class RedisMemoryMonitor {
 
     try {
       // Trigger Redis memory cleanup
-      await redis.memory('purge');
+      await (redis as any).memory('PURGE');
       recordCircuitBreakerSuccess();
       
       logger.info('Redis memory cleanup triggered');
