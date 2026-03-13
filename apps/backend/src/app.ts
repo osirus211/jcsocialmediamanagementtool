@@ -27,6 +27,7 @@ import apiV1Routes from './routes/v1';
 import publicApiV1Routes from './routes/public/v1';
 import apiV2Routes from './api/v2';
 import redirectRoutes from './routes/redirect.routes';
+import unsubscribeRoutes from './routes/unsubscribe';
 
 const app: Application = express();
 
@@ -416,6 +417,9 @@ app.get('/internal/publishing-health', async (_req: Request, res: Response) => {
 
 // Redirect routes (must be before API routes)
 app.use('/r', redirectRoutes);
+
+// Unsubscribe routes (public, no auth required)
+app.use('/unsubscribe', unsubscribeRoutes);
 
 // API v2 routes (external public API)
 app.use('/api/v2', apiV2Routes);

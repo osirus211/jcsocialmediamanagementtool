@@ -450,16 +450,21 @@ export class AuthService {
    */
   private static async sendWelcomeEmail(user: IUser): Promise<void> {
     try {
-      const { emailNotificationService } = await import('./EmailNotificationService');
+      const { emailSequenceService } = await import('./EmailSequenceService');
 
-      // Stub implementation - email service method doesn't exist yet
-      logger.info('Welcome email would be sent', {
-        to: user.email,
-        userName: `${user.firstName} ${user.lastName}`,
+      // Start the welcome email sequence
+      await emailSequenceService.startSequence(user._id.toString());
+      
+      logger.info('Welcome email sequence started', {
         userId: user._id.toString(),
+        email: user.email,
+        userName: `${user.firstName} ${user.lastName}`,
       });
     } catch (error: any) {
-      logger.error('Error sending welcome email', { error: error.message });
+      logger.error('Error starting welcome email sequence', { 
+        userId: user._id.toString(),
+        error: error.message 
+      });
       // Don't throw - email failures should not affect registration
     }
   }

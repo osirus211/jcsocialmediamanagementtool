@@ -79,6 +79,11 @@ export interface IUser extends Document {
   onboardingCompleted: boolean;
   onboardingStep: number;
   
+  // Email sequence state
+  emailSequenceStep: number;
+  emailSequenceStarted: boolean;
+  emailSequenceCompleted: boolean;
+  
   createdAt: Date;
   updatedAt: Date;
 
@@ -215,6 +220,20 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
       default: 0,
       min: 0,
       max: 5,
+    },
+    emailSequenceStep: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 4,
+    },
+    emailSequenceStarted: {
+      type: Boolean,
+      default: false,
+    },
+    emailSequenceCompleted: {
+      type: Boolean,
+      default: false,
     },
   },
   {

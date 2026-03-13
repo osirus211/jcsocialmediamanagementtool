@@ -23,6 +23,7 @@ const PORT = config.port;
 let serverInstance: Server | null = null;
 let workerInstance: any = null;
 let tokenRefreshWorkerInstance: any = null;
+let emailSequenceWorkerInstance: any = null;
 let systemMonitorInstance: any = null;
 let backupVerificationWorkerInstance: any = null;
 let metricsControllerInstance: any = null;
@@ -96,14 +97,21 @@ const gracefulShutdown = async (signal: string) => {
       }
     }
     
-    // 3c. Stop system monitor
+    // 3c. Stop email sequence worker
+    if (emailSequenceWorkerInstance) {
+      logger.info('Stopping email sequence worker...');
+      await emailSequenceWorkerInstance.close();
+      logger.info('✅ Email sequence worker stopped');
+    }
+    
+    // 3d. Stop system monitor
     if (systemMonitorInstance) {
       logger.info('Stopping system monitor...');
       systemMonitorInstance.stop();
       logger.info('✅ System monitor stopped');
     }
     
-    // 3d. Stop backup verification worker
+    // 3e. Stop backup verification worker
     if (backupVerificationWorkerInstance) {
       logger.info('Stopping backup verification worker...');
       backupVerificationWorkerInstance.stop();
@@ -436,6 +444,27 @@ const startServer = async () => {
         logger.error('❌ Token refresh system failed to start:', error);
         logger.warn('Continuing without token refresh');
       }
+    }
+
+    console.log('🔧 Checking email sequence worker...');
+    // Start email sequence worker if Redis is connected
+    if (redisConnected) {
+      try {
+        const { emailSequenceWorker } = await import('./workers/EmailSequenceWorker');
+        
+        // Store reference for graceful shutdown
+        emailSequenceWorkerInstance = emailSequenceWorker;
+        
+        logger.info('📧 Email sequence worker started');
+        console.log('✅ Email sequence worker started');
+      } catch (error) {
+        console.log('❌ Email sequence worker failed to start:', error);
+        logger.error('❌ Email sequence worker failed to start:', error);
+        logger.warn('Continuing without email sequence worker');
+      }
+    } else {
+      console.log('⏸️  Email sequence worker DISABLED (Redis not connected)');
+      logger.warn('⏸️  Email sequence worker DISABLED (Redis not connected)');
     }
 
     console.log('🔧 Checking missed post recovery service...');

@@ -31,7 +31,11 @@ export type NotificationType =
   | 'SUBSCRIPTION_CREATED'
   | 'SUBSCRIPTION_UPDATED'
   | 'SUBSCRIPTION_CANCELLED'
-  | 'PAYMENT_FAILED';
+  | 'PAYMENT_FAILED'
+  | 'WELCOME_DAY_0'
+  | 'WELCOME_DAY_1'
+  | 'WELCOME_DAY_3'
+  | 'WELCOME_DAY_7';
 
 export interface EmailJobData {
   type: NotificationType;
@@ -111,6 +115,10 @@ export class EmailQueue {
       PASSWORD_RESET: 2,
       MAGIC_LINK: 2, // High priority for passwordless auth
       USER_SIGNUP: 3,
+      WELCOME_DAY_0: 3, // Same priority as signup
+      WELCOME_DAY_1: 4,
+      WELCOME_DAY_3: 4,
+      WELCOME_DAY_7: 4,
       OAUTH_EXPIRED: 4,
       OAUTH_REFRESH_FAILURE: 4,
       PAYMENT_FAILED: 5,
