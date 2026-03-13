@@ -1,4 +1,4 @@
-import { User, IUser } from '../models/User';
+import { User } from '../models/User';
 import { GDPRRequestLog, GDPRRequestType, GDPRRequestStatus, IGDPRRequestLog } from '../models/GDPRRequestLog';
 import { logger } from '../utils/logger';
 import { NotFoundError, BadRequestError } from '../utils/errors';
@@ -584,7 +584,7 @@ export class GDPRService {
     }
   }
 
-  private static async getUserBillingHistory(userId: string): Promise<any[]> {
+  private static async getUserBillingHistory(userId: string): Promise<any> {
     try {
       // Import billing models dynamically to avoid circular dependencies
       const { Subscription } = await import('../models/Subscription');

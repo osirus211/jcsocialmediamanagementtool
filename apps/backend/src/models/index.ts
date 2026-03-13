@@ -8,6 +8,8 @@ export * from './PostAnalytics';
 export * from './TikTokPost';
 export * from './Plan';
 export * from './Subscription';
+export * from './Invoice';
+export * from './Payment';
 export * from './ApiKey';
 
 // Phase-5: Automation Engine models
