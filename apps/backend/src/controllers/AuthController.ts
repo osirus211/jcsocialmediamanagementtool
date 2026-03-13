@@ -290,6 +290,170 @@ export class AuthController {
   }
 
   /**
+   * Update user profile
+   * PATCH /api/v1/auth/profile
+   */
+  static async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { firstName, lastName, bio, timezone, language } = req.body;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const updatedUser = await AuthService.updateProfile(userId, {
+        firstName,
+        lastName,
+        bio,
+        timezone,
+        language,
+      });
+
+      res.status(200).json({
+        message: 'Profile updated successfully',
+        user: updatedUser,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upload avatar
+   * POST /api/v1/auth/avatar
+   */
+  static async uploadAvatar(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+      }
+
+      const avatarUrl = await AuthService.uploadAvatar(userId, req.file);
+
+      res.status(200).json({
+        message: 'Avatar uploaded successfully',
+        avatarUrl,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get active sessions
+   * GET /api/v1/auth/sessions
+   */
+  static async getSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const sessions = await AuthService.getSessions(userId);
+
+      res.status(200).json({
+        sessions,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Revoke specific session
+   * DELETE /api/v1/auth/sessions/:sessionId
+   */
+  static async revokeSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { sessionId } = req.params;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      await AuthService.revokeSession(userId, sessionId);
+
+      res.status(200).json({
+        message: 'Session revoked successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update notification preferences
+   * PATCH /api/v1/auth/notifications
+   */
+  static async updateNotificationPreferences(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { email, push } = req.body;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const updatedUser = await AuthService.updateNotificationPreferences(userId, {
+        email,
+        push,
+      });
+
+      res.status(200).json({
+        message: 'Notification preferences updated successfully',
+        notificationPreferences: updatedUser.notificationPreferences,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete account
+   * DELETE /api/v1/auth/account
+   */
+  static async deleteAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { password } = req.body;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      await AuthService.deleteAccount(userId, password);
+
+      // Clear refresh token cookie
+      res.clearCookie('refreshToken', {
+        path: '/api/v1/auth',
+      });
+
+      res.status(200).json({
+        message: 'Account deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Complete login after 2FA verification
    * POST /api/v1/auth/complete-login
    */

@@ -39,6 +39,9 @@ export interface IUser extends Document {
   firstName: string;
   lastName: string;
   avatar?: string;
+  bio?: string;
+  timezone?: string;
+  language?: string;
   role: UserRole;
   isEmailVerified: boolean;
   provider: OAuthProvider;
@@ -56,6 +59,21 @@ export interface IUser extends Document {
   // Magic link / passwordless authentication
   magicLinkToken?: string;
   magicLinkExpiresAt?: Date;
+  
+  // Notification preferences
+  notificationPreferences: {
+    email: {
+      postPublished: boolean;
+      postFailed: boolean;
+      weeklyReport: boolean;
+      accountIssues: boolean;
+    };
+    push: {
+      postPublished: boolean;
+      postFailed: boolean;
+      accountIssues: boolean;
+    };
+  };
   
   createdAt: Date;
   updatedAt: Date;
@@ -106,6 +124,19 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
       type: String,
       default: null,
     },
+    bio: {
+      type: String,
+      maxlength: [500, 'Bio cannot exceed 500 characters'],
+      default: null,
+    },
+    timezone: {
+      type: String,
+      default: 'UTC',
+    },
+    language: {
+      type: String,
+      default: 'en',
+    },
     role: {
       type: String,
       enum: Object.values(UserRole),
@@ -143,6 +174,34 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     twoFactorVerifiedAt: { type: Date, default: null },
     magicLinkToken: { type: String, default: null, select: false },
     magicLinkExpiresAt: { type: Date, default: null, select: false },
+    notificationPreferences: {
+      type: {
+        email: {
+          postPublished: { type: Boolean, default: true },
+          postFailed: { type: Boolean, default: true },
+          weeklyReport: { type: Boolean, default: true },
+          accountIssues: { type: Boolean, default: true },
+        },
+        push: {
+          postPublished: { type: Boolean, default: false },
+          postFailed: { type: Boolean, default: true },
+          accountIssues: { type: Boolean, default: true },
+        },
+      },
+      default: () => ({
+        email: {
+          postPublished: true,
+          postFailed: true,
+          weeklyReport: true,
+          accountIssues: true,
+        },
+        push: {
+          postPublished: false,
+          postFailed: true,
+          accountIssues: true,
+        },
+      }),
+    },
   },
   {
     timestamps: true,

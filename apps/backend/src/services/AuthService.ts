@@ -446,78 +446,6 @@ export class AuthService {
   }
 
   /**
-   * Complete login after 2FA verification
-   */
-  static async completeLogin(userId: string, token: string): Promise<AuthResponse> {
-    try {
-      logger.info('RUNTIME_TRACE COMPLETE_LOGIN_START', { timestamp: new Date().toISOString(), userId });
-      
-      // Find user with 2FA fields
-      const user = await User.findById(userId).select('+twoFactorSecret +twoFactorBackupCodes +refreshTokens');
-      if (!user) {
-        throw new NotFoundError('User not found');
-      }
-
-      // Check if 2FA is enabled
-      if (!user.twoFactorEnabled || !user.twoFactorSecret) {
-        throw new BadRequestError('Two-factor authentication is not enabled for this user');
-      }
-
-      let isValid = false;
-      let usedBackupCodeIndex = -1;
-
-      // Check if token is 6 digits (TOTP) or 8 characters (backup code)
-      if (/^\d{6}$/.test(token)) {
-        // Verify TOTP token
-        const { TwoFactorService } = await import('./TwoFactorService');
-        isValid = TwoFactorService.verifyToken(token, user.twoFactorSecret);
-      } else if (/^[0-9A-F]{8}$/i.test(token)) {
-        // Verify backup code
-        const { TwoFactorService } = await import('./TwoFactorService');
-        const verification = TwoFactorService.verifyBackupCode(token, user.twoFactorBackupCodes);
-        isValid = verification.valid;
-        usedBackupCodeIndex = verification.index;
-      }
-
-      if (!isValid) {
-        throw new UnauthorizedError('Invalid verification code');
-      }
-
-      // If backup code was used, mark it as consumed
-      if (usedBackupCodeIndex >= 0) {
-        user.twoFactorBackupCodes.splice(usedBackupCodeIndex, 1);
-        logger.info('Backup code consumed', { userId, remainingCodes: user.twoFactorBackupCodes.length });
-      }
-
-      // Update last login
-      user.lastLoginAt = new Date();
-      await user.save();
-
-      logger.info('2FA verification successful, completing login', { userId, method: usedBackupCodeIndex >= 0 ? 'backup' : 'totp' });
-
-      // Generate tokens
-      const tokens = TokenService.generateTokenPair({
-        userId: user._id.toString(),
-        email: user.email,
-        role: user.role,
-      });
-
-      // Store refresh token
-      await user.addRefreshToken(tokens.refreshToken);
-
-      // Increment login success metric
-      authMetricsTracker.incrementLoginSuccess();
-
-      logger.info('RUNTIME_TRACE COMPLETE_LOGIN_SUCCESS', { timestamp: new Date().toISOString(), userId });
-      return { user, tokens };
-    } catch (error) {
-      logger.error('RUNTIME_TRACE COMPLETE_LOGIN_FAILED', { timestamp: new Date().toISOString(), userId });
-      logger.error('Complete login error:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Send welcome email to new user
    */
   private static async sendWelcomeEmail(user: IUser): Promise<void> {
@@ -556,6 +484,289 @@ export class AuthService {
     } catch (error: any) {
       logger.error('Error sending password reset email', { error: error.message });
       // Don't throw - email failures should not affect password reset flow
+    }
+  }
+
+  /**
+   * Update user profile
+   */
+  static async updateProfile(userId: string, updates: {
+    firstName?: string;
+    lastName?: string;
+    bio?: string;
+    timezone?: string;
+    language?: string;
+  }): Promise<IUser> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Update fields
+      if (updates.firstName !== undefined) user.firstName = updates.firstName;
+      if (updates.lastName !== undefined) user.lastName = updates.lastName;
+      if (updates.bio !== undefined) user.bio = updates.bio;
+      if (updates.timezone !== undefined) user.timezone = updates.timezone;
+      if (updates.language !== undefined) user.language = updates.language;
+
+      await user.save();
+
+      logger.info('User profile updated', {
+        userId: user._id.toString(),
+        updatedFields: Object.keys(updates),
+      });
+
+      return user;
+    } catch (error: any) {
+      logger.error('Error updating user profile', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Upload avatar
+   */
+  static async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Implement actual file upload to cloud storage
+      // For now, we'll simulate the upload
+      const avatarUrl = `/uploads/avatars/${userId}-${Date.now()}.${file.originalname.split('.').pop()}`;
+      
+      user.avatar = avatarUrl;
+      await user.save();
+
+      logger.info('User avatar uploaded', {
+        userId: user._id.toString(),
+        avatarUrl,
+      });
+
+      return avatarUrl;
+    } catch (error: any) {
+      logger.error('Error uploading avatar', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get active sessions
+   */
+  static async getSessions(userId: string): Promise<Array<{
+    id: string;
+    device: string;
+    location: string;
+    lastActive: Date;
+    current: boolean;
+  }>> {
+    try {
+      const user = await User.findById(userId).select('+refreshTokens');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Implement actual session tracking with device/location info
+      // For now, return mock data based on refresh tokens
+      const sessions = user.refreshTokens.map((token, index) => ({
+        id: token.substring(0, 8),
+        device: index === 0 ? 'Current Device' : `Device ${index + 1}`,
+        location: 'Unknown Location',
+        lastActive: new Date(),
+        current: index === 0,
+      }));
+
+      return sessions;
+    } catch (error: any) {
+      logger.error('Error getting user sessions', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Revoke specific session
+   */
+  static async revokeSession(userId: string, sessionId: string): Promise<void> {
+    try {
+      const user = await User.findById(userId).select('+refreshTokens');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Find token by session ID (first 8 chars)
+      const tokenIndex = user.refreshTokens.findIndex(token => 
+        token.substring(0, 8) === sessionId
+      );
+
+      if (tokenIndex === -1) {
+        throw new NotFoundError('Session not found');
+      }
+
+      user.refreshTokens.splice(tokenIndex, 1);
+      await user.save();
+
+      logger.info('User session revoked', {
+        userId: user._id.toString(),
+        sessionId,
+      });
+    } catch (error: any) {
+      logger.error('Error revoking user session', {
+        userId,
+        sessionId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update notification preferences
+   */
+  static async updateNotificationPreferences(userId: string, preferences: {
+    email?: {
+      postPublished?: boolean;
+      postFailed?: boolean;
+      weeklyReport?: boolean;
+      accountIssues?: boolean;
+    };
+    push?: {
+      postPublished?: boolean;
+      postFailed?: boolean;
+      accountIssues?: boolean;
+    };
+  }): Promise<IUser> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Update notification preferences
+      if (preferences.email) {
+        Object.assign(user.notificationPreferences.email, preferences.email);
+      }
+      if (preferences.push) {
+        Object.assign(user.notificationPreferences.push, preferences.push);
+      }
+
+      await user.save();
+
+      logger.info('User notification preferences updated', {
+        userId: user._id.toString(),
+      });
+
+      return user;
+    } catch (error: any) {
+      logger.error('Error updating notification preferences', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete account (soft delete)
+   */
+  static async deleteAccount(userId: string, password: string): Promise<void> {
+    try {
+      const user = await User.findById(userId).select('+password');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Verify password for local accounts
+      if (user.provider === OAuthProvider.LOCAL) {
+        const isPasswordValid = await user.comparePassword(password);
+        if (!isPasswordValid) {
+          throw new UnauthorizedError('Invalid password');
+        }
+      }
+
+      // Soft delete the user
+      user.softDeletedAt = new Date();
+      user.refreshTokens = []; // Clear all sessions
+      await user.save();
+
+      logger.info('User account deleted', {
+        userId: user._id.toString(),
+      });
+    } catch (error: any) {
+      logger.error('Error deleting user account', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Complete login after 2FA verification
+   * POST /api/v1/auth/complete-login
+   */
+  static async completeLogin(userId: string, token: string): Promise<AuthResponse> {
+    try {
+      const user = await User.findById(userId).select('+twoFactorSecret +twoFactorBackupCodes');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      if (!user.twoFactorEnabled) {
+        throw new BadRequestError('Two-factor authentication is not enabled for this user');
+      }
+
+      // Import TwoFactorService dynamically to avoid circular dependency
+      const { TwoFactorService } = await import('./TwoFactorService');
+      
+      const isValidToken = await TwoFactorService.verifyToken(token, user.twoFactorSecret!);
+      if (!isValidToken) {
+        // authMetricsTracker.recordFailedLogin(user.email, '2FA verification failed');
+        throw new UnauthorizedError('Invalid verification code');
+      }
+
+      // Update last login
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      // Generate tokens
+      const tokens = await TokenService.generateTokenPair({
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      });
+
+      // Add refresh token to user
+      await user.addRefreshToken(tokens.refreshToken);
+
+      // authMetricsTracker.recordSuccessfulLogin(user.email);
+
+      logger.info('2FA login completed successfully', {
+        userId: user._id.toString(),
+        email: user.email,
+      });
+
+      return {
+        user,
+        tokens,
+      };
+    } catch (error: any) {
+      logger.error('Error completing 2FA login', {
+        userId,
+        error: error.message,
+      });
+      throw error;
     }
   }
 }

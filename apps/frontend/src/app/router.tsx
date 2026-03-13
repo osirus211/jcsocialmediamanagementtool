@@ -41,6 +41,9 @@ const CompetitorPage = lazy(() => import('@/pages/analytics/CompetitorPage').the
 // Settings
 const WebhooksPage = lazy(() => import('@/pages/settings/WebhooksPage').then(module => ({ default: module.WebhooksPage })));
 const AutomationPage = lazy(() => import('@/pages/settings/AutomationPage').then(module => ({ default: module.default })));
+const UserProfilePage = lazy(() => import('@/pages/settings/UserProfilePage').then(module => ({ default: module.UserProfilePage })));
+const SecuritySettingsPage = lazy(() => import('@/pages/settings/SecuritySettingsPage').then(module => ({ default: module.SecuritySettingsPage })));
+const TwoFactorSetupPage = lazy(() => import('@/pages/settings/TwoFactorSetupPage').then(module => ({ default: module.TwoFactorSetupPage })));
 
 // Team & Collaboration
 const ApprovalsPage = lazy(() => import('@/pages/approvals/ApprovalsPage').then(module => ({ default: module.ApprovalsPage })));
@@ -175,6 +178,18 @@ const router = createBrowserRouter([
       {
         path: 'analytics/competitors',
         element: <SuspenseWrapper><CompetitorPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'settings/profile',
+        element: <SuspenseWrapper><UserProfilePage /></SuspenseWrapper>,
+      },
+      {
+        path: 'settings/security',
+        element: <SuspenseWrapper><SecuritySettingsPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'settings/2fa/setup',
+        element: <SuspenseWrapper><TwoFactorSetupPage /></SuspenseWrapper>,
       },
       {
         path: 'settings/webhooks',

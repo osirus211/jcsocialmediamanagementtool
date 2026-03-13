@@ -92,3 +92,64 @@ export const completeLoginSchema = z.object({
       }, 'Token must be a 6-digit TOTP code or 8-character backup code'),
   }),
 });
+
+/**
+ * Update profile validation schema
+ */
+export const updateProfileSchema = z.object({
+  body: z.object({
+    firstName: z
+      .string()
+      .min(1, 'First name is required')
+      .max(50, 'First name cannot exceed 50 characters')
+      .trim()
+      .optional(),
+    lastName: z
+      .string()
+      .min(1, 'Last name is required')
+      .max(50, 'Last name cannot exceed 50 characters')
+      .trim()
+      .optional(),
+    bio: z
+      .string()
+      .max(500, 'Bio cannot exceed 500 characters')
+      .optional(),
+    timezone: z
+      .string()
+      .min(1, 'Timezone is required')
+      .optional(),
+    language: z
+      .string()
+      .min(2, 'Language code must be at least 2 characters')
+      .max(5, 'Language code cannot exceed 5 characters')
+      .optional(),
+  }),
+});
+
+/**
+ * Update notification preferences validation schema
+ */
+export const updateNotificationPreferencesSchema = z.object({
+  body: z.object({
+    email: z.object({
+      postPublished: z.boolean().optional(),
+      postFailed: z.boolean().optional(),
+      weeklyReport: z.boolean().optional(),
+      accountIssues: z.boolean().optional(),
+    }).optional(),
+    push: z.object({
+      postPublished: z.boolean().optional(),
+      postFailed: z.boolean().optional(),
+      accountIssues: z.boolean().optional(),
+    }).optional(),
+  }),
+});
+
+/**
+ * Delete account validation schema
+ */
+export const deleteAccountSchema = z.object({
+  body: z.object({
+    password: z.string().min(1, 'Password is required'),
+  }),
+});

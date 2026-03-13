@@ -18,6 +18,9 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
   completeLoginSchema,
+  updateProfileSchema,
+  updateNotificationPreferencesSchema,
+  deleteAccountSchema,
 } from '../../validators/auth.validators';
 
 const router = Router();
@@ -82,6 +85,24 @@ router.post(
 
 // Get current user
 router.get('/me', requireAuth, AuthController.getCurrentUser);
+
+// Update profile
+router.patch('/profile', requireAuth, validateRequest(updateProfileSchema), AuthController.updateProfile);
+
+// Upload avatar (TODO: Add multer middleware)
+router.post('/avatar', requireAuth, AuthController.uploadAvatar);
+
+// Get active sessions
+router.get('/sessions', requireAuth, AuthController.getSessions);
+
+// Revoke specific session
+router.delete('/sessions/:sessionId', requireAuth, AuthController.revokeSession);
+
+// Update notification preferences
+router.patch('/notifications', requireAuth, validateRequest(updateNotificationPreferencesSchema), AuthController.updateNotificationPreferences);
+
+// Delete account
+router.delete('/account', requireAuth, validateRequest(deleteAccountSchema), AuthController.deleteAccount);
 
 // Logout current session
 router.post('/logout', requireAuth, AuthController.logout);
