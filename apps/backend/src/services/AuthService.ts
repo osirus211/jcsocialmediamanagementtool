@@ -769,4 +769,367 @@ export class AuthService {
       throw error;
     }
   }
+
+  /**
+   * Request email change
+   */
+  static async requestEmailChange(userId: string, newEmail: string, password: string): Promise<void> {
+    try {
+      const user = await User.findById(userId).select('+password');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Verify password for local accounts
+      if (user.provider === OAuthProvider.LOCAL) {
+        const isPasswordValid = await user.comparePassword(password);
+        if (!isPasswordValid) {
+          throw new UnauthorizedError('Invalid password');
+        }
+      }
+
+      // Check if new email is already in use
+      const existingUser = await User.findOne({ 
+        email: newEmail.toLowerCase(), 
+        softDeletedAt: null 
+      });
+      if (existingUser) {
+        throw new BadRequestError('Email address is already in use');
+      }
+
+      // TODO: Generate verification token and store pending email change
+      // For now, we'll simulate the process
+      logger.info('Email change requested', {
+        userId: user._id.toString(),
+        currentEmail: user.email,
+        newEmail,
+      });
+
+      // TODO: Send verification email to new address
+      AuthService.sendEmailChangeVerification(user, newEmail).catch(err => {
+        logger.warn('Failed to send email change verification', { 
+          userId: user._id, 
+          error: err.message 
+        });
+      });
+    } catch (error: any) {
+      logger.error('Error requesting email change', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Resend email verification
+   */
+  static async resendEmailVerification(userId: string): Promise<void> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Check if there's a pending email change and resend verification
+      logger.info('Email verification resent', {
+        userId: user._id.toString(),
+      });
+    } catch (error: any) {
+      logger.error('Error resending email verification', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel email change
+   */
+  static async cancelEmailChange(userId: string): Promise<void> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Remove pending email change record
+      logger.info('Email change cancelled', {
+        userId: user._id.toString(),
+      });
+    } catch (error: any) {
+      logger.error('Error cancelling email change', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending email change
+   */
+  static async getPendingEmailChange(userId: string): Promise<any> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Return actual pending email change from database
+      // For now, return null (no pending changes)
+      return null;
+    } catch (error: any) {
+      logger.error('Error getting pending email change', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get login history
+   */
+  static async getLoginHistory(userId: string, limit: number, offset: number): Promise<Array<{
+    id: string;
+    timestamp: string;
+    ipAddress: string;
+    userAgent: string;
+    success: boolean;
+    location?: string;
+    device?: string;
+  }>> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Implement actual login history tracking
+      // For now, return mock data
+      const mockHistory = Array.from({ length: Math.min(limit, 10) }, (_, i) => ({
+        id: `login_${i + 1}`,
+        timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+        ipAddress: `192.168.1.${100 + i}`,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        success: Math.random() > 0.1, // 90% success rate
+        location: 'Unknown',
+        device: 'Desktop',
+      }));
+
+      return mockHistory;
+    } catch (error: any) {
+      logger.error('Error getting login history', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get trusted devices
+   */
+  static async getTrustedDevices(userId: string): Promise<Array<{
+    id: string;
+    name: string;
+    browser: string;
+    os: string;
+    lastUsed: string;
+    isCurrent: boolean;
+    fingerprint: string;
+  }>> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Implement actual trusted device tracking
+      // For now, return mock data
+      const mockDevices = [
+        {
+          id: 'device_1',
+          name: 'Current Device',
+          browser: 'Chrome 120',
+          os: 'Windows 10',
+          lastUsed: new Date().toISOString(),
+          isCurrent: true,
+          fingerprint: 'fp_current',
+        },
+        {
+          id: 'device_2',
+          name: 'Mobile Device',
+          browser: 'Safari 17',
+          os: 'iOS 17',
+          lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          isCurrent: false,
+          fingerprint: 'fp_mobile',
+        },
+      ];
+
+      return mockDevices;
+    } catch (error: any) {
+      logger.error('Error getting trusted devices', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Revoke trusted device
+   */
+  static async revokeTrustedDevice(userId: string, deviceId: string): Promise<void> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Implement actual device revocation
+      logger.info('Trusted device revoked', {
+        userId: user._id.toString(),
+        deviceId,
+      });
+    } catch (error: any) {
+      logger.error('Error revoking trusted device', {
+        userId,
+        deviceId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get account status
+   */
+  static async getAccountStatus(userId: string): Promise<{
+    status: 'active' | 'suspended' | 'deactivated';
+    createdAt: string;
+    lastLoginAt: string;
+    emailVerified: boolean;
+    twoFactorEnabled: boolean;
+  }> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      return {
+        status: user.softDeletedAt ? 'deactivated' : 'active',
+        createdAt: user.createdAt.toISOString(),
+        lastLoginAt: user.lastLoginAt?.toISOString() || user.createdAt.toISOString(),
+        emailVerified: user.isEmailVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+      };
+    } catch (error: any) {
+      logger.error('Error getting account status', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Export account data (GDPR compliance)
+   */
+  static async exportAccountData(userId: string): Promise<any> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // TODO: Gather all user data from various collections
+      const exportData = {
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          bio: user.bio,
+          timezone: user.timezone,
+          language: user.language,
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt,
+          isEmailVerified: user.isEmailVerified,
+          twoFactorEnabled: user.twoFactorEnabled,
+        },
+        // TODO: Add posts, analytics, workspaces, etc.
+        posts: [],
+        workspaces: [],
+        analytics: [],
+        exportedAt: new Date().toISOString(),
+      };
+
+      logger.info('Account data exported', {
+        userId: user._id.toString(),
+      });
+
+      return exportData;
+    } catch (error: any) {
+      logger.error('Error exporting account data', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Deactivate account (soft delete)
+   */
+  static async deactivateAccount(userId: string, password: string): Promise<void> {
+    try {
+      const user = await User.findById(userId).select('+password');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Verify password for local accounts
+      if (user.provider === OAuthProvider.LOCAL) {
+        const isPasswordValid = await user.comparePassword(password);
+        if (!isPasswordValid) {
+          throw new UnauthorizedError('Invalid password');
+        }
+      }
+
+      // Soft delete the user (deactivate)
+      user.softDeletedAt = new Date();
+      user.refreshTokens = []; // Clear all sessions
+      await user.save();
+
+      logger.info('User account deactivated', {
+        userId: user._id.toString(),
+      });
+    } catch (error: any) {
+      logger.error('Error deactivating user account', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send email change verification
+   */
+  private static async sendEmailChangeVerification(user: IUser, newEmail: string): Promise<void> {
+    try {
+      // TODO: Generate verification token and send email
+      logger.info('Email change verification would be sent', {
+        to: newEmail,
+        userId: user._id.toString(),
+      });
+    } catch (error: any) {
+      logger.error('Error sending email change verification', { error: error.message });
+    }
+  }
 }

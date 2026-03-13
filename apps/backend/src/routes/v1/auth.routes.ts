@@ -21,6 +21,9 @@ import {
   updateProfileSchema,
   updateNotificationPreferencesSchema,
   deleteAccountSchema,
+  changeEmailSchema,
+  deactivateAccountSchema,
+  loginHistorySchema,
 } from '../../validators/auth.validators';
 
 const router = Router();
@@ -125,6 +128,24 @@ router.post(
   validateRequest(verifyEmailSchema),
   AuthController.verifyEmail
 );
+
+// Account management endpoints
+router.post('/change-email', requireAuth, validateRequest(changeEmailSchema), AuthController.changeEmail);
+router.post('/resend-email-verification', requireAuth, AuthController.resendEmailVerification);
+router.delete('/cancel-email-change', requireAuth, AuthController.cancelEmailChange);
+router.get('/pending-email-change', requireAuth, AuthController.getPendingEmailChange);
+
+// Security endpoints
+router.get('/login-history', requireAuth, validateRequest(loginHistorySchema), AuthController.getLoginHistory);
+router.get('/trusted-devices', requireAuth, AuthController.getTrustedDevices);
+router.delete('/trusted-devices/:deviceId', requireAuth, AuthController.revokeTrustedDevice);
+router.get('/account-status', requireAuth, AuthController.getAccountStatus);
+
+// Data export endpoint
+router.get('/export-data', requireAuth, AuthController.exportAccountData);
+
+// Account deactivation
+router.post('/deactivate-account', requireAuth, validateRequest(deactivateAccountSchema), AuthController.deactivateAccount);
 
 // Magic link routes
 router.use('/magic-link', magicLinkRoutes);

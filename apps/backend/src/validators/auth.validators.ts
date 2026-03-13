@@ -153,3 +153,31 @@ export const deleteAccountSchema = z.object({
     password: z.string().min(1, 'Password is required'),
   }),
 });
+/**
+ * Change email validation schema
+ */
+export const changeEmailSchema = z.object({
+  body: z.object({
+    newEmail: emailSchema,
+    password: z.string().min(1, 'Password is required'),
+  }),
+});
+
+/**
+ * Deactivate account validation schema
+ */
+export const deactivateAccountSchema = z.object({
+  body: z.object({
+    password: z.string().min(1, 'Password is required'),
+  }),
+});
+
+/**
+ * Login history query validation schema
+ */
+export const loginHistorySchema = z.object({
+  query: z.object({
+    limit: z.string().transform(Number).pipe(z.number().min(1).max(100)).optional(),
+    offset: z.string().transform(Number).pipe(z.number().min(0)).optional(),
+  }),
+});

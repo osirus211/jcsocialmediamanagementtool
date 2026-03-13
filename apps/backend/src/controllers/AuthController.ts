@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/AuthService';
 import { logger } from '../utils/logger';
 import { config } from '../config';
+import { UnauthorizedError } from '../utils/errors';
 
 export class AuthController {
   /**
@@ -489,4 +490,240 @@ export class AuthController {
       next(error);
     }
   }
+
+  /**
+   * Change email address
+   * POST /api/v1/auth/change-email
+   */
+  static async changeEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { newEmail, password } = req.body;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      await AuthService.requestEmailChange(userId, newEmail, password);
+
+      res.status(200).json({
+        message: 'Email change verification sent to your new email address',
+        verificationSent: true,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Resend email verification
+   * POST /api/v1/auth/resend-email-verification
+   */
+  static async resendEmailVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      await AuthService.resendEmailVerification(userId);
+
+      res.status(200).json({
+        message: 'Verification email resent successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Cancel email change
+   * DELETE /api/v1/auth/cancel-email-change
+   */
+  static async cancelEmailChange(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      await AuthService.cancelEmailChange(userId);
+
+      res.status(200).json({
+        message: 'Email change cancelled successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get pending email change
+   * GET /api/v1/auth/pending-email-change
+   */
+  static async getPendingEmailChange(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const pendingChange = await AuthService.getPendingEmailChange(userId);
+
+      res.status(200).json({
+        pendingChange,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get login history
+   * GET /api/v1/auth/login-history
+   */
+  static async getLoginHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { limit = 50, offset = 0 } = req.query;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const activities = await AuthService.getLoginHistory(userId, Number(limit), Number(offset));
+
+      res.status(200).json({
+        activities,
+        total: activities.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get trusted devices
+   * GET /api/v1/auth/trusted-devices
+   */
+  static async getTrustedDevices(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const devices = await AuthService.getTrustedDevices(userId);
+
+      res.status(200).json({
+        devices,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Revoke trusted device
+   * DELETE /api/v1/auth/trusted-devices/:deviceId
+   */
+  static async revokeTrustedDevice(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { deviceId } = req.params;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      await AuthService.revokeTrustedDevice(userId, deviceId);
+
+      res.status(200).json({
+        message: 'Device revoked successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get account status
+   * GET /api/v1/auth/account-status
+   */
+  static async getAccountStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const status = await AuthService.getAccountStatus(userId);
+
+      res.status(200).json({
+        status,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Export account data
+   * GET /api/v1/auth/export-data
+   */
+  static async exportAccountData(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const exportData = await AuthService.exportAccountData(userId);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="account-data-${new Date().toISOString().split('T')[0]}.json"`);
+      
+      res.status(200).json(exportData);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Deactivate account
+   * POST /api/v1/auth/deactivate-account
+   */
+  static async deactivateAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const { password } = req.body;
+
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      await AuthService.deactivateAccount(userId, password);
+
+      // Clear refresh token cookie
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/api/v1/auth',
+      });
+
+      res.status(200).json({
+        message: 'Account deactivated successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

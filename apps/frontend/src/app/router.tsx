@@ -42,6 +42,7 @@ const CompetitorPage = lazy(() => import('@/pages/analytics/CompetitorPage').the
 const WebhooksPage = lazy(() => import('@/pages/settings/WebhooksPage').then(module => ({ default: module.WebhooksPage })));
 const AutomationPage = lazy(() => import('@/pages/settings/AutomationPage').then(module => ({ default: module.default })));
 const UserProfilePage = lazy(() => import('@/pages/settings/UserProfilePage').then(module => ({ default: module.UserProfilePage })));
+const AccountSettingsPage = lazy(() => import('@/pages/settings/AccountSettingsPage').then(module => ({ default: module.AccountSettingsPage })));
 const SecuritySettingsPage = lazy(() => import('@/pages/settings/SecuritySettingsPage').then(module => ({ default: module.SecuritySettingsPage })));
 const TwoFactorSetupPage = lazy(() => import('@/pages/settings/TwoFactorSetupPage').then(module => ({ default: module.TwoFactorSetupPage })));
 
@@ -182,6 +183,10 @@ const router = createBrowserRouter([
       {
         path: 'settings/profile',
         element: <SuspenseWrapper><UserProfilePage /></SuspenseWrapper>,
+      },
+      {
+        path: 'settings/account',
+        element: <SuspenseWrapper><AccountSettingsPage /></SuspenseWrapper>,
       },
       {
         path: 'settings/security',
