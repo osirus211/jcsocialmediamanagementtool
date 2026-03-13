@@ -78,3 +78,17 @@ export const verifyEmailSchema = z.object({
     token: z.string().min(1, 'Verification token is required'),
   }),
 });
+
+/**
+ * Complete login validation schema (for 2FA)
+ */
+export const completeLoginSchema = z.object({
+  body: z.object({
+    userId: z.string().min(1, 'User ID is required'),
+    token: z.string().min(1, 'Verification token is required')
+      .refine((token) => {
+        // Allow either 6-digit TOTP or 8-character backup code
+        return /^\d{6}$/.test(token) || /^[0-9A-F]{8}$/i.test(token);
+      }, 'Token must be a 6-digit TOTP code or 8-character backup code'),
+  }),
+});

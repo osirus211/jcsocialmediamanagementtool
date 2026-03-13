@@ -20,7 +20,7 @@ interface LocationState {
 export function TwoFactorChallengePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setAuth } = useAuthStore();
+  const { completeLogin } = useAuthStore();
   
   const [mode, setMode] = useState<ChallengeMode>('totp');
   const [token, setToken] = useState('');
@@ -57,10 +57,7 @@ export function TwoFactorChallengePage() {
       setError(null);
 
       // Complete login with 2FA token
-      const response = await TwoFactorService.completeLogin(userId, token);
-      
-      // Set authentication state
-      setAuth(response.user, response.tokens);
+      await completeLogin(userId, token);
       
       // Redirect to dashboard
       navigate('/', { replace: true });

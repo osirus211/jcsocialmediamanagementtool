@@ -7,6 +7,7 @@ import {
   User,
   RegisterData,
   LoginResponse,
+  LoginResult,
   RegisterResponse,
   RefreshResponse,
   MeResponse,
@@ -62,12 +63,22 @@ export const useAuthStore = create<AuthStore>()(
           logger.debug('Starting login', { email });
           set({ isLoading: true });
 
-          const response = await apiClient.post<LoginResponse>('/auth/login', {
+          const response = await apiClient.post<LoginResult>('/auth/login', {
             email,
             password,
           });
 
           logger.debug('Login response received');
+          
+          // Check if 2FA is required
+          if ('requiresTwoFactor' in response) {
+            logger.debug('2FA challenge required');
+            set({ isLoading: false });
+            // Return the 2FA challenge response to the caller
+            return response;
+          }
+
+          // Normal login success
           const { user, accessToken } = response;
 
           set({
@@ -78,6 +89,7 @@ export const useAuthStore = create<AuthStore>()(
             authChecked: true,
           });
           logger.info('Login successful');
+          return response;
         } catch (error: any) {
           logger.error('Login failed', { error: error.message });
           set({ isLoading: false });
@@ -106,6 +118,38 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error: any) {
           set({ isLoading: false });
           throw new Error(error.response?.data?.message || 'Registration failed');
+        }
+      },
+
+      /**
+       * Complete login after 2FA verification
+       */
+      completeLogin: async (userId: string, token: string) => {
+        try {
+          logger.debug('Completing login with 2FA', { userId });
+          set({ isLoading: true });
+
+          const response = await apiClient.post<LoginResponse>('/auth/complete-login', {
+            userId,
+            token,
+          });
+
+          logger.debug('Complete login response received');
+          const { user, accessToken } = response;
+
+          set({
+            user,
+            accessToken,
+            isAuthenticated: true,
+            isLoading: false,
+            authChecked: true,
+          });
+          logger.info('Complete login successful');
+          return response;
+        } catch (error: any) {
+          logger.error('Complete login failed', { error: error.message });
+          set({ isLoading: false });
+          throw new Error(error.response?.data?.message || 'Login verification failed');
         }
       },
 

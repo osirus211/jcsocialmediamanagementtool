@@ -7,6 +7,7 @@ export interface User {
   role: 'owner' | 'admin' | 'member';
   isEmailVerified: boolean;
   provider: 'local' | 'google';
+  twoFactorEnabled: boolean;
   lastLoginAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -25,7 +26,8 @@ export interface AuthActions {
   setAccessToken: (token: string | null) => void;
   setLoading: (loading: boolean) => void;
   setAuthChecked: (checked: boolean) => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  completeLogin: (userId: string, token: string) => Promise<LoginResponse>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
@@ -45,6 +47,14 @@ export interface LoginResponse {
   user: User;
   accessToken: string;
 }
+
+export interface TwoFactorChallengeResponse {
+  requiresTwoFactor: true;
+  userId: string;
+  message: string;
+}
+
+export type LoginResult = LoginResponse | TwoFactorChallengeResponse;
 
 export interface RegisterResponse {
   message: string;

@@ -22,10 +22,18 @@ export interface LoginInput {
   password: string;
 }
 
+interface TwoFactorChallengeResponse {
+  requiresTwoFactor: true;
+  userId: string;
+  message: string;
+}
+
 export interface AuthResponse {
   user: IUser;
   tokens: TokenPair;
 }
+
+type LoginResponse = AuthResponse | TwoFactorChallengeResponse;
 
 export class AuthService {
   /**
@@ -101,14 +109,14 @@ export class AuthService {
   /**
    * Login user with email and password
    */
-  static async login(input: LoginInput): Promise<AuthResponse> {
+  static async login(input: LoginInput): Promise<LoginResponse> {
     try {
       logger.info('RUNTIME_TRACE LOGIN_START', { timestamp: new Date().toISOString() });
-      // Find user with password field
+      // Find user with password field and 2FA fields
       const user = await User.findOne({
         email: input.email.toLowerCase(),
         softDeletedAt: null,
-      }).select('+password +refreshTokens');
+      }).select('+password +refreshTokens +twoFactorSecret');
 
       if (!user) {
         // Use generic message to prevent email enumeration
@@ -126,6 +134,18 @@ export class AuthService {
       const isPasswordValid = await user.comparePassword(input.password);
       if (!isPasswordValid) {
         throw new UnauthorizedError('Invalid email or password');
+      }
+
+      // Check if 2FA is enabled
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        logger.info('2FA challenge required', { userId: user._id, email: user.email });
+        
+        // Return 2FA challenge response instead of tokens
+        return {
+          requiresTwoFactor: true,
+          userId: user._id.toString(),
+          message: 'Two-factor authentication required'
+        };
       }
 
       // Update last login
@@ -421,6 +441,78 @@ export class AuthService {
       logger.info('Password reset completed');
     } catch (error) {
       logger.error('Password reset error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Complete login after 2FA verification
+   */
+  static async completeLogin(userId: string, token: string): Promise<AuthResponse> {
+    try {
+      logger.info('RUNTIME_TRACE COMPLETE_LOGIN_START', { timestamp: new Date().toISOString(), userId });
+      
+      // Find user with 2FA fields
+      const user = await User.findById(userId).select('+twoFactorSecret +twoFactorBackupCodes +refreshTokens');
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+
+      // Check if 2FA is enabled
+      if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+        throw new BadRequestError('Two-factor authentication is not enabled for this user');
+      }
+
+      let isValid = false;
+      let usedBackupCodeIndex = -1;
+
+      // Check if token is 6 digits (TOTP) or 8 characters (backup code)
+      if (/^\d{6}$/.test(token)) {
+        // Verify TOTP token
+        const { TwoFactorService } = await import('./TwoFactorService');
+        isValid = TwoFactorService.verifyToken(token, user.twoFactorSecret);
+      } else if (/^[0-9A-F]{8}$/i.test(token)) {
+        // Verify backup code
+        const { TwoFactorService } = await import('./TwoFactorService');
+        const verification = TwoFactorService.verifyBackupCode(token, user.twoFactorBackupCodes);
+        isValid = verification.valid;
+        usedBackupCodeIndex = verification.index;
+      }
+
+      if (!isValid) {
+        throw new UnauthorizedError('Invalid verification code');
+      }
+
+      // If backup code was used, mark it as consumed
+      if (usedBackupCodeIndex >= 0) {
+        user.twoFactorBackupCodes.splice(usedBackupCodeIndex, 1);
+        logger.info('Backup code consumed', { userId, remainingCodes: user.twoFactorBackupCodes.length });
+      }
+
+      // Update last login
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      logger.info('2FA verification successful, completing login', { userId, method: usedBackupCodeIndex >= 0 ? 'backup' : 'totp' });
+
+      // Generate tokens
+      const tokens = TokenService.generateTokenPair({
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      });
+
+      // Store refresh token
+      await user.addRefreshToken(tokens.refreshToken);
+
+      // Increment login success metric
+      authMetricsTracker.incrementLoginSuccess();
+
+      logger.info('RUNTIME_TRACE COMPLETE_LOGIN_SUCCESS', { timestamp: new Date().toISOString(), userId });
+      return { user, tokens };
+    } catch (error) {
+      logger.error('RUNTIME_TRACE COMPLETE_LOGIN_FAILED', { timestamp: new Date().toISOString(), userId });
+      logger.error('Complete login error:', error);
       throw error;
     }
   }

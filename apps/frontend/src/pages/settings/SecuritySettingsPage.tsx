@@ -248,7 +248,7 @@ function BackupCodesModal({ isOpen, onClose, codes }: BackupCodesModalProps) {
 
 export function SecuritySettingsPage() {
   const navigate = useNavigate();
-  const { user, refreshUser } = useAuthStore();
+  const { user, fetchMe } = useAuthStore();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +279,7 @@ export function SecuritySettingsPage() {
       await TwoFactorService.disableTwoFactor(token);
       
       // Refresh user data
-      await refreshUser();
+      await fetchMe();
       
       setSuccess('Two-factor authentication has been disabled');
       setShowDisableModal(false);

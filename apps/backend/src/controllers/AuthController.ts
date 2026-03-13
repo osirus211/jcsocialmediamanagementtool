@@ -45,12 +45,24 @@ export class AuthController {
    * Login user
    * POST /api/v1/auth/login
    */
-  static async login(req: Request, res: Response, next: NextFunction) {
+  static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       console.log('🔐 Login request received:', { email: req.body.email });
       const { email, password } = req.body;
 
       const result = await AuthService.login({ email, password });
+      
+      // Check if 2FA is required
+      if ('requiresTwoFactor' in result) {
+        console.log('🔐 2FA challenge required for:', email);
+        res.status(200).json({
+          requiresTwoFactor: true,
+          userId: result.userId,
+          message: result.message,
+        });
+        return;
+      }
+
       console.log('✅ Login successful for:', email);
 
       // Set refresh token in httpOnly cookie
@@ -271,6 +283,43 @@ export class AuthController {
 
       res.status(200).json({
         message: 'Email verified successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Complete login after 2FA verification
+   * POST /api/v1/auth/complete-login
+   */
+  static async completeLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId, token } = req.body;
+
+      if (!userId || !token) {
+        res.status(400).json({ 
+          error: 'Bad Request',
+          message: 'User ID and verification token are required'
+        });
+        return;
+      }
+
+      const result = await AuthService.completeLogin(userId, token);
+
+      // Set refresh token in httpOnly cookie
+      res.cookie('refreshToken', result.tokens.refreshToken, {
+        httpOnly: true,
+        secure: config.env === 'production', // HTTPS only in production
+        sameSite: 'strict', // CSRF protection
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/api/v1/auth', // Limit cookie to auth endpoints
+      });
+
+      res.status(200).json({
+        message: 'Login completed successfully',
+        user: result.user,
+        accessToken: result.tokens.accessToken,
       });
     } catch (error) {
       next(error);

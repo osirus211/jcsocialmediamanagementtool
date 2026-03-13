@@ -16,6 +16,7 @@ import {
   requestPasswordResetSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  completeLoginSchema,
 } from '../../validators/auth.validators';
 
 const router = Router();
@@ -64,6 +65,14 @@ router.post(
   passwordResetRateLimiter,
   validateRequest(resetPasswordSchema),
   AuthController.resetPassword
+);
+
+// Complete login after 2FA verification
+router.post(
+  '/complete-login',
+  authRateLimiter,
+  validateRequest(completeLoginSchema),
+  AuthController.completeLogin
 );
 
 /**

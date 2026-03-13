@@ -167,3 +167,22 @@ export const oauthCallbackRateLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Strict rate limiter for sensitive operations (2FA recovery, etc.)
+ */
+export const strictRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Only 3 attempts per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many sensitive operation attempts. Please try again later.',
+      retryAfter: 3600, // 1 hour
+    });
+  },
+});

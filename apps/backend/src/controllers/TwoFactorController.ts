@@ -37,6 +37,11 @@ export class TwoFactorController {
       const { secret, otpauthUrl } = TwoFactorService.generateSecret(user.email);
       const qrCodeDataUrl = await TwoFactorService.generateQRCode(otpauthUrl);
 
+      // Store temporary secret in user document for verification
+      // This will be moved to twoFactorSecret field when setup is verified
+      user.twoFactorSecret = secret;
+      await user.save();
+
       logger.info('2FA setup initiated', { userId, email: user.email });
 
       res.status(200).json({
@@ -78,12 +83,13 @@ export class TwoFactorController {
         throw new BadRequestError('Two-factor authentication is already enabled');
       }
 
-      // Get temporary secret from session/cache (for now, generate new one)
-      // In production, this should be stored temporarily during setup
-      const { secret } = TwoFactorService.generateSecret(user.email);
+      // Check if setup was initiated (temporary secret exists)
+      if (!user.twoFactorSecret) {
+        throw new BadRequestError('2FA setup not initiated. Please start setup first.');
+      }
 
-      // Verify TOTP token
-      const isValidToken = TwoFactorService.verifyToken(token, secret);
+      // Verify TOTP token using the temporary secret
+      const isValidToken = TwoFactorService.verifyToken(token, user.twoFactorSecret);
       if (!isValidToken) {
         throw new UnauthorizedError('Invalid verification code');
       }
@@ -94,9 +100,8 @@ export class TwoFactorController {
         TwoFactorService.hashBackupCode(code)
       );
 
-      // Enable 2FA
+      // Enable 2FA (secret is already stored from setup)
       user.twoFactorEnabled = true;
-      user.twoFactorSecret = secret;
       user.twoFactorBackupCodes = hashedBackupCodes;
       user.twoFactorVerifiedAt = new Date();
       await user.save();
