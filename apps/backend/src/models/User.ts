@@ -60,6 +60,10 @@ export interface IUser extends Document {
   magicLinkToken?: string;
   magicLinkExpiresAt?: Date;
   
+  // Password reset
+  passwordResetToken?: string;
+  passwordResetExpiresAt?: Date;
+  
   // Notification preferences
   notificationPreferences: {
     email: {
@@ -183,6 +187,8 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     twoFactorVerifiedAt: { type: Date, default: null },
     magicLinkToken: { type: String, default: null, select: false },
     magicLinkExpiresAt: { type: Date, default: null, select: false },
+    passwordResetToken: { type: String, default: null, select: false },
+    passwordResetExpiresAt: { type: Date, default: null, select: false },
     notificationPreferences: {
       type: {
         email: {

@@ -11,6 +11,9 @@ import { SuspenseWrapper } from '@/components/ui/SuspenseWrapper';
 // Auth pages
 const LoginPage = lazy(() => import('@/pages/auth/Login').then(module => ({ default: module.LoginPage })));
 const RegisterPage = lazy(() => import('@/pages/auth/Register').then(module => ({ default: module.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPassword').then(module => ({ default: module.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPassword').then(module => ({ default: module.ResetPasswordPage })));
+const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmail').then(module => ({ default: module.VerifyEmailPage })));
 const MagicLinkRequestPage = lazy(() => import('@/pages/auth/MagicLinkRequest').then(module => ({ default: module.MagicLinkRequestPage })));
 const MagicLinkVerifyPage = lazy(() => import('@/pages/auth/MagicLinkVerify').then(module => ({ default: module.MagicLinkVerifyPage })));
 
@@ -261,6 +264,18 @@ const router = createBrowserRouter([
       {
         path: 'register',
         element: <SuspenseWrapper><RegisterPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'forgot-password',
+        element: <SuspenseWrapper><ForgotPasswordPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'reset-password',
+        element: <SuspenseWrapper><ResetPasswordPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'verify-email',
+        element: <SuspenseWrapper><VerifyEmailPage /></SuspenseWrapper>,
       },
       {
         path: 'magic-link',

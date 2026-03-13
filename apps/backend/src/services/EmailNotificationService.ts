@@ -355,6 +355,39 @@ export class EmailNotificationService {
       throw error;
     }
   }
+
+  async sendPasswordResetEmail(params: {
+    to: string;
+    firstName: string;
+    resetUrl: string;
+    expiresIn: string;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: 'Reset Your Password',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #3b82f6;">Reset Your Password</h2>
+            <p>Hi ${params.firstName},</p>
+            <p>You requested to reset your password. Click the button below to set a new password:</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${params.resetUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+            </p>
+            <p>This link will expire in ${params.expiresIn}. If you didn't request this, you can safely ignore this email.</p>
+            <p>For security reasons, this link can only be used once.</p>
+            <p>Best regards,<br>Your Social Media Team</p>
+          </div>
+        `,
+        text: `Hi ${params.firstName}, you requested to reset your password. Visit this link to set a new password: ${params.resetUrl}. This link will expire in ${params.expiresIn}.`,
+      });
+
+      logger.info('Password reset email sent', { to: params.to });
+    } catch (error: any) {
+      logger.error('Failed to send password reset email', { error: error.message, to: params.to });
+      throw error;
+    }
+  }
 }
 
 export const emailNotificationService = new EmailNotificationService();

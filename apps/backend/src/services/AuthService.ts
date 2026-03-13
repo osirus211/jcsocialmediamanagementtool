@@ -9,6 +9,7 @@ import {
 import { logger } from '../utils/logger';
 import { authMetricsTracker } from './metrics/AuthMetricsTracker';
 import { config } from '../config';
+import * as crypto from 'crypto';
 
 export interface RegisterInput {
   email: string;
@@ -395,12 +396,6 @@ export class AuthService {
    */
   static async requestPasswordReset(email: string): Promise<void> {
     try {
-      // TODO: Implement password reset request logic
-      // 1. Find user by email
-      // 2. Generate reset token
-      // 3. Send reset email
-      // 4. Store token with expiration
-
       const user = await User.findOne({ email: email.toLowerCase(), softDeletedAt: null });
       if (!user) {
         // Don't reveal if email exists (security)
@@ -408,8 +403,20 @@ export class AuthService {
         return;
       }
 
+      // Generate secure reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+      
+      // Set token expiration (15 minutes)
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      
+      // Update user with reset token
+      user.passwordResetToken = hashedToken;
+      user.passwordResetExpiresAt = expiresAt;
+      await user.save();
+
       // Send password reset email (non-blocking)
-      AuthService.sendPasswordResetEmail(user).catch(err => {
+      AuthService.sendPasswordResetEmail(user, resetToken).catch(err => {
         logger.warn('Failed to send password reset email', { userId: user._id, error: err.message });
       });
 
@@ -425,20 +432,39 @@ export class AuthService {
    */
   static async resetPassword(token: string, newPassword: string): Promise<void> {
     try {
-      // TODO: Implement password reset logic
-      // 1. Verify reset token
-      // 2. Find user by token
-      // 3. Update password
-      // 4. Revoke all tokens
-      // 5. Remove reset token
-
       // Validate new password strength
       const passwordValidation = passwordSchema.safeParse(newPassword);
       if (!passwordValidation.success) {
         throw new BadRequestError(passwordValidation.error.errors[0].message);
       }
 
-      logger.info('Password reset completed');
+      // Hash the provided token to match stored hash
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+      
+      // Find user by reset token and check expiration
+      const user = await User.findOne({
+        passwordResetToken: hashedToken,
+        passwordResetExpiresAt: { $gt: new Date() },
+        softDeletedAt: null
+      }).select('+passwordResetToken +passwordResetExpiresAt +refreshTokens');
+
+      if (!user) {
+        throw new BadRequestError('Invalid or expired reset token');
+      }
+
+      // Update password
+      user.password = newPassword;
+      
+      // Clear reset token
+      user.passwordResetToken = undefined;
+      user.passwordResetExpiresAt = undefined;
+      
+      // Revoke all refresh tokens for security
+      user.refreshTokens = [];
+      
+      await user.save();
+
+      logger.info('Password reset completed', { userId: user._id });
     } catch (error) {
       logger.error('Password reset error:', error);
       throw error;
@@ -472,18 +498,22 @@ export class AuthService {
   /**
    * Send password reset email
    */
-  private static async sendPasswordResetEmail(user: IUser): Promise<void> {
+  private static async sendPasswordResetEmail(user: IUser, resetToken: string): Promise<void> {
     try {
       const { emailNotificationService } = await import('./EmailNotificationService');
 
-      // TODO: Generate actual reset token and URL
-      const resetUrl = `${config.frontend.url}/reset-password?token=placeholder`;
+      const resetUrl = `${config.frontend.url}/auth/reset-password?token=${resetToken}`;
 
-      // Stub implementation - email service method doesn't exist yet
-      logger.info('Password reset email would be sent', {
+      // Send password reset email
+      await emailNotificationService.sendPasswordResetEmail({
         to: user.email,
+        firstName: user.firstName,
         resetUrl,
-        expiresIn: '1 hour',
+        expiresIn: '15 minutes',
+      });
+
+      logger.info('Password reset email sent', {
+        to: user.email,
         userId: user._id.toString(),
       });
     } catch (error: any) {

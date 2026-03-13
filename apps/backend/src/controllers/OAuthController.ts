@@ -243,6 +243,29 @@ export class OAuthController {
   }
 
   /**
+   * Get Google OAuth configuration
+   */
+  private getGoogleConfig(): { clientId: string; clientSecret: string; redirectUri: string; scopes: string[] } {
+    const clientId = config.oauth.google.clientId;
+    const clientSecret = config.oauth.google.clientSecret;
+    const redirectUri = config.oauth.google.callbackUrl;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new BadRequestError('Google OAuth not configured');
+    }
+
+    return {
+      clientId,
+      clientSecret,
+      redirectUri,
+      scopes: [
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/userinfo.email',
+      ],
+    };
+  }
+
+  /**
    * Get GitHub OAuth configuration
    */
   private getGitHubConfig(): { clientId: string; clientSecret: string; redirectUri: string; scopes: string[] } {
@@ -330,8 +353,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'github' && platform !== 'apple') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, GitHub, and Apple platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, and Apple platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -517,6 +540,32 @@ export class OAuthController {
         });
 
         authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      } else if (platform === 'google') {
+        // Google OAuth
+        const googleConfig = this.getGoogleConfig();
+
+        // Store state in Redis with IP binding
+        state = await oauthStateService.createState(workspaceId, userId, platform, {
+          ipHash, // IP binding
+          metadata: {
+            platform,
+            timestamp: new Date().toISOString(),
+            userAgent: req.headers['user-agent'],
+          },
+        });
+
+        // Build authorization URL
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: googleConfig.clientId,
+          redirect_uri: googleConfig.redirectUri,
+          scope: googleConfig.scopes.join(' '),
+          state,
+          access_type: 'offline', // Request refresh token
+          prompt: 'consent', // Force consent to ensure refresh token
+        });
+
+        authorizationUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
       } else if (platform === 'github') {
         // GitHub OAuth
         const githubConfig = this.getGitHubConfig();
@@ -680,8 +729,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'github' && platform !== 'apple') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, GitHub, and Apple platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, and Apple platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -835,6 +884,11 @@ export class OAuthController {
       if (platform === 'google-business') {
         // Pass the already-consumed stateData to avoid double-consumption
         return await this.handleGoogleBusinessCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
+      }
+
+      if (platform === 'google') {
+        // Pass the already-consumed stateData to avoid double-consumption
+        return await this.handleGoogleCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
       }
 
       if (platform === 'github') {
@@ -1286,6 +1340,11 @@ export class OAuthController {
       // Check Threads configuration
       if (config.oauth?.threads?.clientId && config.oauth?.threads?.clientSecret) {
         platforms.push('threads');
+      }
+
+      // Check Google configuration
+      if (config.oauth?.google?.clientId && config.oauth?.google?.clientSecret) {
+        platforms.push('google');
       }
 
       // Check GitHub configuration
@@ -2075,6 +2134,82 @@ export class OAuthController {
       
       res.redirect(
         `${frontendUrl}/social/accounts?error=GOOGLE_BUSINESS_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
+      );
+    }
+  }
+
+  /**
+   * Handle Google OAuth callback
+   * 
+   * SECURITY: State already consumed by main callback handler
+   */
+  private async handleGoogleCallback(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    code: string,
+    state: string,
+    stateData: any,
+    clientIp: string,
+    ipHash: string,
+    debugReport: any,
+    startTime: number
+  ): Promise<void> {
+    try {
+      // Get Google configuration
+      const googleConfig = this.getGoogleConfig();
+
+      // Exchange code for tokens
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: googleConfig.clientId,
+          client_secret: googleConfig.clientSecret,
+          redirect_uri: googleConfig.redirectUri,
+          code,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Token exchange failed: ${tokenResponse.statusText}`);
+      }
+
+      const tokens = await tokenResponse.json() as { access_token: string; refresh_token?: string };
+
+      // Get user profile
+      const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+        },
+      });
+
+      if (!profileResponse.ok) {
+        throw new Error(`Profile fetch failed: ${profileResponse.statusText}`);
+      }
+
+      const profile = await profileResponse.json() as { email: string; name: string; id: string };
+
+      // For Google OAuth, we're using it for user authentication, not social account connection
+      // So we redirect to a success page or handle login
+      const frontendUrl = config.frontend.url;
+      
+      res.redirect(
+        `${frontendUrl}/auth/oauth-success?platform=google&email=${encodeURIComponent(profile.email)}&name=${encodeURIComponent(profile.name)}`
+      );
+    } catch (error: any) {
+      logger.error('Google OAuth callback failed', {
+        error: error.message,
+        code,
+        state: state.substring(0, 10) + '...',
+      });
+      
+      const frontendUrl = config.frontend.url;
+      res.redirect(
+        `${frontendUrl}/auth/login?error=GOOGLE_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
       );
     }
   }
