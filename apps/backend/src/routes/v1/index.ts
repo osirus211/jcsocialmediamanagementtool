@@ -40,6 +40,7 @@ import campaignsRoutes from './campaigns.routes'; // Phase-4: Campaign tagging
 import designIntegrationsRoutes from './design-integrations.routes'; // Phase-4: Canva & Figma integration
 import stockPhotosRoutes from './stock-photos.routes'; // Phase-4: Stock photo library
 import gdprRoutes from './gdpr.routes'; // GDPR compliance
+import { onboardingRoutes } from './onboarding.routes'; // User onboarding
 
 const router = Router();
 
@@ -81,6 +82,7 @@ router.get('/', (_req, res) => {
       designIntegrations: '/api/v1/design-integrations',
       stockPhotos: '/api/v1/stock-photos',
       gdpr: '/api/v1/gdpr',
+      onboarding: '/api/v1/onboarding',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -128,6 +130,7 @@ router.use('/campaigns', campaignsRoutes); // Phase-4: Campaign tagging
 router.use('/design-integrations', designIntegrationsRoutes); // Phase-4: Canva & Figma integration
 router.use('/stock-photos', stockPhotosRoutes); // Phase-4: Stock photo library
 router.use('/gdpr', gdprRoutes); // GDPR compliance
+router.use('/onboarding', onboardingRoutes); // User onboarding
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

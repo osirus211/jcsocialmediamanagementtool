@@ -11,6 +11,8 @@ export interface User {
   isEmailVerified: boolean;
   provider: 'local' | 'google';
   twoFactorEnabled: boolean;
+  onboardingCompleted: boolean;
+  onboardingStep: number;
   notificationPreferences: {
     email: {
       postPublished: boolean;

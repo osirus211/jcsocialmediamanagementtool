@@ -75,6 +75,10 @@ export interface IUser extends Document {
     };
   };
   
+  // Onboarding state
+  onboardingCompleted: boolean;
+  onboardingStep: number;
+  
   createdAt: Date;
   updatedAt: Date;
 
@@ -201,6 +205,16 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
           accountIssues: true,
         },
       }),
+    },
+    onboardingCompleted: {
+      type: Boolean,
+      default: false,
+    },
+    onboardingStep: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
     },
   },
   {

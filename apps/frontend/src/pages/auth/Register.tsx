@@ -27,7 +27,7 @@ export const RegisterPage = () => {
         firstName: data.firstName,
         lastName: data.lastName,
       });
-      navigate('/');
+      navigate('/onboarding');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     }

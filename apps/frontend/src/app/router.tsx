@@ -16,6 +16,7 @@ const MagicLinkVerifyPage = lazy(() => import('@/pages/auth/MagicLinkVerify').th
 
 // Dashboard
 const DashboardPage = lazy(() => import('@/pages/Dashboard').then(module => ({ default: module.DashboardPage })));
+const OnboardingPage = lazy(() => import('@/pages/OnboardingPage').then(module => ({ default: module.default })));
 const NotFoundPage = lazy(() => import('@/pages/NotFound').then(module => ({ default: module.NotFoundPage })));
 
 // Workspaces
@@ -89,6 +90,10 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <SuspenseWrapper><DashboardPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'onboarding',
+        element: <SuspenseWrapper><OnboardingPage /></SuspenseWrapper>,
       },
       {
         path: 'workspaces',
