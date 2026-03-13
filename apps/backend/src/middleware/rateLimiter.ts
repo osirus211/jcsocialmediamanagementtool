@@ -186,3 +186,60 @@ export const strictRateLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Workspace creation rate limiter - 10 creates per hour per user
+ */
+export const workspaceCreateRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many workspace creation attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
+
+/**
+ * Workspace update rate limiter - 100 updates per hour per user
+ */
+export const workspaceUpdateRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many workspace update attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
+
+/**
+ * Workspace delete rate limiter - 5 deletes per hour per user
+ */
+export const workspaceDeleteRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many workspace deletion attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});

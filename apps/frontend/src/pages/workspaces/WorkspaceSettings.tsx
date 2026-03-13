@@ -111,6 +111,48 @@ export const WorkspaceSettingsPage = () => {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !workspaceId) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo file must be smaller than 5MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    try {
+      setError('');
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const response = await fetch(`/api/v1/workspaces/${workspaceId}/logo`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload logo');
+      }
+
+      const data = await response.json();
+      setSuccess('Logo uploaded successfully');
+      
+      // Refresh workspace data
+      await fetchWorkspaceById(workspaceId);
+    } catch (error: any) {
+      setError(error.message || 'Failed to upload logo');
+    }
+  };
+
   const handleRemoveMember = async (member: WorkspaceMember) => {
     if (!workspaceId) return;
 
@@ -259,6 +301,50 @@ export const WorkspaceSettingsPage = () => {
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     disabled={!isAdmin || isLoading}
                   />
+                </div>
+
+                {/* Workspace Logo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Workspace Logo
+                  </label>
+                  <div className="flex items-center gap-4">
+                    {/* Current Logo */}
+                    <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg overflow-hidden">
+                      {workspace.clientPortal?.logoUrl ? (
+                        <img
+                          src={workspace.clientPortal.logoUrl}
+                          alt="Workspace logo"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        workspace.name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    
+                    {/* Upload Button */}
+                    {isAdmin && (
+                      <div>
+                        <input
+                          type="file"
+                          id="logo-upload"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleLogoUpload}
+                          disabled={isLoading}
+                        />
+                        <label
+                          htmlFor="logo-upload"
+                          className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Upload Logo
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          PNG, JPG up to 5MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {isAdmin && (

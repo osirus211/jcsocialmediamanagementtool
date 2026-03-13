@@ -99,7 +99,7 @@ export class WorkspaceService {
   async updateWorkspace(params: {
     workspaceId: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
-    updates: Partial<Pick<IWorkspace, 'name' | 'settings' | 'billingEmail'>>;
+    updates: Partial<Pick<IWorkspace, 'name' | 'settings' | 'billingEmail' | 'clientPortal'>>;
   }): Promise<IWorkspace> {
     const { workspaceId, userId, updates } = params;
 

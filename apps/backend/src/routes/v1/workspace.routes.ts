@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { WorkspaceController } from '../../controllers/WorkspaceController';
 import { requireAuth } from '../../middleware/auth';
 import {
@@ -15,8 +16,30 @@ import {
   transferOwnershipSchema,
 } from '../../validators/workspace.validators';
 import { checkMemberLimit } from '../../middleware/planLimit';
+import {
+  workspaceCreateRateLimiter,
+  workspaceUpdateRateLimiter,
+  workspaceDeleteRateLimiter,
+  uploadRateLimiter,
+} from '../../middleware/rateLimiter';
 
 const router = Router();
+
+// Configure multer for logo upload
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+  },
+  fileFilter: (req, file, cb) => {
+    // Only allow image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 /**
  * Workspace routes
@@ -27,6 +50,7 @@ const router = Router();
 router.post(
   '/',
   requireAuth,
+  workspaceCreateRateLimiter,
   validateRequest(createWorkspaceSchema),
   WorkspaceController.createWorkspace
 );
@@ -48,8 +72,20 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  workspaceUpdateRateLimiter,
   validateRequest(updateWorkspaceSchema),
   WorkspaceController.updateWorkspace
+);
+
+// Upload workspace logo (admin or owner only)
+router.post(
+  '/:workspaceId/logo',
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  uploadRateLimiter,
+  upload.single('logo'),
+  WorkspaceController.uploadLogo
 );
 
 // Delete workspace (owner only)
@@ -58,6 +94,7 @@ router.delete(
   requireAuth,
   requireWorkspace,
   requireOwner,
+  workspaceDeleteRateLimiter,
   WorkspaceController.deleteWorkspace
 );
 

@@ -28,6 +28,20 @@ export class WorkspaceController {
         ownerId: new mongoose.Types.ObjectId(userId),
       });
 
+      // Audit log: Workspace created
+      logAudit({
+        userId,
+        workspaceId: workspace._id.toString(),
+        action: 'workspace.created',
+        entityType: 'workspace',
+        entityId: workspace._id.toString(),
+        metadata: {
+          name: workspace.name,
+          plan: workspace.plan,
+        },
+        req,
+      });
+
       res.status(201).json({
         message: 'Workspace created successfully',
         workspace,
@@ -100,8 +114,90 @@ export class WorkspaceController {
         updates: { name, settings },
       });
 
+      // Audit log: Workspace updated
+      logAudit({
+        userId,
+        workspaceId,
+        action: 'workspace.updated',
+        entityType: 'workspace',
+        entityId: workspaceId,
+        metadata: {
+          name: workspace.name,
+          updatedFields: Object.keys({ name, settings }).filter(key => 
+            req.body[key] !== undefined
+          ),
+        },
+        req,
+      });
+
       res.status(200).json({
         message: 'Workspace updated successfully',
+        workspace,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upload workspace logo
+   * POST /api/v1/workspaces/:workspaceId/logo
+   */
+  static async uploadLogo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({ error: 'No logo file provided' });
+        return;
+      }
+
+      // TODO: Implement actual file upload to cloud storage
+      // For now, we'll simulate the upload similar to avatar upload
+      const logoUrl = `/uploads/workspace-logos/${workspaceId}-${Date.now()}.${req.file.originalname.split('.').pop()}`;
+
+      // Get current workspace to merge clientPortal settings
+      const currentWorkspace = await workspaceService.getWorkspace(new mongoose.Types.ObjectId(workspaceId));
+      if (!currentWorkspace) {
+        res.status(404).json({ error: 'Workspace not found' });
+        return;
+      }
+
+      const workspace = await workspaceService.updateWorkspace({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+        updates: { 
+          clientPortal: {
+            ...currentWorkspace.clientPortal,
+            logoUrl 
+          }
+        },
+      });
+
+      // Audit log: Workspace logo uploaded
+      logAudit({
+        userId,
+        workspaceId,
+        action: 'workspace.logo_uploaded',
+        entityType: 'workspace',
+        entityId: workspaceId,
+        metadata: {
+          logoUrl,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype,
+        },
+        req,
+      });
+
+      res.status(200).json({
+        message: 'Workspace logo uploaded successfully',
+        logoUrl,
         workspace,
       });
     } catch (error) {

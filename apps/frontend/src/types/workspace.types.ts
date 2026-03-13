@@ -35,6 +35,16 @@ export interface Workspace {
   membersCount: number;
   plan: WorkspacePlan;
   settings: WorkspaceSettings;
+  clientPortal?: {
+    enabled: boolean;
+    brandName?: string;
+    logoUrl?: string;
+    primaryColor?: string;
+    customDomain?: string;
+    welcomeMessage?: string;
+    requirePassword: boolean;
+    portalPassword?: string;
+  };
   deletedAt?: string;
   createdAt: string;
   updatedAt: string;
