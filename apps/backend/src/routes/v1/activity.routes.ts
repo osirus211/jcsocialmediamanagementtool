@@ -48,4 +48,23 @@ router.get('/', validateRequest(activityFeedRequestSchema), ActivityController.g
  */
 router.get('/stats', ActivityController.getActivityStats);
 
+/**
+ * @route   GET /api/v1/activity/export
+ * @desc    Export activity logs (CSV/JSON) - Admin only
+ * @access  Private (Admin+)
+ */
+const exportQuerySchema = z.object({
+  format: z.enum(['csv', 'json']).default('csv'),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  action: z.nativeEnum(ActivityAction).optional(),
+  userId: z.string().optional(),
+});
+
+const exportRequestSchema = z.object({
+  query: exportQuerySchema,
+});
+
+router.get('/export', validateRequest(exportRequestSchema), ActivityController.exportActivityLogs);
+
 export default router;

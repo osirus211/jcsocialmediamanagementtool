@@ -17,6 +17,8 @@ export const ActivityFeed: React.FC = () => {
   const [filters, setFilters] = useState<ActivityFilters>({ page: 1, limit: 20 });
   const [hasMore, setHasMore] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const fetchActivities = async (reset = false) => {
     try {
@@ -59,7 +61,19 @@ export const ActivityFeed: React.FC = () => {
 
   const clearFilters = () => {
     setFilters({ page: 1, limit: 20 });
+    setSearchQuery('');
     setShowFilters(false);
+  };
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    try {
+      setExporting(true);
+      await activityService.exportActivityLogs(format, filters);
+    } catch (error) {
+      console.error('Failed to export activity logs');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Initial load
@@ -82,13 +96,13 @@ export const ActivityFeed: React.FC = () => {
     }
   }, [filters.action, filters.resourceType, filters.userId, filters.startDate, filters.endDate]);
 
-  // Auto-refresh every 60 seconds
+  // Auto-refresh every 30 seconds (improved from 60s)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!loading && !loadingMore) {
         fetchActivities(true);
       }
-    }, 60000);
+    }, 30000); // 30 seconds for better real-time experience
 
     return () => clearInterval(interval);
   }, [loading, loadingMore]);
@@ -146,9 +160,58 @@ export const ActivityFeed: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Filter Bar */}
+      {/* Header with Export */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Activity Feed
+          </h2>
+          <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span>Live updates every 30s</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={exporting}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+          >
+            {exporting ? (
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
+            ) : (
+              <span className="mr-2">📊</span>
+            )}
+            Export CSV
+          </button>
+          <button
+            onClick={() => handleExport('json')}
+            disabled={exporting}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+          >
+            {exporting ? (
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
+            ) : (
+              <span className="mr-2">📄</span>
+            )}
+            Export JSON
+          </button>
+        </div>
+      </div>
+
+      {/* Search Bar */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search activities by user name, action, or resource..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm placeholder-gray-500 dark:placeholder-gray-400"
+            />
+          </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
@@ -159,18 +222,18 @@ export const ActivityFeed: React.FC = () => {
             </span>
           </button>
           
-          {(filters.action || filters.resourceType || filters.startDate) && (
+          {(filters.action || filters.resourceType || filters.startDate || searchQuery) && (
             <button
               onClick={clearFilters}
               className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
             >
-              Clear filters
+              Clear all
             </button>
           )}
         </div>
 
         {showFilters && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Action Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -187,6 +250,8 @@ export const ActivityFeed: React.FC = () => {
                 <option value="post_approved">Post approved</option>
                 <option value="member_invited">Member invited</option>
                 <option value="account_connected">Account connected</option>
+                <option value="login_success">Login success</option>
+                <option value="subscription_created">Subscription created</option>
               </select>
             </div>
 
@@ -205,6 +270,22 @@ export const ActivityFeed: React.FC = () => {
                 <option value="WorkspaceMember">Members</option>
                 <option value="SocialAccount">Social Accounts</option>
                 <option value="Media">Media</option>
+                <option value="Subscription">Billing</option>
+              </select>
+            </div>
+
+            {/* User Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                User
+              </label>
+              <select
+                value={filters.userId || ''}
+                onChange={(e) => handleFilterChange({ userId: e.target.value || undefined })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              >
+                <option value="">All users</option>
+                {/* TODO: Populate with workspace members */}
               </select>
             </div>
 
@@ -234,6 +315,7 @@ export const ActivityFeed: React.FC = () => {
                 <option value="1">Last 24 hours</option>
                 <option value="7">Last 7 days</option>
                 <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
               </select>
             </div>
           </div>

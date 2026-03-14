@@ -14,6 +14,8 @@ import { recordPostScheduled } from '../config/publishingMetrics';
 import { workspacePermissionService, Permission } from './WorkspacePermissionService';
 import { MemberRole } from '../models/WorkspaceMember';
 import { ForbiddenError } from '../utils/errors';
+import { workspaceService } from './WorkspaceService';
+import { ActivityAction } from '../models/WorkspaceActivityLog';
 
 export interface CreatePostInput {
   workspaceId: string;
@@ -32,6 +34,10 @@ export interface CreatePostInput {
     audioName?: string;
     shareToFeed?: boolean;
   };
+  // Activity logging context
+  createdBy?: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 export interface UpdatePostInput {
@@ -102,6 +108,7 @@ export class PostService {
       contentType: input.contentType || 'post',
       storyOptions: input.storyOptions,
       reelOptions: input.reelOptions,
+      createdBy: input.createdBy ? new mongoose.Types.ObjectId(input.createdBy) : undefined,
     });
 
     // Enqueue delayed job immediately
@@ -109,6 +116,25 @@ export class PostService {
 
     // Record metric
     recordPostScheduled(input.platform);
+
+    // Log activity
+    if (input.createdBy) {
+      await workspaceService.logActivity({
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+        userId: new mongoose.Types.ObjectId(input.createdBy),
+        action: ActivityAction.POST_CREATED,
+        resourceType: 'ScheduledPost',
+        resourceId: post._id,
+        details: {
+          platform: input.platform,
+          contentType: input.contentType || 'post',
+          scheduledAt: input.scheduledAt.toISOString(),
+          hasMedia: mediaUrls.length > 0,
+        },
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+      });
+    }
 
     logger.info('Scheduled post created and enqueued', {
       postId: post._id.toString(),
@@ -295,7 +321,9 @@ export class PostService {
     workspaceId: string,
     userId: string,
     userRole: MemberRole,
-    input: UpdatePostInput
+    input: UpdatePostInput,
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<IScheduledPost> {
     const post = await ScheduledPost.findOne({
       _id: postId,
@@ -338,6 +366,25 @@ export class PostService {
 
     await post.save();
 
+    // Log activity
+    await workspaceService.logActivity({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      userId: new mongoose.Types.ObjectId(userId),
+      action: ActivityAction.POST_UPDATED,
+      resourceType: 'ScheduledPost',
+      resourceId: post._id,
+      details: {
+        platform: post.platform,
+        changes: {
+          content: input.content !== undefined,
+          mediaUrls: input.mediaUrls !== undefined,
+          scheduledAt: input.scheduledAt !== undefined,
+        },
+      },
+      ipAddress,
+      userAgent,
+    });
+
     logger.info('Post updated', {
       postId: post._id.toString(),
       workspaceId,
@@ -354,7 +401,9 @@ export class PostService {
     postId: string, 
     workspaceId: string, 
     userId: string, 
-    userRole: MemberRole
+    userRole: MemberRole,
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<void> {
     const post = await ScheduledPost.findOne({
       _id: postId,
@@ -383,6 +432,22 @@ export class PostService {
     }
 
     await post.deleteOne();
+
+    // Log activity
+    await workspaceService.logActivity({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      userId: new mongoose.Types.ObjectId(userId),
+      action: ActivityAction.POST_DELETED,
+      resourceType: 'ScheduledPost',
+      resourceId: new mongoose.Types.ObjectId(postId),
+      details: {
+        platform: post.platform,
+        contentType: post.contentType,
+        wasScheduled: post.status === PostStatus.SCHEDULED,
+      },
+      ipAddress,
+      userAgent,
+    });
 
     logger.info('Post deleted', {
       postId: post._id.toString(),

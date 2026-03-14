@@ -37,6 +37,26 @@ export enum ActivityAction {
   // Media actions
   MEDIA_UPLOADED = 'media_uploaded',
   MEDIA_DELETED = 'media_deleted',
+  
+  // Security actions
+  LOGIN_SUCCESS = 'login_success',
+  LOGIN_FAILED = 'login_failed',
+  PASSWORD_CHANGED = 'password_changed',
+  TWO_FACTOR_ENABLED = 'two_factor_enabled',
+  TWO_FACTOR_DISABLED = 'two_factor_disabled',
+  
+  // Billing actions
+  SUBSCRIPTION_CREATED = 'subscription_created',
+  SUBSCRIPTION_UPDATED = 'subscription_updated',
+  SUBSCRIPTION_CANCELLED = 'subscription_cancelled',
+  PAYMENT_SUCCESS = 'payment_success',
+  PAYMENT_FAILED = 'payment_failed',
+  
+  // API actions
+  API_KEY_CREATED = 'api_key_created',
+  API_KEY_DELETED = 'api_key_deleted',
+  WEBHOOK_CREATED = 'webhook_created',
+  WEBHOOK_DELETED = 'webhook_deleted',
 }
 
 export interface IWorkspaceActivityLog extends Document {

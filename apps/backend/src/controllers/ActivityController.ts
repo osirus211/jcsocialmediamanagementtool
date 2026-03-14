@@ -9,6 +9,9 @@ import mongoose from 'mongoose';
 import { workspaceService } from '../services/WorkspaceService';
 import { ActivityAction } from '../models/WorkspaceActivityLog';
 import { logger } from '../utils/logger';
+import { rateLimitService } from '../services/RateLimitService';
+import { ForbiddenError } from '../utils/errors';
+import { MemberRole } from '../models/WorkspaceMember';
 
 export class ActivityController {
   /**
@@ -175,6 +178,147 @@ export class ActivityController {
       });
     } catch (error: unknown) {
       logger.error('Get activity stats error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Export activity logs (CSV/JSON) - Admin only with rate limiting
+   * GET /api/v1/activity/export
+   */
+  static async exportActivityLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const workspaceId = new mongoose.Types.ObjectId(req.workspace!.workspaceId);
+      const userId = req.user!.id;
+      const userRole = req.workspace!.role;
+
+      // Check if user is admin or owner
+      if (userRole !== MemberRole.ADMIN && userRole !== MemberRole.OWNER) {
+        throw new ForbiddenError('Only admins can export activity logs');
+      }
+
+      // Rate limiting: 3 exports per hour per user
+      const rateLimitKey = `activity_export:${userId}`;
+      const isAllowed = await rateLimitService.checkLimit(rateLimitKey, 3, 3600); // 3 requests per hour
+      
+      if (!isAllowed) {
+        res.status(429).json({
+          success: false,
+          error: 'Rate limit exceeded. Maximum 3 exports per hour.',
+        });
+        return;
+      }
+
+      // Parse query parameters
+      const format = (req.query.format as string) || 'csv';
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const action = req.query.action as ActivityAction | undefined;
+      const filterUserId = req.query.userId ? new mongoose.Types.ObjectId(req.query.userId as string) : undefined;
+
+      // Build filters
+      const filters: Record<string, unknown> = { workspaceId };
+      if (action) filters.action = action;
+      if (filterUserId) filters.userId = filterUserId;
+      if (startDate || endDate) {
+        filters.createdAt = {};
+        if (startDate) (filters.createdAt as Record<string, unknown>).$gte = startDate;
+        if (endDate) (filters.createdAt as Record<string, unknown>).$lte = endDate;
+      }
+
+      const { WorkspaceActivityLog } = await import('../models/WorkspaceActivityLog');
+
+      // Get activities with populated user info (limit to 10,000 for performance)
+      const activities = await WorkspaceActivityLog.find(filters)
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .limit(10000);
+
+      if (format === 'json') {
+        // JSON export
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="activity-export-${Date.now()}.json"`);
+        
+        res.json({
+          success: true,
+          data: {
+            activities,
+            exportedAt: new Date().toISOString(),
+            filters: {
+              startDate: startDate?.toISOString(),
+              endDate: endDate?.toISOString(),
+              action,
+              userId: filterUserId?.toString(),
+            },
+            total: activities.length,
+          },
+        });
+      } else {
+        // CSV export
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="activity-export-${Date.now()}.csv"`);
+
+        // CSV headers
+        const csvHeaders = [
+          'Date',
+          'Time',
+          'User Name',
+          'User Email',
+          'Action',
+          'Resource Type',
+          'Resource ID',
+          'IP Address',
+          'Details'
+        ];
+
+        let csvContent = csvHeaders.join(',') + '\n';
+
+        // CSV rows
+        activities.forEach((activity) => {
+          const date = new Date(activity.createdAt);
+          const user = activity.userId as any;
+          const details = activity.details ? JSON.stringify(activity.details).replace(/"/g, '""') : '';
+          
+          const row = [
+            date.toISOString().split('T')[0], // Date
+            date.toISOString().split('T')[1].split('.')[0], // Time
+            user?.name || 'Unknown',
+            user?.email || 'Unknown',
+            activity.action,
+            activity.resourceType || '',
+            activity.resourceId?.toString() || '',
+            activity.ipAddress || '',
+            `"${details}"` // Escape quotes in JSON
+          ];
+
+          csvContent += row.join(',') + '\n';
+        });
+
+        res.send(csvContent);
+      }
+
+      // Log the export activity
+      await workspaceService.logActivity({
+        workspaceId,
+        userId: new mongoose.Types.ObjectId(userId),
+        action: ActivityAction.WORKSPACE_UPDATED,
+        resourceType: 'ActivityExport',
+        details: {
+          format,
+          recordCount: activities.length,
+          filters: {
+            startDate: startDate?.toISOString(),
+            endDate: endDate?.toISOString(),
+            action,
+            userId: filterUserId?.toString(),
+          },
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+
+    } catch (error: unknown) {
+      logger.error('Export activity logs error:', error);
       next(error);
     }
   }

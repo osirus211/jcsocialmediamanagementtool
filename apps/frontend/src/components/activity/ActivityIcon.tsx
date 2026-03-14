@@ -66,6 +66,40 @@ export const ActivityIcon: React.FC<ActivityIconProps> = ({ action, className = 
       case 'media_deleted':
         return { icon: '🗑️', color: 'text-red-600', bgColor: 'bg-red-100' };
       
+      // Security actions
+      case 'login_success':
+        return { icon: '🔐', color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'login_failed':
+        return { icon: '🚫', color: 'text-red-600', bgColor: 'bg-red-100' };
+      case 'password_changed':
+        return { icon: '🔑', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+      case 'two_factor_enabled':
+        return { icon: '🛡️', color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'two_factor_disabled':
+        return { icon: '🛡️', color: 'text-red-600', bgColor: 'bg-red-100' };
+      
+      // Billing actions
+      case 'subscription_created':
+        return { icon: '💳', color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'subscription_updated':
+        return { icon: '💳', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+      case 'subscription_cancelled':
+        return { icon: '💳', color: 'text-red-600', bgColor: 'bg-red-100' };
+      case 'payment_success':
+        return { icon: '💰', color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'payment_failed':
+        return { icon: '💰', color: 'text-red-600', bgColor: 'bg-red-100' };
+      
+      // API actions
+      case 'api_key_created':
+        return { icon: '🔧', color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'api_key_deleted':
+        return { icon: '🔧', color: 'text-red-600', bgColor: 'bg-red-100' };
+      case 'webhook_created':
+        return { icon: '🔗', color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'webhook_deleted':
+        return { icon: '🔗', color: 'text-red-600', bgColor: 'bg-red-100' };
+      
       // Default
       default:
         return { icon: '⚡', color: 'text-gray-600', bgColor: 'bg-gray-100' };

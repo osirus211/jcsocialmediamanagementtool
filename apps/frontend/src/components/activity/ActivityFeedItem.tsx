@@ -81,6 +81,47 @@ export const ActivityFeedItem: React.FC<ActivityFeedItemProps> = ({ activity, on
       case 'media_deleted':
         return 'deleted media';
       
+      // Security actions
+      case 'login_success':
+        return 'logged in successfully';
+      case 'login_failed':
+        return 'failed to log in';
+      case 'password_changed':
+        return 'changed their password';
+      case 'two_factor_enabled':
+        return 'enabled two-factor authentication';
+      case 'two_factor_disabled':
+        return 'disabled two-factor authentication';
+      
+      // Billing actions
+      case 'subscription_created':
+        const plan = details?.plan as string;
+        return plan ? `subscribed to ${plan} plan` : 'created a subscription';
+      case 'subscription_updated':
+        const newPlanName = details?.newPlan as string;
+        return newPlanName ? `updated subscription to ${newPlanName}` : 'updated subscription';
+      case 'subscription_cancelled':
+        return 'cancelled subscription';
+      case 'payment_success':
+        const amount = details?.amount as number;
+        return amount ? `payment of $${amount} succeeded` : 'payment succeeded';
+      case 'payment_failed':
+        return 'payment failed';
+      
+      // API actions
+      case 'api_key_created':
+        const keyName = details?.name as string;
+        return keyName ? `created API key "${keyName}"` : 'created an API key';
+      case 'api_key_deleted':
+        const deletedKeyName = details?.name as string;
+        return deletedKeyName ? `deleted API key "${deletedKeyName}"` : 'deleted an API key';
+      case 'webhook_created':
+        const webhookUrl = details?.url as string;
+        return webhookUrl ? `created webhook for ${webhookUrl}` : 'created a webhook';
+      case 'webhook_deleted':
+        const deletedWebhookUrl = details?.url as string;
+        return deletedWebhookUrl ? `deleted webhook for ${deletedWebhookUrl}` : 'deleted a webhook';
+      
       // Default
       default:
         return `performed ${action.replace(/_/g, ' ')}`;

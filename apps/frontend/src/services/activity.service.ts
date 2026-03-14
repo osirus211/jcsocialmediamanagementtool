@@ -53,6 +53,7 @@ export interface ActivityFilters {
   userId?: string;
   startDate?: string;
   endDate?: string;
+  search?: string;
 }
 
 class ActivityService {
@@ -69,6 +70,7 @@ class ActivityService {
     if (filters?.userId) queryParams.append('userId', filters.userId);
     if (filters?.startDate) queryParams.append('startDate', filters.startDate);
     if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+    if (filters?.search) queryParams.append('search', filters.search);
 
     const response = await apiClient.get(`/activity?${queryParams.toString()}`);
     return response.data.data;
@@ -80,6 +82,29 @@ class ActivityService {
   async getActivityStats(): Promise<ActivityStats> {
     const response = await apiClient.get('/activity/stats');
     return response.data.data;
+  }
+
+  /**
+   * Export activity logs
+   */
+  async exportActivityLogs(format: 'csv' | 'json', filters?: ActivityFilters): Promise<void> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('format', format);
+    
+    if (filters?.action) queryParams.append('action', filters.action);
+    if (filters?.resourceType) queryParams.append('resourceType', filters.resourceType);
+    if (filters?.userId) queryParams.append('userId', filters.userId);
+    if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+    if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+
+    // Create a temporary link to download the file
+    const url = `/activity/export?${queryParams.toString()}`;
+    const link = document.createElement('a');
+    link.href = `${apiClient.defaults.baseURL}${url}`;
+    link.download = `activity-export-${Date.now()}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 }
 

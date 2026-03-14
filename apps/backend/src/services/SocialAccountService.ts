@@ -3,6 +3,8 @@ import { config } from '../config';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/errors';
 import { logger } from '../utils/logger';
 import { usageService } from './UsageService';
+import { workspaceService } from './WorkspaceService';
+import { ActivityAction } from '../models/WorkspaceActivityLog';
 
 /**
  * Social Account Service
@@ -26,6 +28,10 @@ export interface ConnectAccountInput {
   tokenExpiresAt?: Date;
   scopes: string[];
   metadata?: any;
+  // Activity logging context
+  connectedBy?: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 export interface UpdateAccountInput {
@@ -63,6 +69,24 @@ export class SocialAccountService {
 
         await existing.save();
 
+        // Log reconnection activity
+        if (input.connectedBy) {
+          await workspaceService.logActivity({
+            workspaceId: input.workspaceId,
+            userId: input.connectedBy,
+            action: ActivityAction.ACCOUNT_RECONNECTED,
+            resourceType: 'SocialAccount',
+            resourceId: existing._id,
+            details: {
+              platform: input.platform,
+              accountName: input.accountName,
+              accountId: input.accountId,
+            },
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+          });
+        }
+
         logger.info('Social account reconnected', {
           workspaceId: input.workspaceId,
           platform: input.platform,
@@ -91,6 +115,24 @@ export class SocialAccountService {
 
       // Update usage tracking
       await usageService.incrementAccounts(input.workspaceId);
+
+      // Log connection activity
+      if (input.connectedBy) {
+        await workspaceService.logActivity({
+          workspaceId: input.workspaceId,
+          userId: input.connectedBy,
+          action: ActivityAction.ACCOUNT_CONNECTED,
+          resourceType: 'SocialAccount',
+          resourceId: account._id,
+          details: {
+            platform: input.platform,
+            accountName: input.accountName,
+            accountId: input.accountId,
+          },
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+        });
+      }
 
       logger.info('Social account connected', {
         workspaceId: input.workspaceId,
@@ -208,6 +250,23 @@ export class SocialAccountService {
       // Soft delete: mark as DISCONNECTED (preserves audit log)
       account.status = AccountStatus.DISCONNECTED;
       await account.save();
+
+      // Log disconnection activity
+      if (userId) {
+        await workspaceService.logActivity({
+          workspaceId: workspaceId,
+          userId: userId,
+          action: ActivityAction.ACCOUNT_DISCONNECTED,
+          resourceType: 'SocialAccount',
+          resourceId: account._id,
+          details: {
+            platform: account.provider,
+            accountName: account.accountName,
+            providerUserId: account.providerUserId,
+          },
+          ipAddress: ipAddress,
+        });
+      }
 
       // Log security event
       if (userId && ipAddress) {
