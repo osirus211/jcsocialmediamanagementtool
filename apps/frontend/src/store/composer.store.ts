@@ -56,6 +56,10 @@ interface ComposerState {
   // First comment (Instagram/Facebook)
   firstComment?: string;
   enableFirstComment?: boolean;
+  
+  // Per-platform customization
+  enablePlatformCustomization: boolean;
+  platformSettings: Record<SocialPlatform, any>;
 }
 
 /**
@@ -81,6 +85,12 @@ interface ComposerActions {
   // First comment
   setFirstComment: (comment: string) => void;
   setEnableFirstComment: (enabled: boolean) => void;
+  
+  // Per-platform customization
+  setEnablePlatformCustomization: (enabled: boolean) => void;
+  copyFromBaseContent: (platform: SocialPlatform) => void;
+  resetPlatformContent: (platform: SocialPlatform) => void;
+  setPlatformSettings: (platform: SocialPlatform, settings: any) => void;
   
   // Media management
   addMedia: (files: File[]) => Promise<void>;
@@ -142,6 +152,8 @@ const initialState: ComposerState = {
   tags: [],
   firstComment: '',
   enableFirstComment: false,
+  enablePlatformCustomization: false,
+  platformSettings: {} as Record<SocialPlatform, any>,
 };
 
 /**
@@ -261,6 +273,68 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
 
   setEnableFirstComment: (enabled) => {
     set({ enableFirstComment: enabled, hasUnsavedChanges: true });
+  },
+
+  // ============================================
+  // PER-PLATFORM CUSTOMIZATION
+  // ============================================
+
+  setEnablePlatformCustomization: (enabled) => {
+    const state = get();
+    
+    if (enabled && state.mainContent.trim()) {
+      // When enabling, pre-fill each platform with base content
+      const newPlatformContent = { ...state.platformContent };
+      
+      // Get selected platforms from selected accounts
+      // This will be populated when accounts are selected
+      const selectedPlatforms: SocialPlatform[] = [];
+      
+      selectedPlatforms.forEach(platform => {
+        if (!newPlatformContent[platform]) {
+          newPlatformContent[platform] = state.mainContent;
+        }
+      });
+      
+      set({ 
+        enablePlatformCustomization: enabled, 
+        platformContent: newPlatformContent,
+        hasUnsavedChanges: true 
+      });
+    } else {
+      set({ enablePlatformCustomization: enabled, hasUnsavedChanges: true });
+    }
+  },
+
+  copyFromBaseContent: (platform) => {
+    const state = get();
+    set((state) => ({
+      platformContent: {
+        ...state.platformContent,
+        [platform]: state.mainContent,
+      },
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  resetPlatformContent: (platform) => {
+    set((state) => ({
+      platformContent: {
+        ...state.platformContent,
+        [platform]: '',
+      },
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  setPlatformSettings: (platform, settings) => {
+    set((state) => ({
+      platformSettings: {
+        ...state.platformSettings,
+        [platform]: settings,
+      },
+      hasUnsavedChanges: true,
+    }));
   },
 
   // ============================================
@@ -518,6 +592,7 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
           .filter((m) => m.uploadStatus === 'completed')
           .map((m) => m.id),
         platformContent: platformContent.length > 0 ? platformContent : undefined,
+        platformSettings: Object.keys(state.platformSettings).length > 0 ? state.platformSettings : undefined,
         categoryId: state.categoryId,
         campaignId: state.campaignId,
         tags: state.tags,

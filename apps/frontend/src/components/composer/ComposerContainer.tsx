@@ -69,6 +69,10 @@ export function ComposerContainer({
   const saveDraft = useComposerStore(state => state.saveDraft);
   const setDraftId = useComposerStore(state => state.setDraftId);
   const setIsNewDraft = useComposerStore(state => state.setIsNewDraft);
+  const enablePlatformCustomization = useComposerStore(state => state.enablePlatformCustomization);
+  const setEnablePlatformCustomization = useComposerStore(state => state.setEnablePlatformCustomization);
+  const copyFromBaseContent = useComposerStore(state => state.copyFromBaseContent);
+  const resetPlatformContent = useComposerStore(state => state.resetPlatformContent);
   const reset = useComposerStore(state => state.reset);
 
   const { accounts } = useSocialAccountStore();
@@ -570,6 +574,7 @@ export function ComposerContainer({
                 mainContent={mainContent}
                 platformContent={platformContent}
                 onContentChange={setContent}
+                onAutoAdapt={() => addToast('success', 'Content auto-adapted for all platforms')}
               />
             </section>
 

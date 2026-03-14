@@ -3,17 +3,20 @@ import { PlatformTabs } from './PlatformTabs';
 import { EmojiPicker } from './EmojiPicker';
 import { MentionAutocomplete } from './MentionAutocomplete';
 import { LinkPreviewCard } from './LinkPreviewCard';
+import { PlatformSpecificSettings } from './PlatformSpecificSettings';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useLinkPreview } from '@/hooks/useLinkPreview';
 import { getSuggestedAdaptations } from '@/utils/contentAdaptation';
-import { useState, useRef } from 'react';
-import { Smile, Wand2 } from 'lucide-react';
+import { useComposerStore } from '@/store/composer.store';
+import { useState, useRef, useCallback } from 'react';
+import { Smile, Wand2, Settings, Copy, RotateCcw } from 'lucide-react';
 
 interface ContentSectionProps {
   platforms: SocialPlatform[];
   mainContent: string;
   platformContent: Record<SocialPlatform, string>;
   onContentChange: (platform: SocialPlatform | 'main', content: string) => void;
+  onAutoAdapt?: () => void;
 }
 
 export function ContentSection({
@@ -21,7 +24,13 @@ export function ContentSection({
   mainContent,
   platformContent,
   onContentChange,
+  onAutoAdapt,
 }: ContentSectionProps) {
+  const enablePlatformCustomization = useComposerStore(state => state.enablePlatformCustomization);
+  const setEnablePlatformCustomization = useComposerStore(state => state.setEnablePlatformCustomization);
+  const copyFromBaseContent = useComposerStore(state => state.copyFromBaseContent);
+  const resetPlatformContent = useComposerStore(state => state.resetPlatformContent);
+  
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(
     platforms.length > 0 ? platforms[0] : null
   );
@@ -42,7 +51,7 @@ export function ContentSection({
 
   // Get current content based on active platform
   const getCurrentContent = () => {
-    if (!activePlatform) return mainContent;
+    if (!enablePlatformCustomization || !activePlatform) return mainContent;
     return platformContent[activePlatform] || mainContent;
   };
 
@@ -54,13 +63,17 @@ export function ContentSection({
 
   // Determine content status for each platform
   const contentStatus = platforms.reduce((acc, platform) => {
-    acc[platform] = platformContent[platform]?.trim() ? 'customized' : 'default';
+    if (!enablePlatformCustomization) {
+      acc[platform] = 'default';
+    } else {
+      acc[platform] = platformContent[platform]?.trim() && platformContent[platform] !== mainContent ? 'customized' : 'default';
+    }
     return acc;
   }, {} as Record<SocialPlatform, 'default' | 'customized'>);
 
   // Get character limit for active platform
   const getCharacterLimit = () => {
-    if (!activePlatform) return 280; // Default
+    if (!enablePlatformCustomization || !activePlatform) return 280; // Default
     return PLATFORM_LIMITS[activePlatform];
   };
 
@@ -70,7 +83,7 @@ export function ContentSection({
   const isOverLimit = characterCount > maxLength;
 
   const handleContentChange = (content: string) => {
-    if (activePlatform) {
+    if (enablePlatformCustomization && activePlatform) {
       onContentChange(activePlatform, content);
     } else {
       onContentChange('main', content);
@@ -127,15 +140,76 @@ export function ContentSection({
     });
   };
 
+  const handleCopyFromBase = useCallback(() => {
+    if (activePlatform) {
+      copyFromBaseContent(activePlatform);
+    }
+  }, [activePlatform, copyFromBaseContent]);
+
+  const handleResetPlatform = useCallback(() => {
+    if (activePlatform) {
+      resetPlatformContent(activePlatform);
+    }
+  }, [activePlatform, resetPlatformContent]);
+
+  const handleToggleCustomization = useCallback((enabled: boolean) => {
+    setEnablePlatformCustomization(enabled);
+    if (enabled && platforms.length > 0 && mainContent.trim()) {
+      // Auto-adapt content for each platform
+      const adaptations = getSuggestedAdaptations(mainContent, platforms);
+      
+      platforms.forEach(platform => {
+        if (adaptations[platform]) {
+          onContentChange(platform, adaptations[platform]);
+        }
+      });
+      
+      // Show toast notification
+      onAutoAdapt?.();
+    }
+  }, [setEnablePlatformCustomization, platforms, mainContent, onContentChange, onAutoAdapt]);
+
   return (
     <div className="space-y-4">
+      {/* Platform Customization Toggle */}
+      {platforms.length > 1 && (
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+          <div className="flex items-center gap-3">
+            <Settings className="h-5 w-5 text-gray-600" />
+            <div>
+              <label htmlFor="platform-customization" className="text-sm font-medium text-gray-900">
+                Customize content per platform
+              </label>
+              <p className="text-xs text-gray-600">
+                Create different content for each social media platform
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              id="platform-customization"
+              type="checkbox"
+              checked={enablePlatformCustomization}
+              onChange={(e) => handleToggleCustomization(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+      )}
+
       {/* Platform Tabs */}
-      {platforms.length > 0 && (
+      {platforms.length > 0 && enablePlatformCustomization && (
         <PlatformTabs
           platforms={platforms}
           activeTab={activePlatform}
           onTabChange={setActivePlatform}
           contentStatus={contentStatus}
+          showActions={true}
+          onCopyFromBase={handleCopyFromBase}
+          onReset={handleResetPlatform}
+          mainContent={mainContent}
+          platformContent={platformContent}
         />
       )}
 
@@ -144,7 +218,7 @@ export function ContentSection({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium text-gray-700">
-              {activePlatform
+              {enablePlatformCustomization && activePlatform
                 ? `${activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Content`
                 : 'Post Content'}
             </label>
@@ -157,7 +231,7 @@ export function ContentSection({
               >
                 <Smile className="h-4 w-4" />
               </button>
-              {platforms.length > 1 && mainContent.trim() && (
+              {platforms.length > 1 && mainContent.trim() && !enablePlatformCustomization && (
                 <button
                   type="button"
                   onClick={handleAutoAdapt}
@@ -186,13 +260,13 @@ export function ContentSection({
               onChange={(e) => handleContentChange(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={
-                activePlatform && !platformContent[activePlatform]
+                enablePlatformCustomization && activePlatform && !platformContent[activePlatform]
                   ? `Customize content for ${activePlatform} or use main content...`
                   : "What's on your mind?"
               }
               rows={6}
               aria-label={
-                activePlatform
+                enablePlatformCustomization && activePlatform
                   ? `${activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} post content`
                   : 'Post content'
               }
@@ -239,7 +313,7 @@ export function ContentSection({
           
           <div className="flex items-center justify-between mt-1">
             <span className="text-xs text-gray-500">
-              {activePlatform && !platformContent[activePlatform] && (
+              {enablePlatformCustomization && activePlatform && !platformContent[activePlatform] && (
                 <span className="text-blue-600">Using main content</span>
               )}
             </span>
@@ -260,6 +334,11 @@ export function ContentSection({
             </span>
           </div>
         </div>
+
+        {/* Platform-Specific Settings */}
+        {enablePlatformCustomization && activePlatform && (
+          <PlatformSpecificSettings platform={activePlatform} />
+        )}
 
         {/* AI Assistant Panel - Placeholder for now */}
         {showAIAssistant && (
