@@ -50,6 +50,7 @@ import { facebookAnalyticsRoutes } from '../analytics/facebook.analytics.routes'
 import blueskyRoutes from './bluesky.routes'; // Bluesky OAuth and management
 import mastodonRoutes from './mastodon.routes'; // Mastodon OAuth and management
 import redditRoutes from './reddit.routes'; // Reddit OAuth and management
+import tokensRoutes from './tokens.routes'; // Token lifecycle management
 
 const router = Router();
 
@@ -99,6 +100,7 @@ router.get('/', (_req, res) => {
       bluesky: '/api/v1/bluesky',
       mastodon: '/api/v1/mastodon',
       dashboard: '/api/v1/dashboard',
+      tokens: '/api/v1/tokens',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
       admin: '/api/v1/admin',
@@ -156,6 +158,7 @@ router.use('/instagram', instagramRoutes); // Instagram-specific features
 router.use('/bluesky', blueskyRoutes); // Bluesky OAuth and management
 router.use('/mastodon', mastodonRoutes); // Mastodon OAuth and management
 router.use('/reddit', redditRoutes); // Reddit OAuth and management
+router.use('/tokens', tokensRoutes); // Token lifecycle management
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

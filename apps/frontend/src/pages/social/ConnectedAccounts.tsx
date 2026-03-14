@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '@/store/workspace.store';
 import { AccountCard } from '@/components/social/AccountCard';
 import { ConnectButton } from '@/components/social/ConnectButton';
 import { SuccessToast } from '@/components/feedback/SuccessToast';
+import { TokenHealthDashboard } from '@/components/tokens/TokenHealthDashboard';
 import { SocialPlatform, SocialAccount } from '@/types/social.types';
 import { AlertCircle } from 'lucide-react';
 
@@ -157,6 +158,13 @@ export const ConnectedAccountsPage = () => {
                 ✕
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Token Health Dashboard - only show if we have accounts */}
+        {accounts.length > 0 && (
+          <div className="mb-8">
+            <TokenHealthDashboard />
           </div>
         )}
 

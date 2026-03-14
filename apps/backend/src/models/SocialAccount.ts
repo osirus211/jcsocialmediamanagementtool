@@ -93,6 +93,8 @@ export interface ISocialAccount extends Document {
   lastRefreshedAt?: Date;
   lastError?: string;
   lastErrorAt?: Date;
+  refreshFailureCount?: number;
+  lastRefreshError?: string;
   disconnectedAt?: Date; // Added missing field
   metadata: {
     profileUrl?: string;

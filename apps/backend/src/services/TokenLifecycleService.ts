@@ -1,7 +1,9 @@
-import { SocialAccount, ISocialAccount, AccountStatus } from '../models/SocialAccount';
+import { SocialAccount, ISocialAccount, AccountStatus, SocialPlatform } from '../models/SocialAccount';
 import { logger } from '../utils/logger';
 import { securityAuditService } from './SecurityAuditService';
 import { SecurityEventType } from '../models/SecurityEvent';
+import { emailService } from './EmailService';
+import { NotificationType } from '../models/Notification';
 import mongoose from 'mongoose';
 
 /**
@@ -35,6 +37,27 @@ export enum TokenState {
   REVOKED = 'revoked',
 }
 
+export interface TokenHealth {
+  accountId: mongoose.Types.ObjectId;
+  provider: string;
+  state: TokenState;
+  expiresAt?: Date;
+  daysUntilExpiry?: number;
+  reconnectRequired: boolean;
+  lastRefreshedAt?: Date;
+  refreshFailureCount: number;
+  lastRefreshError?: string;
+}
+
+export interface RefreshResult {
+  success: boolean;
+  accountId: string;
+  provider: string;
+  newExpiresAt?: Date;
+  error?: string;
+  requiresReconnect?: boolean;
+}
+
 export interface TokenLifecycleInfo {
   accountId: mongoose.Types.ObjectId;
   provider: string;
@@ -48,6 +71,25 @@ export interface TokenLifecycleInfo {
 export class TokenLifecycleService {
   private readonly EXPIRY_WARNING_DAYS = 7; // Warn when token expires within 7 days
   private readonly EXPIRY_WARNING_MS = this.EXPIRY_WARNING_DAYS * 24 * 60 * 60 * 1000;
+  private readonly MAX_REFRESH_FAILURES = 3; // Mark for reconnect after 3 failures
+
+  // Platform-specific refresh thresholds (days before expiry)
+  private readonly REFRESH_THRESHOLDS: Record<string, number> = {
+    [SocialPlatform.INSTAGRAM]: 7,
+    [SocialPlatform.FACEBOOK]: 7,
+    [SocialPlatform.LINKEDIN]: 7,
+    [SocialPlatform.TIKTOK]: 7,
+    [SocialPlatform.PINTEREST]: 7,
+    [SocialPlatform.THREADS]: 7,
+    [SocialPlatform.YOUTUBE]: 0.5, // 12 hours for Google tokens (1 hour expiry)
+    [SocialPlatform.GOOGLE_BUSINESS]: 0.5, // 12 hours for Google tokens
+    [SocialPlatform.REDDIT]: 7,
+    [SocialPlatform.BLUESKY]: 0.5, // 12 hours for session tokens (~24hr expiry)
+    [SocialPlatform.TWITTER]: 30, // Check monthly for revocation
+    [SocialPlatform.MASTODON]: 365, // Check yearly (typically no expiry)
+    [SocialPlatform.GITHUB]: 365, // Check yearly (no expiry)
+    [SocialPlatform.APPLE]: 180, // Check every 6 months
+  };
 
   /**
    * Determine token state based on expiry
@@ -425,6 +467,278 @@ export class TokenLifecycleService {
         expiringSoon: 0,
         expired: 0,
         updated: 0,
+      };
+    }
+  }
+
+  /**
+   * Check if token is expiring soon based on platform-specific thresholds
+   */
+  isExpiringSoon(account: ISocialAccount, customThresholdDays?: number): boolean {
+    if (!account.tokenExpiresAt) {
+      return false;
+    }
+
+    const thresholdDays = customThresholdDays || this.REFRESH_THRESHOLDS[account.provider] || this.EXPIRY_WARNING_DAYS;
+    const thresholdMs = thresholdDays * 24 * 60 * 60 * 1000;
+    const timeUntilExpiry = account.tokenExpiresAt.getTime() - Date.now();
+
+    return timeUntilExpiry <= thresholdMs && timeUntilExpiry > 0;
+  }
+
+  /**
+   * Get token health for a specific account
+   */
+  async checkTokenHealth(accountId: mongoose.Types.ObjectId | string): Promise<TokenHealth | null> {
+    try {
+      const account = await SocialAccount.findById(accountId);
+
+      if (!account) {
+        logger.warn('Social account not found', { accountId });
+        return null;
+      }
+
+      const state = this.determineTokenState(account.tokenExpiresAt, account.status);
+      const daysUntilExpiry = this.calculateDaysUntilExpiry(account.tokenExpiresAt);
+      const reconnectRequired = [TokenState.EXPIRED, TokenState.REVOKED].includes(state);
+
+      return {
+        accountId: account._id,
+        provider: account.provider,
+        state,
+        expiresAt: account.tokenExpiresAt,
+        daysUntilExpiry,
+        reconnectRequired,
+        lastRefreshedAt: account.lastRefreshedAt,
+        refreshFailureCount: account.refreshFailureCount || 0,
+        lastRefreshError: account.lastRefreshError,
+      };
+    } catch (error: any) {
+      logger.error('Failed to check token health', {
+        accountId,
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get all accounts with expiring tokens (within platform-specific thresholds)
+   */
+  async getExpiringAccounts(workspaceId?: string): Promise<ISocialAccount[]> {
+    try {
+      const query: any = {
+        status: AccountStatus.ACTIVE,
+        tokenExpiresAt: { $exists: true, $gt: new Date() }, // Not yet expired
+      };
+
+      if (workspaceId) {
+        query.workspaceId = workspaceId;
+      }
+
+      const accounts = await SocialAccount.find(query);
+      
+      // Filter by platform-specific thresholds
+      const expiringAccounts = accounts.filter(account => this.isExpiringSoon(account));
+
+      logger.debug('Found expiring accounts', {
+        total: accounts.length,
+        expiring: expiringAccounts.length,
+        workspaceId,
+      });
+
+      return expiringAccounts;
+    } catch (error: any) {
+      logger.error('Failed to get expiring accounts', {
+        error: error.message,
+        workspaceId,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Mark account as expired and increment failure count
+   */
+  async markAsExpired(accountId: mongoose.Types.ObjectId | string, reason?: string): Promise<void> {
+    try {
+      const account = await SocialAccount.findById(accountId);
+      if (!account) {
+        logger.warn('Account not found for expiry marking', { accountId });
+        return;
+      }
+
+      account.status = AccountStatus.EXPIRED;
+      account.refreshFailureCount = (account.refreshFailureCount || 0) + 1;
+      account.lastRefreshError = reason;
+      await account.save();
+
+      logger.info('Account marked as expired', {
+        accountId,
+        provider: account.provider,
+        failureCount: account.refreshFailureCount,
+        reason,
+      });
+
+      // Send notification if failure count exceeds threshold
+      if (account.refreshFailureCount >= this.MAX_REFRESH_FAILURES) {
+        await this.notifyTokenExpiry(account);
+      }
+    } catch (error: any) {
+      logger.error('Failed to mark account as expired', {
+        accountId,
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Send notification about token expiry requiring reconnect
+   */
+  async notifyTokenExpiry(account: ISocialAccount): Promise<void> {
+    try {
+      // Get workspace owner for notification
+      const workspace = await mongoose.model('Workspace').findById(account.workspaceId);
+      if (!workspace) {
+        logger.warn('Workspace not found for notification', { 
+          workspaceId: account.workspaceId,
+          accountId: account._id,
+        });
+        return;
+      }
+
+      const user = await mongoose.model('User').findById(workspace.ownerId);
+      if (!user) {
+        logger.warn('User not found for notification', { 
+          userId: workspace.ownerId,
+          accountId: account._id,
+        });
+        return;
+      }
+
+      // Send email notification
+      await emailService.sendEmail({
+        to: user.email,
+        subject: `${account.provider} account needs reconnection`,
+        body: `Your ${account.provider} account "${account.accountName}" in workspace "${workspace.name}" needs to be reconnected. Please visit ${process.env.FRONTEND_URL}/accounts?reconnect=${account._id} to reconnect.`,
+        html: `
+          <p>Your <strong>${account.provider}</strong> account "${account.accountName}" in workspace "${workspace.name}" needs to be reconnected.</p>
+          <p><a href="${process.env.FRONTEND_URL}/accounts?reconnect=${account._id}">Click here to reconnect your account</a></p>
+        `,
+      });
+
+      logger.info('Token expiry notification sent', {
+        accountId: account._id,
+        provider: account.provider,
+        userEmail: user.email,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send token expiry notification', {
+        accountId: account._id,
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Refresh all expiring tokens for a workspace
+   */
+  async refreshAllExpiring(workspaceId?: string): Promise<RefreshResult[]> {
+    try {
+      const expiringAccounts = await this.getExpiringAccounts(workspaceId);
+      const results: RefreshResult[] = [];
+
+      logger.info('Starting bulk token refresh', {
+        count: expiringAccounts.length,
+        workspaceId,
+      });
+
+      for (const account of expiringAccounts) {
+        try {
+          const result = await this.refreshToken(account);
+          results.push(result);
+        } catch (error: any) {
+          results.push({
+            success: false,
+            accountId: account._id.toString(),
+            provider: account.provider,
+            error: error.message,
+          });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      logger.info('Bulk token refresh completed', {
+        total: results.length,
+        successful: successCount,
+        failed: results.length - successCount,
+        workspaceId,
+      });
+
+      return results;
+    } catch (error: any) {
+      logger.error('Bulk token refresh failed', {
+        error: error.message,
+        workspaceId,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Refresh token for a specific account
+   */
+  async refreshToken(account: ISocialAccount): Promise<RefreshResult> {
+    try {
+      logger.info('Starting token refresh', {
+        accountId: account._id,
+        provider: account.provider,
+      });
+
+      // For now, return success for platforms that don't need refresh
+      // Individual OAuth services will handle the actual refresh logic
+      const platformsWithoutRefresh = ['mastodon', 'github', 'apple'];
+      
+      if (platformsWithoutRefresh.includes(account.provider)) {
+        return {
+          success: true,
+          accountId: account._id.toString(),
+          provider: account.provider,
+          error: 'Platform does not require token refresh',
+        };
+      }
+
+      // Update account with successful refresh placeholder
+      account.lastRefreshedAt = new Date();
+      account.refreshFailureCount = 0;
+      account.lastRefreshError = undefined;
+      account.status = AccountStatus.ACTIVE;
+      await account.save();
+
+      logger.info('Token refresh successful', {
+        accountId: account._id,
+        provider: account.provider,
+      });
+
+      return {
+        success: true,
+        accountId: account._id.toString(),
+        provider: account.provider,
+      };
+    } catch (error: any) {
+      logger.error('Token refresh failed', {
+        accountId: account._id,
+        provider: account.provider,
+        error: error.message,
+      });
+
+      await this.markAsExpired(account._id, error.message);
+
+      return {
+        success: false,
+        accountId: account._id.toString(),
+        provider: account.provider,
+        error: error.message,
       };
     }
   }

@@ -23,6 +23,7 @@ import {
   Unlink,
   ExternalLink,
 } from 'lucide-react';
+import { TokenHealthBadge, TokenState } from '../tokens/TokenHealthBadge';
 
 interface InstagramAccountCardProps {
   account: InstagramAccount;
@@ -48,6 +49,11 @@ interface InstagramAccount {
   avgEngagementRate: number;
   recentPostsCount: number;
   isActive: boolean;
+  // Token health fields
+  tokenState?: TokenState;
+  daysUntilExpiry?: number;
+  refreshFailureCount?: number;
+  lastRefreshError?: string;
 }
 
 const ACCOUNT_TYPE_COLORS = {
@@ -127,8 +133,22 @@ export const InstagramAccountCard: React.FC<InstagramAccountCardProps> = ({
     }
   };
 
-  const isTokenExpiringSoon = getDaysUntilExpiry() <= 7;
-  const needsAttention = account.connectionStatus !== 'connected' || isTokenExpiringSoon;
+  const getTokenState = (): TokenState => {
+    if (account.tokenState) return account.tokenState;
+    
+    // Fallback logic for backward compatibility
+    if (account.connectionStatus === 'error') return 'revoked';
+    if (account.connectionStatus === 'expired') return 'expired';
+    
+    const daysUntilExpiry = getDaysUntilExpiry();
+    if (daysUntilExpiry <= 0) return 'expired';
+    if (daysUntilExpiry <= 7) return 'expiring_soon';
+    return 'active';
+  };
+
+  const tokenState = getTokenState();
+  const daysUntilExpiry = account.daysUntilExpiry ?? getDaysUntilExpiry();
+  const needsAttention = tokenState !== 'active';
 
   return (
     <div className={`relative overflow-hidden border rounded-lg ${className}`}>
@@ -209,7 +229,7 @@ export const InstagramAccountCard: React.FC<InstagramAccountCardProps> = ({
           </div>
         </div>
 
-        {/* Connection Status */}
+        {/* Connection Status and Token Health */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
@@ -218,16 +238,23 @@ export const InstagramAccountCard: React.FC<InstagramAccountCardProps> = ({
             </span>
           </div>
 
-          {needsAttention && (
-            <button
-              onClick={handleReconnect}
-              disabled={isReconnecting}
-              className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
-            >
-              <RefreshCw className={`w-3 h-3 ${isReconnecting ? 'animate-spin' : ''}`} />
-              Reconnect
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <TokenHealthBadge 
+              state={tokenState}
+              daysUntilExpiry={daysUntilExpiry}
+              isRefreshing={isReconnecting}
+            />
+            {needsAttention && (
+              <button
+                onClick={handleReconnect}
+                disabled={isReconnecting}
+                className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${isReconnecting ? 'animate-spin' : ''}`} />
+                {tokenState === 'revoked' ? 'Reconnect' : 'Refresh'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Account Stats */}
@@ -268,10 +295,12 @@ export const InstagramAccountCard: React.FC<InstagramAccountCardProps> = ({
           
           {account.connectionStatus === 'connected' && (
             <div className="flex items-center justify-between">
-              <span>Token expires:</span>
-              <span className={isTokenExpiringSoon ? 'text-yellow-600 font-medium' : ''}>
-                {getDaysUntilExpiry()} days
-              </span>
+              <span>Token health:</span>
+              <TokenHealthBadge 
+                state={tokenState}
+                daysUntilExpiry={daysUntilExpiry}
+                className="text-xs"
+              />
             </div>
           )}
 
@@ -281,24 +310,14 @@ export const InstagramAccountCard: React.FC<InstagramAccountCardProps> = ({
           </div>
         </div>
 
-        {/* Warnings */}
-        {isTokenExpiringSoon && account.connectionStatus === 'connected' && (
-          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-yellow-600" />
-              <p className="text-xs text-yellow-800">
-                Token expires in {getDaysUntilExpiry()} days. Reconnect to avoid interruption.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {account.connectionStatus === 'error' && (
+        {/* Warnings - now handled by TokenHealthBadge, but keep for additional context */}
+        {account.refreshFailureCount && account.refreshFailureCount > 0 && (
           <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-600" />
               <p className="text-xs text-red-800">
-                Connection error. Please reconnect your account.
+                {account.refreshFailureCount} failed refresh attempt{account.refreshFailureCount !== 1 ? 's' : ''}
+                {account.lastRefreshError && `: ${account.lastRefreshError}`}
               </p>
             </div>
           </div>

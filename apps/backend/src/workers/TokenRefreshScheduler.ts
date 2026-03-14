@@ -1,12 +1,16 @@
 /**
- * Token Refresh Scheduler
+ * Enhanced Token Refresh Scheduler
  * 
- * Scans database for expiring tokens and enqueues refresh jobs
- * Phase 1: Minimal implementation (no dedup, no staggering)
+ * Comprehensive token lifecycle management:
+ * - Scans for expiring tokens using platform-specific thresholds
+ * - Proactive refresh (7 days before expiry for most platforms)
+ * - Automatic notifications for failed refreshes
+ * - Health monitoring and reporting
  */
 
 import { SocialAccount, AccountStatus } from '../models/SocialAccount';
 import { tokenRefreshQueue } from '../queue/TokenRefreshQueue';
+import { tokenLifecycleService } from '../services/TokenLifecycleService';
 import { logger } from '../utils/logger';
 import crypto from 'crypto';
 
@@ -14,8 +18,9 @@ export class TokenRefreshScheduler {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning: boolean = false;
 
-  private readonly POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  private readonly REFRESH_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
+  // Run every 6 hours for comprehensive token management
+  private readonly POLL_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
+  private readonly LIFECYCLE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
 
   /**
    * Start scheduler
@@ -29,16 +34,16 @@ export class TokenRefreshScheduler {
     this.isRunning = true;
 
     // Run immediately
-    this.scan();
+    this.runComprehensiveCheck();
 
-    // Schedule periodic scans
+    // Schedule periodic checks every 6 hours
     this.intervalId = setInterval(() => {
-      this.scan();
+      this.runComprehensiveCheck();
     }, this.POLL_INTERVAL);
 
-    logger.info('Token refresh scheduler started', {
+    logger.info('Enhanced token refresh scheduler started', {
       pollInterval: this.POLL_INTERVAL,
-      refreshWindow: this.REFRESH_WINDOW,
+      lifecycleCheckInterval: this.LIFECYCLE_CHECK_INTERVAL,
     });
   }
 
@@ -58,45 +63,37 @@ export class TokenRefreshScheduler {
   }
 
   /**
-   * Scan database for expiring tokens and enqueue jobs
+   * Run comprehensive token lifecycle check
    */
-  private async scan(): Promise<void> {
+  private async runComprehensiveCheck(): Promise<void> {
     const startTime = Date.now();
     
     try {
-      logger.info('Token refresh scan started');
+      logger.info('Starting comprehensive token lifecycle check');
 
-      // Calculate refresh threshold (24 hours from now)
-      const refreshThreshold = new Date(Date.now() + this.REFRESH_WINDOW);
+      // Step 1: Run general lifecycle check (updates expired statuses)
+      const lifecycleResults = await tokenLifecycleService.runLifecycleCheck();
+      
+      logger.info('Lifecycle check completed', lifecycleResults);
 
-      // Query accounts with tokens expiring within window
-      const accounts = await SocialAccount.find({
-        status: AccountStatus.ACTIVE,
-        tokenExpiresAt: {
-          $lt: refreshThreshold,
-          $ne: null,
-        },
-      })
-        .select('_id provider tokenExpiresAt')
-        .sort({ tokenExpiresAt: 1 }) // Soonest expiry first
-        .limit(10000); // Process max 10K per scan
-
-      logger.info('Token refresh scan found accounts', {
-        count: accounts.length,
-        threshold: refreshThreshold,
+      // Step 2: Get accounts that need proactive refresh
+      const expiringAccounts = await tokenLifecycleService.getExpiringAccounts();
+      
+      logger.info('Found accounts needing proactive refresh', {
+        count: expiringAccounts.length,
       });
 
-      // Enqueue refresh jobs with jitter (storm protection)
+      // Step 3: Enqueue refresh jobs for expiring accounts
       let enqueued = 0;
       let failed = 0;
 
-      for (const account of accounts) {
+      for (const account of expiringAccounts) {
         try {
           const correlationId = crypto.randomBytes(8).toString('hex');
 
-          // Add jitter: random delay ±10 minutes (±600,000 ms)
-          const jitterMs = Math.floor(Math.random() * 1200000) - 600000; // -600000 to +600000
-          const delay = Math.max(0, jitterMs); // Ensure non-negative
+          // Add jitter to prevent thundering herd: ±30 minutes
+          const jitterMs = Math.floor(Math.random() * 3600000) - 1800000; // -30min to +30min
+          const delay = Math.max(0, jitterMs);
 
           await tokenRefreshQueue.addRefreshJob({
             connectionId: account._id.toString(),
@@ -107,15 +104,36 @@ export class TokenRefreshScheduler {
 
           enqueued++;
 
-          logger.debug('Token refresh job enqueued with jitter', {
+          logger.debug('Proactive refresh job enqueued', {
             connectionId: account._id.toString(),
             provider: account.provider,
+            expiresAt: account.tokenExpiresAt,
             jitterMs: delay,
           });
         } catch (error: any) {
           failed++;
-          logger.error('Failed to enqueue refresh job', {
+          logger.error('Failed to enqueue proactive refresh job', {
             connectionId: account._id.toString(),
+            provider: account.provider,
+            error: error.message,
+          });
+        }
+      }
+
+      // Step 4: Check for accounts that need immediate attention
+      const expiredAccounts = await tokenLifecycleService.findExpiredAccounts();
+      
+      for (const account of expiredAccounts) {
+        // Try to refresh expired tokens (last chance before marking for reconnect)
+        try {
+          const result = await tokenLifecycleService.refreshToken(account);
+          
+          if (!result.success && result.requiresReconnect) {
+            await tokenLifecycleService.notifyTokenExpiry(account);
+          }
+        } catch (error: any) {
+          logger.error('Failed to refresh expired token', {
+            accountId: account._id,
             provider: account.provider,
             error: error.message,
           });
@@ -124,14 +142,16 @@ export class TokenRefreshScheduler {
 
       const duration = Date.now() - startTime;
 
-      logger.info('Token refresh scan completed', {
-        total: accounts.length,
+      logger.info('Comprehensive token lifecycle check completed', {
+        lifecycleResults,
+        expiringAccounts: expiringAccounts.length,
+        expiredAccounts: expiredAccounts.length,
         enqueued,
         failed,
         duration,
       });
     } catch (error: any) {
-      logger.error('Token refresh scan failed', {
+      logger.error('Comprehensive token lifecycle check failed', {
         error: error.message,
         duration: Date.now() - startTime,
       });
@@ -139,10 +159,17 @@ export class TokenRefreshScheduler {
   }
 
   /**
-   * Force immediate scan (for testing)
+   * Force immediate comprehensive check (for testing and manual triggers)
+   */
+  async forceCheck(): Promise<void> {
+    await this.runComprehensiveCheck();
+  }
+
+  /**
+   * Legacy method for backward compatibility
    */
   async forceScan(): Promise<void> {
-    await this.scan();
+    await this.runComprehensiveCheck();
   }
 
   /**
@@ -152,7 +179,8 @@ export class TokenRefreshScheduler {
     return {
       isRunning: this.isRunning,
       pollInterval: this.POLL_INTERVAL,
-      refreshWindow: this.REFRESH_WINDOW,
+      lifecycleCheckInterval: this.LIFECYCLE_CHECK_INTERVAL,
+      nextCheckIn: this.intervalId ? this.POLL_INTERVAL : null,
     };
   }
 }
