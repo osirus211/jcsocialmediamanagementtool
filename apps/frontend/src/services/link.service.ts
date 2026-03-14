@@ -5,6 +5,11 @@ export interface ShortLinkOptions {
   platform?: string;
   expiresAt?: string;
   customDomain?: string;
+  title?: string;
+  tags?: string[];
+  password?: string;
+  useBitly?: boolean;
+  bitlyAccessToken?: string;
   utmParams?: {
     source?: string;
     medium?: string;
@@ -23,6 +28,12 @@ export interface ShortLink {
   platform?: string;
   postId?: string;
   expiresAt?: string;
+  title?: string;
+  tags?: string[];
+  isActive: boolean;
+  useBitly?: boolean;
+  bitlyUrl?: string;
+  password?: string;
 }
 
 export interface LinkStats {
@@ -35,6 +46,13 @@ export interface LinkStats {
     referrer?: string;
   }>;
   createdAt: string;
+}
+
+export interface BulkShortenResult {
+  original: string;
+  shortened: string;
+  id: string;
+  error?: string;
 }
 
 export class LinkService {
@@ -50,6 +68,22 @@ export class LinkService {
   }
 
   /**
+   * Bulk shorten URLs
+   */
+  async bulkShortenUrls(urls: string[], options?: Omit<ShortLinkOptions, 'postId'>): Promise<{
+    results: BulkShortenResult[];
+    total: number;
+    successful: number;
+    failed: number;
+  }> {
+    const response = await apiClient.post('/links/bulk', {
+      urls,
+      ...options,
+    });
+    return response.data;
+  }
+
+  /**
    * Get link statistics
    */
   async getLinkStats(shortCode: string): Promise<LinkStats> {
@@ -58,11 +92,63 @@ export class LinkService {
   }
 
   /**
+   * Get link analytics
+   */
+  async getLinkAnalytics(shortCode: string, dateFrom?: string, dateTo?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (dateFrom) params.append('dateFrom', dateFrom);
+    if (dateTo) params.append('dateTo', dateTo);
+    
+    const response = await apiClient.get(`/links/${shortCode}/analytics?${params.toString()}`);
+    return response.data;
+  }
+
+  /**
    * Get workspace links
    */
-  async getLinks(page: number = 1, limit: number = 20) {
-    const response = await apiClient.get(`/links?page=${page}&limit=${limit}`);
+  async getLinks(page: number = 1, limit: number = 20, filters?: {
+    search?: string;
+    platform?: string;
+    status?: 'active' | 'inactive' | 'expired';
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.platform) params.append('platform', filters.platform);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+
+    const response = await apiClient.get(`/links?${params.toString()}`);
     return response;
+  }
+
+  /**
+   * Update a link
+   */
+  async updateLink(shortCode: string, updates: {
+    originalUrl?: string;
+    title?: string;
+    tags?: string[];
+    password?: string;
+    expiresAt?: string;
+    isActive?: boolean;
+  }): Promise<ShortLink> {
+    const response = await apiClient.patch(`/links/${shortCode}`, updates);
+    return response.data;
+  }
+
+  /**
+   * Toggle link status
+   */
+  async toggleLink(shortCode: string): Promise<{ shortCode: string; isActive: boolean }> {
+    const response = await apiClient.patch(`/links/${shortCode}/toggle`);
+    return response.data;
   }
 
   /**
@@ -70,6 +156,18 @@ export class LinkService {
    */
   async deleteLink(shortCode: string): Promise<void> {
     await apiClient.delete(`/links/${shortCode}`);
+  }
+
+  /**
+   * Get QR code for link
+   */
+  async getQRCode(shortCode: string, format: 'png' | 'svg' = 'png', size: number = 256): Promise<{
+    qrCode: string;
+    shortUrl: string;
+    format: string;
+  }> {
+    const response = await apiClient.get(`/links/${shortCode}/qr-code?format=${format}&size=${size}`);
+    return response.data;
   }
 
   /**

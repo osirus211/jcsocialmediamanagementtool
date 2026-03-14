@@ -17,6 +17,15 @@ export interface IShortLink extends Document {
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   expiresAt?: Date;
+  // Bitly integration
+  bitlyId?: string;
+  bitlyUrl?: string;
+  useBitly?: boolean;
+  // Enhanced features
+  title?: string;
+  tags?: string[];
+  password?: string;
+  isActive: boolean;
 }
 
 const ShortLinkSchema = new Schema<IShortLink>(
@@ -59,6 +68,34 @@ const ShortLinkSchema = new Schema<IShortLink>(
     },
     expiresAt: {
       type: Date,
+    },
+    // Bitly integration
+    bitlyId: {
+      type: String,
+      sparse: true,
+    },
+    bitlyUrl: {
+      type: String,
+    },
+    useBitly: {
+      type: Boolean,
+      default: false,
+    },
+    // Enhanced features
+    title: {
+      type: String,
+      trim: true,
+    },
+    tags: [{
+      type: String,
+      trim: true,
+    }],
+    password: {
+      type: String,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   {
