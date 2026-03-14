@@ -13,6 +13,7 @@ export interface AnalyticsData {
   saves?: number;
   retweets?: number;
   views?: number;
+  reach?: number;
   platformData?: Record<string, any>;
 }
 
@@ -20,6 +21,7 @@ export interface CollectAnalyticsParams {
   platformPostId: string;
   accessToken: string;
   account: any;
+  accountId?: string;
 }
 
 export interface IAnalyticsAdapter {

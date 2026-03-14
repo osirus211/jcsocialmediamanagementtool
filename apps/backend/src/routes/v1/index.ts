@@ -43,6 +43,7 @@ import designIntegrationsRoutes from './design-integrations.routes'; // Phase-4:
 import stockPhotosRoutes from './stock-photos.routes'; // Phase-4: Stock photo library
 import gdprRoutes from './gdpr.routes'; // GDPR compliance
 import { onboardingRoutes } from './onboarding.routes'; // User onboarding
+import instagramRoutes from './instagram.routes'; // Instagram-specific features
 
 const router = Router();
 
@@ -88,6 +89,7 @@ router.get('/', (_req, res) => {
       stockPhotos: '/api/v1/stock-photos',
       gdpr: '/api/v1/gdpr',
       onboarding: '/api/v1/onboarding',
+      instagram: '/api/v1/instagram',
       dashboard: '/api/v1/dashboard',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
@@ -139,6 +141,7 @@ router.use('/design-integrations', designIntegrationsRoutes); // Phase-4: Canva 
 router.use('/stock-photos', stockPhotosRoutes); // Phase-4: Stock photo library
 router.use('/gdpr', gdprRoutes); // GDPR compliance
 router.use('/onboarding', onboardingRoutes); // User onboarding
+router.use('/instagram', instagramRoutes); // Instagram-specific features
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

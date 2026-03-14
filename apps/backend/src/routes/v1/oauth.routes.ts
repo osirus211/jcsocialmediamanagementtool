@@ -58,6 +58,10 @@ router.use(requireWorkspace);
 // Get available OAuth platforms
 router.get('/platforms', oauthController.getPlatforms.bind(oauthController));
 
+// Instagram OAuth routes
+router.get('/instagram/authorize', authorizeRateLimit, oauthController.authorize.bind(oauthController));
+router.get('/instagram/callback', callbackRateLimit, oauthController.callback.bind(oauthController));
+
 // Instagram-specific endpoints
 router.get('/instagram/connect-options', instagramConnectOptionsRateLimit, oauthController.getInstagramConnectOptions.bind(oauthController));
 router.post('/instagram/connect', instagramConnectRateLimit, oauthController.connectInstagram.bind(oauthController));

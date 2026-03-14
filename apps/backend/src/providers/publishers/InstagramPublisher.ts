@@ -9,10 +9,38 @@ import { ISocialAccount } from '../../models/SocialAccount';
 import { PublishPostOptions, PublishPostResult } from './IPublisher';
 import { logger } from '../../utils/logger';
 import { IPost, ContentType } from '../../models/Post';
+import axios from 'axios';
 
-const INSTAGRAM_API_BASE = 'https://graph.facebook.com/v18.0';
+const INSTAGRAM_API_BASE = 'https://graph.instagram.com/v21.0';
 const MAX_CONTENT_LENGTH = 2200;
 const MAX_MEDIA_COUNT = 10;
+const MAX_HASHTAGS = 30;
+
+interface InstagramMediaContainer {
+  id: string;
+  status_code?: string;
+}
+
+interface InstagramLocation {
+  id: string;
+  name: string;
+}
+
+interface InstagramUser {
+  id: string;
+  username: string;
+}
+
+interface CarouselItem {
+  media_url: string;
+  media_type: 'IMAGE' | 'VIDEO';
+  alt_text?: string;
+  user_tags?: Array<{
+    user: { username: string };
+    x: number;
+    y: number;
+  }>;
+}
 
 export class InstagramPublisher extends BasePublisher {
   readonly platform = 'instagram';
@@ -31,22 +59,75 @@ export class InstagramPublisher extends BasePublisher {
       }
     }
 
-    // Default: regular post
+    // Check if this is a carousel post (multiple media items)
+    if (mediaIds.length > 1) {
+      return this.publishCarousel(account, options);
+    }
+
+    // Default: single image/video post
+    return this.publishSinglePost(account, options);
+  }
+
+  async publishSinglePost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    const { content, mediaIds = [] } = options;
+    const post = (options as any).post;
+
     this.validateContentLength(content, MAX_CONTENT_LENGTH);
-    this.validateMediaCount(mediaIds, MAX_MEDIA_COUNT);
+    this.validateMediaCount(mediaIds, 1);
 
     const accessToken = this.getAccessToken(account);
     const instagramAccountId = account.providerUserId;
 
     try {
+      const mediaUrl = mediaIds[0];
+      const isVideo = this.isVideoUrl(mediaUrl);
+
       // Create media container
+      const containerPayload: Record<string, any> = {
+        access_token: accessToken,
+      };
+
+      if (isVideo) {
+        containerPayload.media_type = 'VIDEO';
+        containerPayload.video_url = mediaUrl;
+      } else {
+        containerPayload.media_type = 'IMAGE';
+        containerPayload.image_url = mediaUrl;
+      }
+
+      // Add caption (or save for first comment)
+      const { caption, firstComment } = this.processCaption(content, post);
+      if (caption) {
+        containerPayload.caption = caption;
+      }
+
+      // Add alt text for accessibility
+      if (post && 'instagramOptions' in post && post.instagramOptions?.altText) {
+        containerPayload.alt_text = post.instagramOptions.altText;
+      }
+
+      // Add location tagging
+      if (post && 'instagramOptions' in post && post.instagramOptions?.locationId) {
+        containerPayload.location_id = post.instagramOptions.locationId;
+      }
+
+      // Add user tags
+      if (post && 'instagramOptions' in post && post.instagramOptions?.userTags?.length) {
+        containerPayload.user_tags = post.instagramOptions.userTags.map((tag: any) => ({
+          user: { username: tag.username },
+          x: tag.x,
+          y: tag.y,
+        }));
+      }
+
+      // Add collaborators
+      if (post && 'instagramOptions' in post && post.instagramOptions?.collaborators?.length) {
+        containerPayload.collaborators = post.instagramOptions.collaborators;
+      }
+
       const containerResponse = await this.httpClient.post(
         `${INSTAGRAM_API_BASE}/${instagramAccountId}/media`,
-        {
-          image_url: mediaIds[0], // Instagram requires at least one image
-          caption: content,
-          access_token: accessToken,
-        }
+        containerPayload
       );
 
       const containerId = containerResponse.data.id;
@@ -62,9 +143,15 @@ export class InstagramPublisher extends BasePublisher {
 
       const postId = publishResponse.data.id;
 
+      // Schedule first comment if needed
+      if (firstComment) {
+        await this.scheduleFirstComment(instagramAccountId, postId, firstComment, accessToken);
+      }
+
       logger.info('Instagram post published successfully', {
         postId,
         accountId: account._id.toString(),
+        hasFirstComment: !!firstComment,
       });
 
       return {
@@ -73,7 +160,123 @@ export class InstagramPublisher extends BasePublisher {
         metadata: publishResponse.data,
       };
     } catch (error: any) {
-      this.handleApiError(error, 'publishPost');
+      this.handleApiError(error, 'publishSinglePost');
+    }
+  }
+
+  async publishCarousel(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    const { content, mediaIds = [] } = options;
+    const post = (options as any).post;
+
+    this.validateContentLength(content, MAX_CONTENT_LENGTH);
+    this.validateMediaCount(mediaIds, MAX_MEDIA_COUNT);
+
+    const accessToken = this.getAccessToken(account);
+    const instagramAccountId = account.providerUserId;
+
+    try {
+      // Create individual media containers for each item
+      const childContainers: string[] = [];
+
+      for (let i = 0; i < mediaIds.length; i++) {
+        const mediaUrl = mediaIds[i];
+        const isVideo = this.isVideoUrl(mediaUrl);
+
+        const containerPayload: Record<string, any> = {
+          access_token: accessToken,
+          is_carousel_item: true,
+        };
+
+        if (isVideo) {
+          containerPayload.media_type = 'VIDEO';
+          containerPayload.video_url = mediaUrl;
+        } else {
+          containerPayload.media_type = 'IMAGE';
+          containerPayload.image_url = mediaUrl;
+        }
+
+        // Add alt text for this specific item
+        if (post && 'instagramOptions' in post && post.instagramOptions?.carouselItems?.[i]?.altText) {
+          containerPayload.alt_text = post.instagramOptions.carouselItems[i].altText;
+        }
+
+        // Add user tags for this specific item
+        if (post && 'instagramOptions' in post && post.instagramOptions?.carouselItems?.[i]?.userTags?.length) {
+          containerPayload.user_tags = post.instagramOptions.carouselItems[i].userTags.map((tag: any) => ({
+            user: { username: tag.username },
+            x: tag.x,
+            y: tag.y,
+          }));
+        }
+
+        const containerResponse = await this.httpClient.post(
+          `${INSTAGRAM_API_BASE}/${instagramAccountId}/media`,
+          containerPayload
+        );
+
+        childContainers.push(containerResponse.data.id);
+      }
+
+      // Create carousel container
+      const { caption, firstComment } = this.processCaption(content, post);
+      
+      const carouselPayload: Record<string, any> = {
+        media_type: 'CAROUSEL',
+        children: childContainers.join(','),
+        access_token: accessToken,
+      };
+
+      if (caption) {
+        carouselPayload.caption = caption;
+      }
+
+      // Add location tagging
+      if (post && 'instagramOptions' in post && post.instagramOptions?.locationId) {
+        carouselPayload.location_id = post.instagramOptions.locationId;
+      }
+
+      // Add collaborators
+      if (post && 'instagramOptions' in post && post.instagramOptions?.collaborators?.length) {
+        carouselPayload.collaborators = post.instagramOptions.collaborators;
+      }
+
+      const carouselResponse = await this.httpClient.post(
+        `${INSTAGRAM_API_BASE}/${instagramAccountId}/media`,
+        carouselPayload
+      );
+
+      const carouselId = carouselResponse.data.id;
+
+      // Publish carousel
+      const publishResponse = await this.httpClient.post(
+        `${INSTAGRAM_API_BASE}/${instagramAccountId}/media_publish`,
+        {
+          creation_id: carouselId,
+          access_token: accessToken,
+        }
+      );
+
+      const postId = publishResponse.data.id;
+
+      // Schedule first comment if needed
+      if (firstComment) {
+        await this.scheduleFirstComment(instagramAccountId, postId, firstComment, accessToken);
+      }
+
+      logger.info('Instagram carousel published successfully', {
+        postId,
+        accountId: account._id.toString(),
+        itemCount: mediaIds.length,
+        hasFirstComment: !!firstComment,
+      });
+
+      return {
+        platformPostId: postId,
+        url: `https://instagram.com/p/${postId}`,
+        metadata: { ...publishResponse.data, contentType: 'carousel', itemCount: mediaIds.length },
+      };
+    } catch (error: any) {
+      this.handleApiError(error, 'publishCarousel');
     }
   }
 
@@ -159,10 +362,15 @@ export class InstagramPublisher extends BasePublisher {
       const containerPayload: Record<string, any> = {
         media_type: 'REELS',
         video_url: videoUrl,
-        caption: content,
         share_to_feed: true, // Default to true
         access_token: accessToken,
       };
+
+      // Add caption (or save for first comment)
+      const { caption, firstComment } = this.processCaption(content, post);
+      if (caption) {
+        containerPayload.caption = caption;
+      }
 
       // Add reel options if provided
       if (post && 'reelOptions' in post) {
@@ -174,6 +382,26 @@ export class InstagramPublisher extends BasePublisher {
           if (postDoc.reelOptions.audioName) {
             containerPayload.audio_name = postDoc.reelOptions.audioName;
           }
+        }
+      }
+
+      // Add Instagram-specific options
+      if (post && 'instagramOptions' in post) {
+        const instagramOptions = post.instagramOptions;
+        
+        // Cover image for reel
+        if (instagramOptions?.coverImageUrl) {
+          containerPayload.thumb_offset = instagramOptions.coverImageOffset || 0;
+        }
+
+        // Location tagging
+        if (instagramOptions?.locationId) {
+          containerPayload.location_id = instagramOptions.locationId;
+        }
+
+        // Collaborators
+        if (instagramOptions?.collaborators?.length) {
+          containerPayload.collaborators = instagramOptions.collaborators;
         }
       }
 
@@ -195,9 +423,15 @@ export class InstagramPublisher extends BasePublisher {
 
       const reelId = publishResponse.data.id;
 
+      // Schedule first comment if needed
+      if (firstComment) {
+        await this.scheduleFirstComment(instagramAccountId, reelId, firstComment, accessToken);
+      }
+
       logger.info('Instagram reel published successfully', {
         reelId,
         accountId: account._id.toString(),
+        hasFirstComment: !!firstComment,
       });
 
       return {
@@ -219,7 +453,150 @@ export class InstagramPublisher extends BasePublisher {
     return {
       maxContentLength: MAX_CONTENT_LENGTH,
       maxMediaCount: MAX_MEDIA_COUNT,
+      maxHashtags: MAX_HASHTAGS,
       supportedMediaTypes: ['image/jpeg', 'image/png', 'video/mp4'],
+      supportedAspectRatios: {
+        feed: ['1:1', '4:5', '16:9'],
+        story: ['9:16'],
+        reel: ['9:16'],
+      },
     };
+  }
+
+  /**
+   * Process caption to separate main caption from first comment
+   */
+  private processCaption(content: string, post: any): { caption: string; firstComment?: string } {
+    if (!post || !('instagramOptions' in post) || !post.instagramOptions?.useFirstComment) {
+      return { caption: content };
+    }
+
+    // Extract hashtags from content
+    const hashtagRegex = /#[\w\u0590-\u05ff]+/g;
+    const hashtags = content.match(hashtagRegex) || [];
+    
+    if (hashtags.length === 0) {
+      return { caption: content };
+    }
+
+    // Remove hashtags from main caption
+    const caption = content.replace(hashtagRegex, '').trim();
+    const firstComment = hashtags.join(' ');
+
+    return { caption, firstComment };
+  }
+
+  /**
+   * Schedule first comment with hashtags
+   */
+  private async scheduleFirstComment(
+    instagramAccountId: string,
+    postId: string,
+    comment: string,
+    accessToken: string
+  ): Promise<void> {
+    try {
+      // Wait a moment for post to be fully published
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      await this.httpClient.post(
+        `${INSTAGRAM_API_BASE}/${postId}/comments`,
+        {
+          message: comment,
+          access_token: accessToken,
+        }
+      );
+
+      logger.info('First comment scheduled successfully', {
+        postId,
+        comment: comment.substring(0, 50) + '...',
+      });
+    } catch (error: any) {
+      logger.error('Failed to schedule first comment', {
+        postId,
+        error: error.message,
+      });
+      // Don't throw - first comment failure shouldn't fail the entire post
+    }
+  }
+
+  /**
+   * Check if URL is a video
+   */
+  private isVideoUrl(url: string): boolean {
+    return /\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i.test(url) || url.includes('video');
+  }
+
+  /**
+   * Search Instagram locations
+   */
+  async searchLocations(account: ISocialAccount, query: string): Promise<InstagramLocation[]> {
+    const accessToken = this.getAccessToken(account);
+
+    try {
+      const response = await this.httpClient.get(
+        `${INSTAGRAM_API_BASE}/search`,
+        {
+          params: {
+            type: 'place',
+            q: query,
+            access_token: accessToken,
+          },
+        }
+      );
+
+      return response.data.data || [];
+    } catch (error: any) {
+      logger.error('Failed to search Instagram locations', {
+        query,
+        error: error.message,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Search Instagram users for tagging
+   */
+  async searchUsers(account: ISocialAccount, query: string): Promise<InstagramUser[]> {
+    const accessToken = this.getAccessToken(account);
+
+    try {
+      const response = await this.httpClient.get(
+        `${INSTAGRAM_API_BASE}/search`,
+        {
+          params: {
+            type: 'user',
+            q: query,
+            access_token: accessToken,
+          },
+        }
+      );
+
+      return response.data.data || [];
+    } catch (error: any) {
+      logger.error('Failed to search Instagram users', {
+        query,
+        error: error.message,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Validate aspect ratio for Instagram content
+   */
+  validateAspectRatio(aspectRatio: string, contentType: 'feed' | 'story' | 'reel'): boolean {
+    const limits = this.getLimits();
+    return limits.supportedAspectRatios[contentType].includes(aspectRatio);
+  }
+
+  /**
+   * Count hashtags in content
+   */
+  countHashtags(content: string): number {
+    const hashtagRegex = /#[\w\u0590-\u05ff]+/g;
+    const hashtags = content.match(hashtagRegex) || [];
+    return hashtags.length;
   }
 }

@@ -45,6 +45,30 @@ export interface ReelOptions {
   shareToFeed?: boolean;
 }
 
+export interface InstagramOptions {
+  useFirstComment?: boolean;
+  altText?: string;
+  locationId?: string;
+  locationName?: string;
+  userTags?: Array<{
+    username: string;
+    x: number;
+    y: number;
+  }>;
+  collaborators?: string[];
+  aspectRatio?: string;
+  coverImageUrl?: string;
+  coverImageOffset?: number;
+  carouselItems?: Array<{
+    altText?: string;
+    userTags?: Array<{
+      username: string;
+      x: number;
+      y: number;
+    }>;
+  }>;
+}
+
 export interface PlatformContent {
   platform: string;
   text?: string;
@@ -66,6 +90,7 @@ export interface IPost extends Document {
   contentType?: ContentType; // NEW: Post type (post/story/reel)
   storyOptions?: StoryOptions; // NEW: Story-specific options
   reelOptions?: ReelOptions; // NEW: Reel-specific options
+  instagramOptions?: InstagramOptions; // NEW: Instagram-specific options
   /**
    * Scheduled publish time (ALWAYS stored in UTC)
    * 
@@ -213,6 +238,32 @@ const PostSchema = new Schema<IPost>(
       type: {
         audioName: { type: String },
         shareToFeed: { type: Boolean, default: true },
+      },
+      required: false,
+    },
+    instagramOptions: {
+      type: {
+        useFirstComment: { type: Boolean, default: false },
+        altText: { type: String, maxlength: 100 },
+        locationId: { type: String },
+        locationName: { type: String },
+        userTags: [{
+          username: { type: String, required: true },
+          x: { type: Number, required: true, min: 0, max: 1 },
+          y: { type: Number, required: true, min: 0, max: 1 },
+        }],
+        collaborators: [{ type: String }],
+        aspectRatio: { type: String },
+        coverImageUrl: { type: String },
+        coverImageOffset: { type: Number, min: 0, max: 100 },
+        carouselItems: [{
+          altText: { type: String, maxlength: 100 },
+          userTags: [{
+            username: { type: String, required: true },
+            x: { type: Number, required: true, min: 0, max: 1 },
+            y: { type: Number, required: true, min: 0, max: 1 },
+          }],
+        }],
       },
       required: false,
     },

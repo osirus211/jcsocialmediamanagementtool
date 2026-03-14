@@ -60,7 +60,7 @@ const envSchema = z.object({
   INSTAGRAM_BASIC_APP_ID: z.string().optional(),
   INSTAGRAM_BASIC_APP_SECRET: z.string().optional(),
   INSTAGRAM_BASIC_REDIRECT_URI: z.string().url().optional(),
-  USE_INSTAGRAM_PROFESSIONAL: z.string().transform(val => val === 'true').default('false'),
+  USE_INSTAGRAM_PROFESSIONAL: z.string().transform(val => val !== 'false').default('true'),
   
   // Google Business Profile
   GOOGLE_BUSINESS_CLIENT_ID: z.string().optional(),
