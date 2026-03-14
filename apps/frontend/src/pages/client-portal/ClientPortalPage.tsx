@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Settings, Users, Eye, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
-import { clientPortalService, ClientReview, ReviewsResponse } from '@/services/client-portal.service';
-import { CreateReviewModal } from '@/components/client-portal/CreateReviewModal';
-import { ReviewCard } from '@/components/client-portal/ReviewCard';
+import { Plus, Settings, Users, Eye, CheckCircle, XCircle, MessageCircle, Calendar, ExternalLink, Copy, Send, MoreVertical, Trash2, Edit, BarChart3 } from 'lucide-react';
+import { clientPortalService, ClientPortal, PortalsResponse } from '@/services/client-portal.service';
+import { CreatePortalModal } from '@/components/client-portal/CreatePortalModal';
+import { PortalCard } from '@/components/client-portal/PortalCard';
 import { BrandingSettings } from '@/components/client-portal/BrandingSettings';
 
-type TabType = 'reviews' | 'settings';
+type TabType = 'portals' | 'settings';
 
 /**
  * ClientPortalPage Component
  * 
- * Main page for managing client review sessions and portal branding
+ * Main page for managing client approval portals and portal branding
  */
 export const ClientPortalPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('reviews');
-  const [reviews, setReviews] = useState<ClientReview[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('portals');
+  const [portals, setPortals] = useState<ClientPortal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -26,12 +26,12 @@ export const ClientPortalPage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (activeTab === 'reviews') {
-      loadReviews();
+    if (activeTab === 'portals') {
+      loadPortals();
     }
   }, [activeTab, statusFilter, pagination.page]);
 
-  const loadReviews = async () => {
+  const loadPortals = async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -45,15 +45,15 @@ export const ClientPortalPage: React.FC = () => {
         params.status = statusFilter;
       }
 
-      const response: ReviewsResponse = await clientPortalService.listReviews(params);
-      setReviews(response.reviews);
+      const response: PortalsResponse = await clientPortalService.listPortals(params);
+      setPortals(response.portals);
       setPagination({
         page: response.page,
         totalPages: response.totalPages,
         total: response.total,
       });
     } catch (err: any) {
-      setError(err.message || 'Failed to load reviews');
+      setError(err.message || 'Failed to load portals');
     } finally {
       setIsLoading(false);
     }
@@ -61,21 +61,33 @@ export const ClientPortalPage: React.FC = () => {
 
   const handleCreateSuccess = () => {
     setShowCreateModal(false);
-    loadReviews();
+    loadPortals();
   };
 
-  const handleDeleteReview = () => {
-    loadReviews();
+  const handleDeletePortal = () => {
+    loadPortals();
   };
 
   const getStatusStats = () => {
     const stats = {
-      total: reviews.length,
-      pending: reviews.filter(r => r.status === 'pending').length,
-      viewed: reviews.filter(r => r.status === 'viewed').length,
-      approved: reviews.filter(r => r.status === 'approved').length,
-      rejected: reviews.filter(r => r.status === 'rejected').length,
-      changes_requested: reviews.filter(r => r.status === 'changes_requested').length,
+      total: pagination.total,
+      active: portals.filter(p => p.status === 'active').length,
+      inactive: portals.filter(p => p.status === 'inactive').length,
+      expired: portals.filter(p => p.status === 'expired').length,
+      pendingReview: portals.reduce((acc, p) => {
+        const pending = p.postApprovals.filter(a => a.status === 'pending').length;
+        return acc + pending;
+      }, 0),
+      approvedThisWeek: portals.reduce((acc, p) => {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const approved = p.postApprovals.filter(a => 
+          a.status === 'approved' && 
+          a.approvedAt && 
+          new Date(a.approvedAt) > weekAgo
+        ).length;
+        return acc + approved;
+      }, 0),
     };
     return stats;
   };
@@ -90,17 +102,17 @@ export const ClientPortalPage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Client Portal</h1>
             <p className="text-gray-600 mt-1">
-              Manage client review sessions and customize your white-label portal
+              Create branded approval portals for your clients to review and approve content
             </p>
           </div>
           
-          {activeTab === 'reviews' && (
+          {activeTab === 'portals' && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create Review
+              Create Portal
             </button>
           )}
         </div>
@@ -109,15 +121,15 @@ export const ClientPortalPage: React.FC = () => {
         <div className="border-b border-gray-200 mb-8">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setActiveTab('reviews')}
+              onClick={() => setActiveTab('portals')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'reviews'
+                activeTab === 'portals'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
               <Users className="w-4 h-4 inline mr-2" />
-              Reviews
+              Client Portals
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -133,31 +145,19 @@ export const ClientPortalPage: React.FC = () => {
           </nav>
         </div>
 
-        {/* Reviews Tab */}
-        {activeTab === 'reviews' && (
+        {/* Portals Tab */}
+        {activeTab === 'portals' && (
           <>
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
               <div className="bg-white rounded-lg shadow-sm p-4">
                 <div className="flex items-center">
                   <div className="p-2 bg-blue-100 rounded-lg">
-                    <Eye className="w-5 h-5 text-blue-600" />
+                    <Users className="w-5 h-5 text-blue-600" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Total</p>
-                    <p className="text-2xl font-semibold text-gray-900">{pagination.total}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <Eye className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Pending</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.pending}</p>
+                    <p className="text-sm font-medium text-gray-600">Total Portals</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
                   </div>
                 </div>
               </div>
@@ -168,20 +168,8 @@ export const ClientPortalPage: React.FC = () => {
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Approved</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.approved}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <XCircle className="w-5 h-5 text-red-600" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Rejected</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.rejected}</p>
+                    <p className="text-sm font-medium text-gray-600">Active</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.active}</p>
                   </div>
                 </div>
               </div>
@@ -189,11 +177,35 @@ export const ClientPortalPage: React.FC = () => {
               <div className="bg-white rounded-lg shadow-sm p-4">
                 <div className="flex items-center">
                   <div className="p-2 bg-orange-100 rounded-lg">
-                    <MessageCircle className="w-5 h-5 text-orange-600" />
+                    <Eye className="w-5 h-5 text-orange-600" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Changes</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.changes_requested}</p>
+                    <p className="text-sm font-medium text-gray-600">Pending Review</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.pendingReview}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <div className="flex items-center">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <BarChart3 className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-600">Approved This Week</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.approvedThisWeek}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <div className="flex items-center">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Calendar className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-600">Expired</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.expired}</p>
                   </div>
                 </div>
               </div>
@@ -211,17 +223,15 @@ export const ClientPortalPage: React.FC = () => {
                   }}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="all">All Reviews</option>
-                  <option value="pending">Pending</option>
-                  <option value="viewed">Viewed</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="changes_requested">Changes Requested</option>
+                  <option value="all">All Portals</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="expired">Expired</option>
                 </select>
               </div>
             </div>
 
-            {/* Reviews Grid */}
+            {/* Portals Grid */}
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
@@ -235,37 +245,38 @@ export const ClientPortalPage: React.FC = () => {
             ) : error ? (
               <div className="text-center py-12">
                 <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Reviews</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Portals</h3>
                 <p className="text-gray-600 mb-4">{error}</p>
                 <button
-                  onClick={loadReviews}
+                  onClick={loadPortals}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Try Again
                 </button>
               </div>
-            ) : reviews.length === 0 ? (
+            ) : portals.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Reviews Yet</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Portals Yet</h3>
                 <p className="text-gray-600 mb-4">
-                  Create your first client review to get started with the portal.
+                  Create your first client portal to get started with branded approval workflows.
                 </p>
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Create Review
+                  Create Portal
                 </button>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {reviews.map((review) => (
-                    <ReviewCard
-                      key={review._id}
-                      review={review}
-                      onDelete={handleDeleteReview}
+                  {portals.map((portal) => (
+                    <PortalCard
+                      key={portal._id}
+                      portal={portal}
+                      onDelete={handleDeletePortal}
+                      onUpdate={loadPortals}
                     />
                   ))}
                 </div>
@@ -306,8 +317,8 @@ export const ClientPortalPage: React.FC = () => {
           }} />
         )}
 
-        {/* Create Review Modal */}
-        <CreateReviewModal
+        {/* Create Portal Modal */}
+        <CreatePortalModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onSuccess={handleCreateSuccess}

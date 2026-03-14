@@ -23,7 +23,7 @@ import { Media } from '../models/Media';
 import { FollowerHistory } from '../models/FollowerHistory';
 import { Campaign } from '../models/Campaign';
 import { Category } from '../models/Category';
-import { ClientReview } from '../models/ClientReview';
+import { ClientReview, ClientPortal } from '../models/ClientReview';
 import { PostComment } from '../models/PostComment';
 import { AccountPermission } from '../models/AccountPermission';
 import { Notification } from '../models/Notification';
@@ -55,6 +55,7 @@ const models: ModelInfo[] = [
   { name: 'Campaign', model: Campaign },
   { name: 'Category', model: Category },
   { name: 'ClientReview', model: ClientReview },
+  { name: 'ClientPortal', model: ClientPortal },
   { name: 'PostComment', model: PostComment },
   { name: 'AccountPermission', model: AccountPermission },
   { name: 'Notification', model: Notification },

@@ -78,6 +78,7 @@ const BillingCancelPage = lazy(() => import('@/pages/billing/Cancel').then(modul
 // Client Portal
 const ClientPortalPage = lazy(() => import('@/pages/client-portal/ClientPortalPage').then(module => ({ default: module.ClientPortalPage })));
 const ClientReviewPage = lazy(() => import('@/pages/client-portal/ClientReviewPage').then(module => ({ default: module.ClientReviewPage })));
+const ClientPortalView = lazy(() => import('@/pages/client-portal/ClientPortalView').then(module => ({ default: module.ClientPortalView })));
 
 const router = createBrowserRouter([
   {
@@ -254,6 +255,11 @@ const router = createBrowserRouter([
   {
     path: '/review/:token',
     element: <SuspenseWrapper><ClientReviewPage /></SuspenseWrapper>,
+  },
+  // Public client portal page (no authentication required)
+  {
+    path: '/portal/:slug',
+    element: <SuspenseWrapper><ClientPortalView /></SuspenseWrapper>,
   },
   // Public invitation acceptance page (no authentication required)
   {

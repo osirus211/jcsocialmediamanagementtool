@@ -79,6 +79,7 @@ router.get('/', (_req, res) => {
       accountPermissions: '/api/v1/account-permissions',
       postComments: '/api/v1/posts/:postId/comments',
       clientPortal: '/api/v1/client-portal',
+      clientPortals: '/api/v1/client-portals',
       categories: '/api/v1/categories',
       campaigns: '/api/v1/campaigns',
       designIntegrations: '/api/v1/design-integrations',
@@ -128,6 +129,7 @@ router.use('/drafts', draftsRoutes); // Phase-4: Collaborative draft editing
 router.use('/account-permissions', accountPermissionsRoutes); // Phase-4: Granular permissions
 router.use('/posts', postCommentsRoutes); // Phase-4: In-line post comments
 router.use('/client-portal', clientPortalRoutes); // Phase-4: Client approval portal
+router.use('/client-portals', clientPortalRoutes); // Phase-4: Client approval portal (new endpoints)
 router.use('/categories', categoriesRoutes); // Phase-4: Content categories
 router.use('/campaigns', campaignsRoutes); // Phase-4: Campaign tagging
 router.use('/design-integrations', designIntegrationsRoutes); // Phase-4: Canva & Figma integration
