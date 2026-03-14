@@ -2,9 +2,11 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { 
   Plus, X, GripVertical, MessageCircle, BarChart3, Clock, 
   ArrowUp, ArrowDown, Image, Video, Hash, Wand2, Copy, 
-  RotateCcw, Settings, Eye, Shuffle, Link2, Timer
+  RotateCcw, Settings, Eye, Shuffle, Link2, Timer, Smile
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { EmojiPicker } from './EmojiPicker';
+import { useTheme } from '@/hooks/useTheme';
 
 interface Tweet {
   id: string;
@@ -95,7 +97,9 @@ export function EnhancedTwitterThreadComposer({
   const [showSettings, setShowSettings] = useState(false);
   const [longText, setLongText] = useState('');
   const [showAutoSplit, setShowAutoSplit] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
+  const theme = useTheme();
 
   // Update character counts
   useEffect(() => {
@@ -279,6 +283,28 @@ export function EnhancedTwitterThreadComposer({
       setTimeout(() => focusNextTweet(tweetId), 100);
     }
   }, [tweets, addTweet, focusNextTweet]);
+
+  // Handle emoji selection
+  const handleEmojiSelect = useCallback((emoji: string, tweetId: string) => {
+    const textarea = textareaRefs.current[tweetId];
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const tweet = tweets.find(t => t.id === tweetId);
+    if (!tweet) return;
+
+    const newContent = tweet.content.slice(0, start) + emoji + tweet.content.slice(end);
+    updateTweet(tweetId, newContent);
+    
+    // Restore cursor position after emoji
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
+    
+    setShowEmojiPicker(null);
+  }, [tweets, updateTweet]);
   return (
     <div className="space-y-4">
       {/* Header with Actions */}
@@ -588,22 +614,44 @@ export function EnhancedTwitterThreadComposer({
                       </div>
                       {/* Tweet Content */}
                       <div className="space-y-3">
-                        <textarea
-                          ref={(el) => textareaRefs.current[tweet.id] = el}
-                          value={tweet.content}
-                          onChange={(e) => updateTweet(tweet.id, e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, tweet.id)}
-                          placeholder={
-                            index === 0 
-                              ? options.connectToTweet 
-                                ? "Start your reply thread..."
-                                : "Start your thread..." 
-                              : "Continue your thread..."
-                          }
-                          className="w-full p-3 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          rows={3}
-                          maxLength={characterLimit}
-                        />
+                        <div className="relative">
+                          <textarea
+                            ref={(el) => textareaRefs.current[tweet.id] = el}
+                            value={tweet.content}
+                            onChange={(e) => updateTweet(tweet.id, e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, tweet.id)}
+                            placeholder={
+                              index === 0 
+                                ? options.connectToTweet 
+                                  ? "Start your reply thread..."
+                                  : "Start your thread..." 
+                                : "Continue your thread..."
+                            }
+                            className="w-full p-3 pr-12 border border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows={3}
+                            maxLength={characterLimit}
+                          />
+                          
+                          {/* Emoji Button */}
+                          <button
+                            type="button"
+                            onClick={() => setShowEmojiPicker(showEmojiPicker === tweet.id ? null : tweet.id)}
+                            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+                            title="Add emoji"
+                          >
+                            <Smile className="h-4 w-4" />
+                          </button>
+
+                          {/* Emoji Picker */}
+                          {showEmojiPicker === tweet.id && (
+                            <EmojiPicker
+                              isOpen={true}
+                              onEmojiSelect={(emoji) => handleEmojiSelect(emoji, tweet.id)}
+                              onClose={() => setShowEmojiPicker(null)}
+                              theme={theme}
+                            />
+                          )}
+                        </div>
                         
                         {/* Media Upload Placeholder */}
                         <div className="flex items-center gap-2">

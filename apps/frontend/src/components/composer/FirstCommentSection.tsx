@@ -1,7 +1,9 @@
-import { useState, memo } from 'react';
+import { useState, memo, useRef } from 'react';
 import { useComposerStore } from '@/store/composer.store';
 import { SocialPlatform } from '@/types/composer.types';
-import { MessageCircle, Info, Hash, Undo2, Clock, Save } from 'lucide-react';
+import { MessageCircle, Info, Hash, Undo2, Clock, Save, Smile } from 'lucide-react';
+import { EmojiPicker } from './EmojiPicker';
+import { useTheme } from '@/hooks/useTheme';
 
 interface FirstCommentSectionProps {
   selectedPlatforms: SocialPlatform[];
@@ -46,6 +48,9 @@ const FirstCommentSection = memo(function FirstCommentSection({ selectedPlatform
 
   const [movedHashtags, setMovedHashtags] = useState<string[]>([]);
   const [originalContent, setOriginalContent] = useState<string>('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const theme = useTheme();
 
   // Check if any selected platforms support first comments
   const supportedPlatforms = selectedPlatforms.filter(platform => 
@@ -127,6 +132,25 @@ const FirstCommentSection = memo(function FirstCommentSection({ selectedPlatform
   // Update delay
   const updateDelay = (delay: number) => {
     setFirstCommentConfig({ delay });
+  };
+
+  // Handle emoji selection
+  const handleEmojiSelect = (emoji: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentContent = firstCommentContent;
+    const newContent = currentContent.slice(0, start) + emoji + currentContent.slice(end);
+    
+    setFirstComment(newContent);
+    
+    // Restore cursor position after emoji
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+    }, 0);
   };
 
   if (supportedPlatforms.length === 0) {
@@ -258,17 +282,38 @@ const FirstCommentSection = memo(function FirstCommentSection({ selectedPlatform
 
             {/* First Comment Input */}
             <div className="space-y-2">
-              <textarea
-                value={firstCommentContent}
-                onChange={(e) => setFirstComment(e.target.value)}
-                placeholder="Add a first comment that will be posted automatically after your post goes live..."
-                rows={4}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                  isOverLimit ? 'border-red-500' : 'border-gray-300'
-                }`}
-                aria-label="First comment content"
-                aria-describedby="first-comment-count"
-              />
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={firstCommentContent}
+                  onChange={(e) => setFirstComment(e.target.value)}
+                  placeholder="Add a first comment that will be posted automatically after your post goes live..."
+                  rows={4}
+                  className={`w-full px-3 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                    isOverLimit ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  aria-label="First comment content"
+                  aria-describedby="first-comment-count"
+                />
+                
+                {/* Emoji Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+                  title="Add emoji"
+                >
+                  <Smile className="h-4 w-4" />
+                </button>
+
+                {/* Emoji Picker */}
+                <EmojiPicker
+                  isOpen={showEmojiPicker}
+                  onEmojiSelect={handleEmojiSelect}
+                  onClose={() => setShowEmojiPicker(false)}
+                  theme={theme}
+                />
+              </div>
               
               {/* Character Count */}
               <div className="flex justify-between items-center text-sm">

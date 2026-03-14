@@ -1,148 +1,48 @@
 import { useState, useRef, useEffect, memo, useCallback } from 'react';
-import { Search, Smile, Heart, Zap, Coffee, Car, Flag, Music } from 'lucide-react';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
+import { X } from 'lucide-react';
+import './EmojiPicker.css';
 
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
   onClose: () => void;
   isOpen: boolean;
+  theme?: 'light' | 'dark' | 'auto';
 }
 
-interface EmojiCategory {
+interface EmojiData {
   id: string;
   name: string;
-  icon: React.ReactNode;
-  emojis: string[];
+  native: string;
+  unified: string;
+  keywords: string[];
+  shortcodes: string;
 }
 
-const EMOJI_CATEGORIES: EmojiCategory[] = [
-  {
-    id: 'recent',
-    name: 'Recent',
-    icon: <Smile className="h-4 w-4" />,
-    emojis: [], // Will be populated from localStorage
-  },
-  {
-    id: 'smileys',
-    name: 'Smileys & People',
-    icon: <Smile className="h-4 w-4" />,
-    emojis: [
-      '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
-      '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
-      '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒',
-      '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕',
-      '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱',
-      '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩',
-      '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
-    ],
-  },
-  {
-    id: 'animals',
-    name: 'Animals & Nature',
-    icon: <Heart className="h-4 w-4" />,
-    emojis: [
-      '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵',
-      '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗',
-      '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜', '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎',
-      '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅',
-      '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖',
-      '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐈‍⬛', '🐓', '🦃', '🦚', '🦜', '🦢'
-    ],
-  },
-  {
-    id: 'food',
-    name: 'Food & Drink',
-    icon: <Coffee className="h-4 w-4" />,
-    emojis: [
-      '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝',
-      '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐',
-      '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭',
-      '🍔', '🍟', '🍕', '🫓', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜',
-      '🍲', '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧',
-      '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜', '🍯'
-    ],
-  },
-  {
-    id: 'activities',
-    name: 'Activities',
-    icon: <Zap className="h-4 w-4" />,
-    emojis: [
-      '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍',
-      '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛷', '⛸️', '🥌', '🎿',
-      '⛷️', '🏂', '🪂', '🏋️‍♀️', '🏋️', '🏋️‍♂️', '🤼‍♀️', '🤼', '🤼‍♂️', '🤸‍♀️', '🤸', '🤸‍♂️', '⛹️‍♀️', '⛹️', '⛹️‍♂️', '🤺',
-      '🤾‍♀️', '🤾', '🤾‍♂️', '🏌️‍♀️', '🏌️', '🏌️‍♂️', '🏇', '🧘‍♀️', '🧘', '🧘‍♂️', '🏄‍♀️', '🏄', '🏄‍♂️', '🏊‍♀️', '🏊', '🏊‍♂️',
-      '🤽‍♀️', '🤽', '🤽‍♂️', '🚣‍♀️', '🚣', '🚣‍♂️', '🧗‍♀️', '🧗', '🧗‍♂️', '🚵‍♀️', '🚵', '🚵‍♂️', '🚴‍♀️', '🚴', '🚴‍♂️', '🏆',
-      '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫', '🎟️', '🎪', '🤹', '🤹‍♀️', '🤹‍♂️', '🎭', '🩰', '🎨'
-    ],
-  },
-  {
-    id: 'travel',
-    name: 'Travel & Places',
-    icon: <Car className="h-4 w-4" />,
-    emojis: [
-      '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🏍️', '🛵',
-      '🚲', '🛴', '🛹', '🛼', '🚁', '🛸', '✈️', '🛩️', '🪂', '💺', '🚀', '🛰️', '🚉', '🚊', '🚝', '🚞',
-      '🚋', '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉', '🚁', '🚟', '🚠',
-      '🚡', '⛴️', '🚤', '🛥️', '🛳️', '⛵', '🚣', '🚣‍♀️', '🚣‍♂️', '🏊', '🏊‍♀️', '🏊‍♂️', '⚓', '🪝', '⛽', '🚨',
-      '🚥', '🚦', '🛑', '🚧', '⚠️', '🚸', '⛔', '🚫', '🚳', '🚭', '🚯', '🚱', '🚷', '📵', '🔞', '☢️'
-    ],
-  },
-  {
-    id: 'objects',
-    name: 'Objects',
-    icon: <Music className="h-4 w-4" />,
-    emojis: [
-      '⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾', '💿', '📀', '📼',
-      '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '🧭',
-      '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋', '🔌', '💡', '🔦', '🕯️', '🪔', '🧯', '🛢️', '💸',
-      '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🔧', '🔨', '⚒️', '🛠️', '⛏️',
-      '🪓', '🪚', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️'
-    ],
-  },
-  {
-    id: 'symbols',
-    name: 'Symbols',
-    icon: <Flag className="h-4 w-4" />,
-    emojis: [
-      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖',
-      '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈',
-      '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴',
-      '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲'
-    ],
-  },
-  {
-    id: 'flags',
-    name: 'Flags',
-    icon: <Flag className="h-4 w-4" />,
-    emojis: [
-      '🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇦🇫', '🇦🇽', '🇦🇱', '🇩🇿', '🇦🇸', '🇦🇩', '🇦🇴', '🇦🇮',
-      '🇦🇶', '🇦🇬', '🇦🇷', '🇦🇲', '🇦🇼', '🇦🇺', '🇦🇹', '🇦🇿', '🇧🇸', '🇧🇭', '🇧🇩', '🇧🇧', '🇧🇾', '🇧🇪', '🇧🇿', '🇧🇯',
-      '🇧🇲', '🇧🇹', '🇧🇴', '🇧🇦', '🇧🇼', '🇧🇷', '🇮🇴', '🇻🇬', '🇧🇳', '🇧🇬', '🇧🇫', '🇧🇮', '🇰🇭', '🇨🇲', '🇨🇦', '🇮🇨',
-      '🇨🇻', '🇧🇶', '🇰🇾', '🇨🇫', '🇹🇩', '🇨🇱', '🇨🇳', '🇨🇽', '🇨🇨', '🇨🇴', '🇰🇲', '🇨🇬', '🇨🇩', '🇨🇰', '🇨🇷', '🇨🇮'
-    ],
-  },
-];
-
-const EmojiPicker = memo(function EmojiPicker({ onEmojiSelect, onClose, isOpen }: EmojiPickerProps) {
-  const [activeCategory, setActiveCategory] = useState('recent');
-  const [searchQuery, setSearchQuery] = useState('');
+const EmojiPicker = memo(function EmojiPicker({ 
+  onEmojiSelect, 
+  onClose, 
+  isOpen, 
+  theme = 'light' 
+}: EmojiPickerProps) {
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
+  const [frequentEmojis, setFrequentEmojis] = useState<Record<string, number>>({});
   const pickerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Load recent emojis from localStorage
+  // Load recent and frequent emojis from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('recentEmojis');
-    if (stored) {
-      setRecentEmojis(JSON.parse(stored));
+    const storedRecent = localStorage.getItem('recentEmojis');
+    const storedFrequent = localStorage.getItem('frequentEmojis');
+    
+    if (storedRecent) {
+      setRecentEmojis(JSON.parse(storedRecent));
+    }
+    
+    if (storedFrequent) {
+      setFrequentEmojis(JSON.parse(storedFrequent));
     }
   }, []);
-
-  // Focus search input when opened
-  useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [isOpen]);
 
   // Close on outside click
   useEffect(() => {
@@ -172,132 +72,129 @@ const EmojiPicker = memo(function EmojiPicker({ onEmojiSelect, onClose, isOpen }
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const handleEmojiClick = useCallback((emoji: string) => {
+  const handleEmojiClick = useCallback((emojiData: EmojiData) => {
+    const emoji = emojiData.native;
     onEmojiSelect(emoji);
     
-    // Add to recent emojis
-    const newRecent = [emoji, ...recentEmojis.filter(e => e !== emoji)].slice(0, 24);
+    // Update recent emojis (last 20)
+    const newRecent = [emoji, ...recentEmojis.filter(e => e !== emoji)].slice(0, 20);
     setRecentEmojis(newRecent);
     localStorage.setItem('recentEmojis', JSON.stringify(newRecent));
     
+    // Update frequent emojis count
+    const newFrequent = { ...frequentEmojis };
+    newFrequent[emoji] = (newFrequent[emoji] || 0) + 1;
+    setFrequentEmojis(newFrequent);
+    localStorage.setItem('frequentEmojis', JSON.stringify(newFrequent));
+    
     onClose();
-  }, [onEmojiSelect, recentEmojis, onClose]);
+  }, [onEmojiSelect, recentEmojis, frequentEmojis, onClose]);
 
-  // Filter emojis based on search
-  const getFilteredEmojis = useCallback((category: EmojiCategory) => {
-    if (category.id === 'recent') {
-      return recentEmojis;
-    }
-
-    if (!searchQuery) {
-      return category.emojis;
-    }
-
-    // Simple emoji search by common names
-    const emojiNames: Record<string, string[]> = {
-      '😀': ['grinning', 'smile', 'happy'],
-      '😃': ['smiley', 'smile', 'happy'],
-      '😄': ['smile', 'happy', 'joy'],
-      '😁': ['grin', 'smile', 'happy'],
-      '😆': ['laughing', 'satisfied', 'happy'],
-      '😅': ['sweat_smile', 'happy', 'relief'],
-      '🤣': ['rofl', 'laughing', 'funny'],
-      '😂': ['joy', 'tears', 'laughing'],
-      '❤️': ['heart', 'love', 'red'],
-      '💙': ['blue_heart', 'love', 'blue'],
-      '💚': ['green_heart', 'love', 'green'],
-      '💛': ['yellow_heart', 'love', 'yellow'],
-      '💜': ['purple_heart', 'love', 'purple'],
-      '🔥': ['fire', 'hot', 'flame'],
-      '💯': ['hundred', '100', 'perfect'],
-      '👍': ['thumbs_up', 'like', 'good'],
-      '👎': ['thumbs_down', 'dislike', 'bad'],
-      '🎉': ['party', 'celebration', 'confetti'],
-      '🚀': ['rocket', 'space', 'launch'],
-    };
-
-    return category.emojis.filter(emoji => {
-      const names = emojiNames[emoji] || [];
-      return names.some(name => name.toLowerCase().includes(searchQuery.toLowerCase()));
-    });
-  }, [searchQuery, recentEmojis]);
-
-  // Update recent category with actual recent emojis
-  const categoriesWithRecent = EMOJI_CATEGORIES.map(cat => 
-    cat.id === 'recent' ? { ...cat, emojis: recentEmojis } : cat
-  );
+  // Get frequently used emojis (top 24 by usage count)
+  const getFrequentlyUsed = useCallback(() => {
+    return Object.entries(frequentEmojis)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 24)
+      .map(([emoji]) => emoji);
+  }, [frequentEmojis]);
 
   if (!isOpen) return null;
 
   return (
     <div 
       ref={pickerRef}
-      className="absolute bottom-full mb-2 left-0 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+      className="absolute bottom-full mb-2 left-0 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden"
+      style={{ width: '352px' }}
     >
-      {/* Header */}
-      <div className="p-3 border-b border-gray-200">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search emojis..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+      {/* Header with close button */}
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+        <h3 className="text-sm font-medium text-gray-900">Choose an emoji</h3>
+        <button
+          onClick={onClose}
+          className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+          title="Close emoji picker"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex border-b border-gray-200 overflow-x-auto">
-        {categoriesWithRecent.map((category) => (
-          <button
-            key={category.id}
-            onClick={() => setActiveCategory(category.id)}
-            className={`flex-shrink-0 p-2 border-b-2 transition-colors ${
-              activeCategory === category.id
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-            title={category.name}
-          >
-            {category.icon}
-          </button>
-        ))}
-      </div>
-
-      {/* Emoji Grid */}
-      <div className="h-64 overflow-y-auto p-2">
-        {(() => {
-          const activecat = categoriesWithRecent.find(cat => cat.id === activeCategory);
-          if (!activecat) return null;
-          
-          const filteredEmojis = getFilteredEmojis(activecat);
-          
-          if (filteredEmojis.length === 0) {
-            return (
-              <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-                {activeCategory === 'recent' ? 'No recent emojis' : 'No emojis found'}
-              </div>
-            );
-          }
-
-          return (
-            <div className="grid grid-cols-8 gap-1">
-              {filteredEmojis.map((emoji, index) => (
-                <button
-                  key={`${emoji}-${index}`}
-                  onClick={() => handleEmojiClick(emoji)}
-                  className="w-8 h-8 flex items-center justify-center text-lg hover:bg-gray-100 rounded transition-colors"
-                  title={emoji}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          );
-        })()}
+      {/* Emoji Mart Picker */}
+      <div className="emoji-picker-container">
+        <Picker
+          data={data}
+          onEmojiSelect={handleEmojiClick}
+          theme={theme}
+          set="native"
+          skin={1}
+          skinTonePosition="search"
+          previewPosition="none"
+          searchPosition="sticky"
+          navPosition="bottom"
+          perLine={8}
+          maxFrequentRows={3}
+          categories={[
+            'frequent',
+            'people', 
+            'nature', 
+            'foods', 
+            'activity', 
+            'places', 
+            'objects', 
+            'symbols', 
+            'flags'
+          ]}
+          categoryIcons={{
+            frequent: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'
+            },
+            people: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>'
+            },
+            nature: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20m0-20C8 2 5 5 5 9s3 7 7 7 7-3 7-7-3-7-7-7z"></path></svg>'
+            },
+            foods: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>'
+            },
+            activity: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10,8 16,12 10,16 10,8"></polygon></svg>'
+            },
+            places: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>'
+            },
+            objects: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>'
+            },
+            symbols: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="6" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'
+            },
+            flags: {
+              svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>'
+            }
+          }}
+          custom={[
+            {
+              id: 'recent',
+              name: 'Recently Used',
+              emojis: recentEmojis.map(emoji => ({
+                id: emoji,
+                name: emoji,
+                keywords: [],
+                skins: [{ native: emoji }]
+              }))
+            },
+            {
+              id: 'frequent',
+              name: 'Frequently Used',
+              emojis: getFrequentlyUsed().map(emoji => ({
+                id: emoji,
+                name: emoji,
+                keywords: [],
+                skins: [{ native: emoji }]
+              }))
+            }
+          ]}
+        />
       </div>
     </div>
   );

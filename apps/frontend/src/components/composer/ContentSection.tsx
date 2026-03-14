@@ -9,6 +9,7 @@ import { TwitterCharacterOptimizer } from './TwitterCharacterOptimizer';
 import { EnhancedTwitterThreadComposer } from './EnhancedTwitterThreadComposer';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useLinkPreview } from '@/hooks/useLinkPreview';
+import { useTheme } from '@/hooks/useTheme';
 import { getSuggestedAdaptations } from '@/utils/contentAdaptation';
 import { useComposerStore } from '@/store/composer.store';
 import { getPlatformCharacterCount, getPlatformLimit, getCharacterStatus } from '@/utils/characterCount';
@@ -46,6 +47,7 @@ export function ContentSection({
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const theme = useTheme();
 
   // Mention autocomplete
   const mentions = useMentionAutocomplete({
@@ -303,6 +305,7 @@ export function ContentSection({
                 isOpen={showEmojiPicker}
                 onEmojiSelect={handleEmojiSelect}
                 onClose={() => setShowEmojiPicker(false)}
+                theme={theme}
               />
               
               {/* Mention Autocomplete */}
