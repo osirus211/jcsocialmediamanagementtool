@@ -115,7 +115,7 @@ export class InvitationController {
     try {
       const { workspaceId } = req.params;
       const userId = req.user?.userId;
-      const { page = 1, limit = 50 } = req.query;
+      const { page = 1, limit = 50, status, search, role } = req.query;
 
       if (!userId) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -129,6 +129,9 @@ export class InvitationController {
         userId: new mongoose.Types.ObjectId(userId),
         limit: Number(limit),
         skip,
+        status: status as string,
+        search: search as string,
+        role: role as string,
       });
 
       // Format response to include token for frontend actions
@@ -256,6 +259,99 @@ export class InvitationController {
       
       if (error.message.includes('not found')) {
         res.status(404).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Bulk cancel invitations
+   * DELETE /api/v1/workspaces/:workspaceId/invitations/bulk
+   */
+  static async bulkCancelInvitations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const { tokens } = req.body;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
+        res.status(400).json({ error: 'Tokens array is required' });
+        return;
+      }
+
+      if (tokens.length > 50) {
+        res.status(400).json({ error: 'Cannot cancel more than 50 invitations at once' });
+        return;
+      }
+
+      const results = await workspaceService.bulkCancelInvites({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        tokens,
+        userId: new mongoose.Types.ObjectId(userId),
+      });
+
+      // Audit log the bulk cancellation
+      logAudit({
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        action: 'invitation.bulk_cancelled',
+        entityType: 'invitation',
+        metadata: {
+          tokensCount: tokens.length,
+          successCount: results.successCount,
+          failureCount: results.failureCount,
+        },
+        req,
+      });
+
+      res.json({
+        message: `Successfully cancelled ${results.successCount} invitations`,
+        results,
+      });
+    } catch (error: any) {
+      logger.error('Bulk cancel invitations error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Get invitation stats
+   * GET /api/v1/workspaces/:workspaceId/invitations/stats
+   */
+  static async getInvitationStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const stats = await workspaceService.getInvitationStats({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+      });
+
+      res.json({ stats });
+    } catch (error: any) {
+      logger.error('Get invitation stats error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
         return;
       }
 

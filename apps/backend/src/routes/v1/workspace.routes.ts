@@ -223,4 +223,23 @@ router.delete(
   InvitationController.revokeInvitation
 );
 
+// Bulk cancel invitations (admin or owner only)
+router.delete(
+  '/:workspaceId/invitations/bulk',
+  invitationRevokeRateLimiter,
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  InvitationController.bulkCancelInvitations
+);
+
+// Get invitation stats (admin or owner only)
+router.get(
+  '/:workspaceId/invitations/stats',
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  InvitationController.getInvitationStats
+);
+
 export default router;

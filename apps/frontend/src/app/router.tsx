@@ -27,6 +27,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFound').then(module => ({ def
 const WorkspaceListPage = lazy(() => import('@/pages/workspaces/WorkspaceList').then(module => ({ default: module.WorkspaceListPage })));
 const CreateWorkspacePage = lazy(() => import('@/pages/workspaces/CreateWorkspace').then(module => ({ default: module.CreateWorkspacePage })));
 const WorkspaceSettingsPage = lazy(() => import('@/pages/workspaces/WorkspaceSettings').then(module => ({ default: module.WorkspaceSettingsPage })));
+const PendingInvitesPage = lazy(() => import('@/pages/workspaces/PendingInvitesPage').then(module => ({ default: module.PendingInvitesPage })));
 
 // Social & Connections
 const ConnectedAccountsPage = lazy(() => import('@/pages/social/ConnectedAccounts').then(module => ({ default: module.ConnectedAccountsPage })));
@@ -110,6 +111,10 @@ const router = createBrowserRouter([
       {
         path: 'workspaces/:workspaceId/settings',
         element: <SuspenseWrapper><WorkspaceSettingsPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'workspaces/:workspaceId/invites',
+        element: <SuspenseWrapper><PendingInvitesPage /></SuspenseWrapper>,
       },
       {
         path: 'social/accounts',

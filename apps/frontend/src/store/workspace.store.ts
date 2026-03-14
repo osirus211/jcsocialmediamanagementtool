@@ -52,7 +52,7 @@ interface WorkspaceActions {
   
   // Member actions
   fetchMembers: (workspaceId: string) => Promise<void>;
-  fetchPendingInvites: (workspaceId: string) => Promise<void>;
+  fetchPendingInvites: (workspaceId: string, params?: { status?: string; search?: string; role?: string }) => Promise<void>;
   inviteMember: (workspaceId: string, input: InviteMemberInput) => Promise<WorkspaceMember>;
   removeMember: (workspaceId: string, userId: string) => Promise<void>;
   deactivateMember: (workspaceId: string, userId: string) => Promise<void>;
@@ -60,6 +60,11 @@ interface WorkspaceActions {
   updateMemberRole: (workspaceId: string, userId: string, input: UpdateMemberRoleInput) => Promise<WorkspaceMember>;
   transferOwnership: (workspaceId: string, input: TransferOwnershipInput) => Promise<void>;
   leaveWorkspace: (workspaceId: string) => Promise<void>;
+
+  // Invitation actions
+  resendInvitation: (workspaceId: string, token: string) => Promise<void>;
+  cancelInvitation: (workspaceId: string, token: string) => Promise<void>;
+  bulkCancelInvitations: (workspaceId: string, tokens: string[]) => Promise<void>;
 
   // Utility actions
   clearWorkspaceData: () => void;
@@ -343,11 +348,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       /**
        * Fetch pending invites
        */
-      fetchPendingInvites: async (workspaceId: string) => {
+      fetchPendingInvites: async (workspaceId: string, params?: { status?: string; search?: string; role?: string }) => {
         try {
-          const response = await apiClient.get<{ invitations: any[] }>(
-            `/workspaces/${workspaceId}/invitations`
-          );
+          const queryParams = new URLSearchParams();
+          if (params?.status) queryParams.append('status', params.status);
+          if (params?.search) queryParams.append('search', params.search);
+          if (params?.role) queryParams.append('role', params.role);
+
+          const url = `/workspaces/${workspaceId}/invitations${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+          const response = await apiClient.get<{ invitations: any[] }>(url);
 
           set({
             pendingInvites: response.invitations,
@@ -563,6 +572,54 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           });
         } catch (error: any) {
           console.error('Leave workspace error:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Resend invitation
+       */
+      resendInvitation: async (workspaceId: string, token: string) => {
+        try {
+          await apiClient.post(`/workspaces/${workspaceId}/invitations/${token}/resend`);
+        } catch (error: any) {
+          console.error('Resend invitation error:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Cancel invitation
+       */
+      cancelInvitation: async (workspaceId: string, token: string) => {
+        try {
+          await apiClient.delete(`/workspaces/${workspaceId}/invitations/${token}`);
+          
+          // Remove from pending invites list
+          set((state) => ({
+            pendingInvites: state.pendingInvites.filter((invite) => invite.token !== token),
+          }));
+        } catch (error: any) {
+          console.error('Cancel invitation error:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Bulk cancel invitations
+       */
+      bulkCancelInvitations: async (workspaceId: string, tokens: string[]) => {
+        try {
+          await apiClient.delete(`/workspaces/${workspaceId}/invitations/bulk`, {
+            data: { tokens },
+          });
+          
+          // Remove from pending invites list
+          set((state) => ({
+            pendingInvites: state.pendingInvites.filter((invite) => !tokens.includes(invite.token)),
+          }));
+        } catch (error: any) {
+          console.error('Bulk cancel invitations error:', error);
           throw error;
         }
       },

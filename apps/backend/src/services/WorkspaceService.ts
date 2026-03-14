@@ -1024,8 +1024,11 @@ export class WorkspaceService {
     userId: mongoose.Types.ObjectId;
     limit?: number;
     skip?: number;
+    status?: string;
+    search?: string;
+    role?: string;
   }): Promise<IWorkspaceInvitation[]> {
-    const { workspaceId, userId, limit = 50, skip = 0 } = params;
+    const { workspaceId, userId, limit = 50, skip = 0, status, search, role } = params;
 
     // Check permission
     const member = await this.getMember(workspaceId, userId);
@@ -1033,10 +1036,39 @@ export class WorkspaceService {
       throw new Error('Insufficient permissions to view invitations');
     }
 
-    return WorkspaceInvitation.find({
-      workspaceId,
-      status: { $in: [InvitationStatus.PENDING, InvitationStatus.EXPIRED] },
-    })
+    // Build query
+    const query: any = { workspaceId };
+
+    // Status filter
+    if (status && status !== 'all') {
+      if (status === 'pending') {
+        query.status = InvitationStatus.PENDING;
+      } else if (status === 'expired') {
+        query.status = InvitationStatus.EXPIRED;
+      } else if (status === 'accepted') {
+        query.status = InvitationStatus.ACCEPTED;
+      } else if (status === 'revoked') {
+        query.status = InvitationStatus.REVOKED;
+      }
+    } else {
+      // Default: show pending and expired
+      query.status = { $in: [InvitationStatus.PENDING, InvitationStatus.EXPIRED] };
+    }
+
+    // Role filter
+    if (role && role !== 'all') {
+      query.role = role;
+    }
+
+    // Search filter
+    if (search) {
+      query.$or = [
+        { invitedEmail: { $regex: search, $options: 'i' } },
+        { inviterName: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    return WorkspaceInvitation.find(query)
       .populate('invitedBy', 'name email')
       .sort({ createdAt: -1 })
       .limit(limit)
@@ -1186,6 +1218,142 @@ export class WorkspaceService {
       throw error;
     } finally {
       session.endSession();
+    }
+  }
+
+  /**
+   * Bulk cancel invitations
+   */
+  async bulkCancelInvites(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    tokens: string[];
+    userId: mongoose.Types.ObjectId;
+  }): Promise<{ successCount: number; failureCount: number; errors: string[] }> {
+    const { workspaceId, tokens, userId } = params;
+
+    // Check permissions
+    const member = await this.getMember(workspaceId, userId);
+    if (!member || !workspacePermissionService.hasPermission(member.role, Permission.MANAGE_TEAM)) {
+      throw new Error('Insufficient permissions to cancel invitations');
+    }
+
+    const results = {
+      successCount: 0,
+      failureCount: 0,
+      errors: [] as string[],
+    };
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      for (const token of tokens) {
+        try {
+          const tokenHash = WorkspaceInvitation.hashToken(token);
+          const invitation = await WorkspaceInvitation.findOne({
+            workspaceId,
+            tokenHash,
+            status: InvitationStatus.PENDING,
+          }).session(session);
+
+          if (!invitation) {
+            results.failureCount++;
+            results.errors.push(`Invitation not found: ${token.substring(0, 8)}...`);
+            continue;
+          }
+
+          await invitation.markAsRevoked();
+          results.successCount++;
+
+          // Log activity
+          await this.logActivity({
+            workspaceId,
+            userId,
+            action: ActivityAction.MEMBER_REMOVED,
+            details: {
+              invitedEmail: invitation.invitedEmail,
+              role: invitation.role,
+              token: token.substring(0, 8) + '...',
+            },
+            session,
+          });
+        } catch (error: any) {
+          results.failureCount++;
+          results.errors.push(`Failed to cancel ${token.substring(0, 8)}...: ${error.message}`);
+        }
+      }
+
+      await session.commitTransaction();
+      logger.info(`Bulk cancelled ${results.successCount} invitations for workspace ${workspaceId}`);
+      return results;
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Failed to bulk cancel invitations:', error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Get invitation statistics
+   */
+  async getInvitationStats(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+  }): Promise<{
+    totalSent: number;
+    pending: number;
+    accepted: number;
+    expired: number;
+    revoked: number;
+    acceptanceRate: number;
+  }> {
+    const { workspaceId, userId } = params;
+
+    // Check permissions
+    const member = await this.getMember(workspaceId, userId);
+    if (!member || !workspacePermissionService.hasPermission(member.role, Permission.MANAGE_TEAM)) {
+      throw new Error('Insufficient permissions to view invitation statistics');
+    }
+
+    try {
+      const stats = await WorkspaceInvitation.aggregate([
+        { $match: { workspaceId } },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const statusCounts = stats.reduce((acc, stat) => {
+        acc[stat._id] = stat.count;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const totalSent = stats.reduce((sum, stat) => sum + stat.count, 0);
+      const pending = statusCounts[InvitationStatus.PENDING] || 0;
+      const accepted = statusCounts[InvitationStatus.ACCEPTED] || 0;
+      const expired = statusCounts[InvitationStatus.EXPIRED] || 0;
+      const revoked = statusCounts[InvitationStatus.REVOKED] || 0;
+
+      // Calculate acceptance rate (accepted / (accepted + expired + revoked))
+      const totalProcessed = accepted + expired + revoked;
+      const acceptanceRate = totalProcessed > 0 ? (accepted / totalProcessed) * 100 : 0;
+
+      return {
+        totalSent,
+        pending,
+        accepted,
+        expired,
+        revoked,
+        acceptanceRate: Math.round(acceptanceRate * 100) / 100, // Round to 2 decimal places
+      };
+    } catch (error) {
+      logger.error('Failed to get invitation stats:', error);
+      throw error;
     }
   }
 }

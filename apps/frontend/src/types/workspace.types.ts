@@ -126,3 +126,24 @@ export interface MembersResponse {
 export interface MembershipResponse {
   membership: WorkspaceMember;
 }
+
+// Invitation types
+export interface WorkspaceInvitation {
+  _id: string;
+  token: string;
+  invitedEmail: string;
+  role: 'admin' | 'member' | 'viewer';
+  status: 'pending' | 'accepted' | 'expired' | 'revoked';
+  expiresAt: string;
+  createdAt: string;
+  inviterName: string;
+}
+
+export interface InvitationStats {
+  totalSent: number;
+  pending: number;
+  accepted: number;
+  expired: number;
+  revoked: number;
+  acceptanceRate: number;
+}

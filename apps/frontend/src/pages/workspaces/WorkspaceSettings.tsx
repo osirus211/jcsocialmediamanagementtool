@@ -314,6 +314,14 @@ export const WorkspaceSettingsPage = () => {
             >
               Members ({workspace.membersCount})
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => navigate(`/workspaces/${workspaceId}/invites`)}
+                className="pb-4 px-1 border-b-2 border-transparent font-medium text-sm transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                Pending Invites
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('queue')}
               className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
