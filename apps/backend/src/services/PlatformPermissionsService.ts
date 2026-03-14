@@ -82,14 +82,22 @@ const PLATFORM_PERMISSIONS: Record<SocialPlatform, PlatformPermission> = {
   [SocialPlatform.YOUTUBE]: {
     platform: SocialPlatform.YOUTUBE,
     permissions: [
+      'https://www.googleapis.com/auth/youtube',
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/youtube.force-ssl',
+      'https://www.googleapis.com/auth/youtubepartner'
     ],
-    explanation: 'We need permission to upload videos to your YouTube channel and read your channel information.',
+    explanation: 'We need permission to upload videos to your YouTube channel, read your channel information, and manage your content.',
     documentationLink: 'https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps',
     requiredScopes: [
+      'https://www.googleapis.com/auth/youtube',
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/youtube.force-ssl'
+    ],
+    optionalScopes: [
+      'https://www.googleapis.com/auth/youtubepartner'
     ],
   },
 

@@ -47,6 +47,16 @@ export interface MediaFile {
     isPoll?: boolean;
     options?: string[];
     duration?: string;
+    // YouTube-specific metadata
+    youtubeTitle?: string;
+    youtubeDescription?: string;
+    youtubeTags?: string[];
+    youtubeCategory?: string;
+    youtubePrivacy?: 'public' | 'unlisted' | 'private';
+    youtubeIsShort?: boolean;
+    youtubeMadeForKids?: boolean;
+    youtubeLanguage?: string;
+    youtubeThumbnail?: string;
     [key: string]: any;
   };
 }
@@ -196,8 +206,22 @@ export const FILE_VALIDATION = {
     extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
   },
   video: {
-    types: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
-    maxSize: 100 * 1024 * 1024, // 100MB
-    extensions: ['.mp4', '.mov', '.avi'],
+    types: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'],
+    maxSize: 512 * 1024 * 1024 * 1024, // 512GB for YouTube (but warn at 2GB)
+    extensions: ['.mp4', '.mov', '.avi', '.webm'],
+  },
+  youtube: {
+    video: {
+      types: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-flv', 'video/3gpp'],
+      maxSize: 512 * 1024 * 1024 * 1024, // 512GB for verified accounts
+      extensions: ['.mp4', '.mov', '.avi', '.webm', '.flv', '.3gp'],
+      maxDuration: 12 * 60 * 60, // 12 hours for verified accounts
+    },
+    thumbnail: {
+      types: ['image/jpeg', 'image/png'],
+      maxSize: 2 * 1024 * 1024, // 2MB
+      extensions: ['.jpg', '.jpeg', '.png'],
+      recommendedSize: '1280x720',
+    },
   },
 };

@@ -28,8 +28,14 @@ export class YouTubeProvider extends OAuthProvider {
   private readonly apiBaseUrl = 'https://www.googleapis.com/youtube/v3';
 
   constructor(clientId: string, clientSecret: string, redirectUri: string) {
-    // YouTube readonly scope only
-    const scopes = ['https://www.googleapis.com/auth/youtube.readonly'];
+    // Full YouTube scopes for publishing and analytics
+    const scopes = [
+      'https://www.googleapis.com/auth/youtube',
+      'https://www.googleapis.com/auth/youtube.upload',
+      'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/youtube.force-ssl',
+      'https://www.googleapis.com/auth/youtubepartner'
+    ];
     super(clientId, clientSecret, redirectUri, scopes);
   }
 
@@ -202,7 +208,7 @@ export class YouTubeProvider extends OAuthProvider {
 
       const response = await axios.get(`${this.apiBaseUrl}/channels`, {
         params: {
-          part: 'snippet',
+          part: 'snippet,statistics,brandingSettings',
           mine: 'true',
         },
         headers: {
@@ -218,10 +224,14 @@ export class YouTubeProvider extends OAuthProvider {
 
       const channel = channels[0];
       const snippet = channel.snippet;
+      const statistics = channel.statistics || {};
+      const branding = channel.brandingSettings || {};
 
       logger.info('YouTube channel info fetched', {
         channelId: channel.id,
         channelTitle: snippet.title,
+        subscriberCount: statistics.subscriberCount,
+        videoCount: statistics.videoCount,
         provider: 'YouTubeProvider',
       });
 
@@ -235,7 +245,15 @@ export class YouTubeProvider extends OAuthProvider {
           platform: 'youtube',
           channelId: channel.id,
           channelTitle: snippet.title,
+          channelDescription: snippet.description,
           channelThumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
+          subscriberCount: statistics.subscriberCount,
+          videoCount: statistics.videoCount,
+          viewCount: statistics.viewCount,
+          customUrl: snippet.customUrl,
+          country: snippet.country,
+          defaultLanguage: snippet.defaultLanguage,
+          isVerified: branding.channel?.moderateComments === false, // Approximation
         },
       };
     } catch (error: any) {
@@ -294,11 +312,19 @@ export class YouTubeProvider extends OAuthProvider {
 
   getCapabilities(accountType?: string): any {
     return {
-      supportsPublishing: false,
-      supportsScheduling: false,
+      supportsPublishing: true,
+      supportsScheduling: true,
       supportsAnalytics: true,
-      maxTextLength: 0,
-      supportedMediaTypes: [],
+      maxTextLength: 5000,
+      supportedMediaTypes: ['video/mp4', 'video/mov', 'video/avi', 'video/webm'],
+      supportedFeatures: [
+        'video_upload',
+        'shorts_upload',
+        'thumbnail_upload',
+        'scheduled_publishing',
+        'analytics',
+        'live_streaming'
+      ],
     };
   }
 }

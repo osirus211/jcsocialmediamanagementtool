@@ -142,7 +142,13 @@ export class YouTubeOAuthService {
         accessToken: tokens.accessToken, // Encrypted by pre-save hook
         refreshToken: tokens.refreshToken, // Encrypted by pre-save hook
         tokenExpiresAt: tokens.expiresAt || undefined,
-        scopes: ['https://www.googleapis.com/auth/youtube.readonly'],
+        scopes: [
+          'https://www.googleapis.com/auth/youtube',
+          'https://www.googleapis.com/auth/youtube.upload',
+          'https://www.googleapis.com/auth/youtube.readonly',
+          'https://www.googleapis.com/auth/youtube.force-ssl',
+          'https://www.googleapis.com/auth/youtubepartner'
+        ],
         status: AccountStatus.ACTIVE,
         connectionVersion: 'v2',
         connectionMetadata,
