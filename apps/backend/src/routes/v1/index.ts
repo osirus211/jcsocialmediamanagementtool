@@ -22,6 +22,7 @@ import taskRoutes from './tasks.routes'; // Task management
 import templatesRoutes from './templates.routes'; // Phase-2: Post templates
 import queueSlotsRoutes from './queue-slots.routes'; // Phase-2: Queue slots
 import linksRoutes from './links.routes'; // Phase-2: Link shortening
+import linkPreviewRoutes from './link-preview.routes'; // Link preview API
 import followersRoutes from './followers.routes'; // Phase-3: Follower analytics
 import competitorsRoutes from './competitors.routes'; // Phase-3: Competitor analytics
 import listeningRulesRoutes from './listening-rules.routes'; // Phase-4: Social listening
@@ -80,6 +81,7 @@ router.get('/', (_req, res) => {
       templates: '/api/v1/templates',
       queueSlots: '/api/v1/queue-slots',
       links: '/api/v1/links',
+      linkPreview: '/api/v1/link-preview',
       media: '/api/v1/media',
       platforms: '/api/v1/platforms',
       social: '/api/v1/social',
@@ -145,6 +147,7 @@ router.use('/tasks', taskRoutes); // Task management
 router.use('/templates', templatesRoutes); // Phase-2: Post templates
 router.use('/queue-slots', queueSlotsRoutes); // Phase-2: Queue slots
 router.use('/links', linksRoutes); // Phase-2: Link shortening
+router.use('/link-preview', linkPreviewRoutes); // Link preview API
 router.use('/alttext', alttextRoutes); // Alt text generation and validation
 router.use('/media', mediaRoutes); // Media API
 router.use('/platforms', platformRoutes); // Platforms API

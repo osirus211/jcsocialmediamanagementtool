@@ -1,13 +1,28 @@
 import { apiClient } from '@/lib/api-client';
 
+export interface ShortLinkOptions {
+  postId?: string;
+  platform?: string;
+  expiresAt?: string;
+  customDomain?: string;
+  utmParams?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    term?: string;
+    content?: string;
+  };
+}
+
 export interface ShortLink {
   shortCode: string;
   originalUrl: string;
   shortUrl: string;
   clicks: number;
+  createdAt: string;
   platform?: string;
   postId?: string;
-  createdAt: string;
+  expiresAt?: string;
 }
 
 export interface LinkStats {
@@ -22,39 +37,63 @@ export interface LinkStats {
   createdAt: string;
 }
 
-export interface LinksResponse {
-  success: boolean;
-  links: ShortLink[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
-
-class LinkService {
-  async shortenUrl(originalUrl: string, postId?: string, platform?: string): Promise<ShortLink> {
-    const response = await apiClient.post<{ success: boolean; data: ShortLink }>(
-      '/links/shorten',
-      { originalUrl, postId, platform }
-    );
+export class LinkService {
+  /**
+   * Shorten a URL
+   */
+  async shortenUrl(originalUrl: string, options?: ShortLinkOptions): Promise<ShortLink> {
+    const response = await apiClient.post('/links/shorten', {
+      originalUrl,
+      ...options,
+    });
     return response.data;
   }
 
-  async getLinks(page: number = 1, limit: number = 20): Promise<LinksResponse> {
-    const response = await apiClient.get<LinksResponse>(
-      `/links?page=${page}&limit=${limit}`
-    );
+  /**
+   * Get link statistics
+   */
+  async getLinkStats(shortCode: string): Promise<LinkStats> {
+    const response = await apiClient.get(`/links/${shortCode}/stats`);
+    return response.data;
+  }
+
+  /**
+   * Get workspace links
+   */
+  async getLinks(page: number = 1, limit: number = 20) {
+    const response = await apiClient.get(`/links?page=${page}&limit=${limit}`);
     return response;
   }
 
-  async getLinkStats(shortCode: string): Promise<LinkStats> {
-    const response = await apiClient.get<{ success: boolean; data: LinkStats }>(
-      `/links/${shortCode}/stats`
-    );
+  /**
+   * Delete a link
+   */
+  async deleteLink(shortCode: string): Promise<void> {
+    await apiClient.delete(`/links/${shortCode}`);
+  }
+
+  /**
+   * Get link preview
+   */
+  async getLinkPreview(url: string) {
+    const response = await apiClient.post('/link-preview', { url });
     return response.data;
   }
 
-  async deleteLink(shortCode: string): Promise<void> {
-    await apiClient.delete(`/links/${shortCode}`);
+  /**
+   * Get batch link previews
+   */
+  async getBatchLinkPreviews(urls: string[]) {
+    const response = await apiClient.post('/link-preview/batch', { urls });
+    return response.data;
+  }
+
+  /**
+   * Extract URLs from content
+   */
+  async extractUrls(content: string) {
+    const response = await apiClient.post('/link-preview/extract', { content });
+    return response.data.urls;
   }
 }
 

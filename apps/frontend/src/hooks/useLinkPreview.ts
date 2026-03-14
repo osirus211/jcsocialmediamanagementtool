@@ -1,57 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LinkPreview } from '@/components/composer/LinkPreviewCard';
+import { apiClient } from '@/lib/api-client';
 
 interface UseLinkPreviewProps {
   content: string;
   enabled?: boolean;
 }
 
-// Mock link preview service - in real app, this would call your backend
+// Real link preview service using backend API
 const fetchLinkPreview = async (url: string): Promise<LinkPreview> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock data based on common domains
-  const domain = new URL(url).hostname.toLowerCase();
-  
-  if (domain.includes('github.com')) {
+  try {
+    const response = await apiClient.post('/link-preview', { url });
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch link preview:', error);
+    
+    // Fallback preview on error
     return {
       url,
-      title: 'GitHub Repository',
-      description: 'A great open source project with lots of stars and contributors.',
-      image: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
-      siteName: 'GitHub',
+      title: new URL(url).hostname,
+      description: 'Unable to fetch preview',
+      siteName: new URL(url).hostname,
     };
   }
-  
-  if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-    return {
-      url,
-      title: 'Amazing Video Title',
-      description: 'This video will change your life! Watch now to learn incredible tips and tricks.',
-      image: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-      siteName: 'YouTube',
-    };
-  }
-  
-  if (domain.includes('twitter.com') || domain.includes('x.com')) {
-    return {
-      url,
-      title: 'Tweet from @username',
-      description: 'An interesting tweet that sparked a lot of discussion in the community.',
-      image: 'https://abs.twimg.com/icons/apple-touch-icon-192x192.png',
-      siteName: 'Twitter',
-    };
-  }
-  
-  // Default preview
-  return {
-    url,
-    title: 'Interesting Article Title',
-    description: 'This is a fascinating article that covers important topics and provides valuable insights.',
-    image: undefined,
-    siteName: new URL(url).hostname,
-  };
 };
 
 export function useLinkPreview({ content, enabled = true }: UseLinkPreviewProps) {
@@ -143,6 +114,27 @@ export function useLinkPreview({ content, enabled = true }: UseLinkPreviewProps)
     await fetchPreview(url);
   }, [fetchPreview]);
 
+  // Update URL with UTM parameters
+  const updateUrl = useCallback((oldUrl: string, newUrl: string) => {
+    setLinkPreviews(prev => {
+      if (!prev[oldUrl]) return prev;
+      
+      const newPreviews = { ...prev };
+      const preview = newPreviews[oldUrl];
+      delete newPreviews[oldUrl];
+      newPreviews[newUrl] = { ...preview, url: newUrl };
+      
+      return newPreviews;
+    });
+    
+    // Remove old URL from removed set if it exists
+    setRemovedUrls(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(oldUrl);
+      return newSet;
+    });
+  }, []);
+
   // Upload custom image for preview
   const uploadCustomImage = useCallback(async (url: string, file: File): Promise<void> => {
     // In real app, upload file and get URL
@@ -175,5 +167,6 @@ export function useLinkPreview({ content, enabled = true }: UseLinkPreviewProps)
     removePreview,
     refreshPreview,
     uploadCustomImage,
+    updateUrl,
   };
 }

@@ -17,6 +17,14 @@ export interface CreateShortLinkOptions {
   postId?: string;
   platform?: string;
   expiresAt?: Date;
+  customDomain?: string;
+  utmParams?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    term?: string;
+    content?: string;
+  };
 }
 
 export interface ClickMetadata {
@@ -81,8 +89,23 @@ export class ShortLinkService {
   ): Promise<{ shortLink: IShortLink; shortUrl: string }> {
     try {
       // Validate URL
+      let processedUrl = originalUrl;
       try {
-        new URL(originalUrl);
+        const urlObj = new URL(originalUrl);
+        
+        // Add UTM parameters if provided
+        if (options?.utmParams) {
+          const params = new URLSearchParams(urlObj.search);
+          
+          if (options.utmParams.source) params.set('utm_source', options.utmParams.source);
+          if (options.utmParams.medium) params.set('utm_medium', options.utmParams.medium);
+          if (options.utmParams.campaign) params.set('utm_campaign', options.utmParams.campaign);
+          if (options.utmParams.term) params.set('utm_term', options.utmParams.term);
+          if (options.utmParams.content) params.set('utm_content', options.utmParams.content);
+          
+          urlObj.search = params.toString();
+          processedUrl = urlObj.toString();
+        }
       } catch {
         throw new BadRequestError('Invalid URL format');
       }
@@ -90,7 +113,7 @@ export class ShortLinkService {
       const shortCode = await this.generateShortCode();
 
       const shortLink = await ShortLink.create({
-        originalUrl,
+        originalUrl: processedUrl,
         shortCode,
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
         postId: options?.postId ? new mongoose.Types.ObjectId(options.postId) : undefined,
@@ -100,12 +123,15 @@ export class ShortLinkService {
         clicks: 0,
       });
 
-      const shortUrl = `${config.apiUrl}/r/${shortCode}`;
+      // Use custom domain if provided, otherwise use default
+      const domain = options?.customDomain || config.apiUrl;
+      const shortUrl = `${domain}/r/${shortCode}`;
 
       logger.info('Short link created', {
         shortCode,
-        originalUrl,
+        originalUrl: processedUrl,
         workspaceId,
+        customDomain: options?.customDomain,
       });
 
       return { shortLink, shortUrl };

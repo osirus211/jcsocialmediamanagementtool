@@ -1,5 +1,6 @@
 import { useState, memo, useCallback } from 'react';
-import { X, ExternalLink, Upload, RefreshCw } from 'lucide-react';
+import { X, ExternalLink, Upload, RefreshCw, Link2 } from 'lucide-react';
+import { UTMBuilder, UTMParams } from './UTMBuilder';
 
 interface LinkPreview {
   url: string;
@@ -14,6 +15,7 @@ interface LinkPreviewCardProps {
   onRemove: () => void;
   onCustomImageUpload?: (file: File) => void;
   onRefresh?: () => void;
+  onUrlUpdate?: (newUrl: string, utmParams: UTMParams) => void;
   isLoading?: boolean;
 }
 
@@ -22,9 +24,18 @@ const LinkPreviewCard = memo(function LinkPreviewCard({
   onRemove,
   onCustomImageUpload,
   onRefresh,
+  onUrlUpdate,
   isLoading = false,
 }: LinkPreviewCardProps) {
   const [imageError, setImageError] = useState(false);
+  const [showUTMBuilder, setShowUTMBuilder] = useState(false);
+
+  const handleUTMApply = useCallback((newUrl: string, utmParams: UTMParams) => {
+    if (onUrlUpdate) {
+      onUrlUpdate(newUrl, utmParams);
+    }
+    setShowUTMBuilder(false);
+  }, [onUrlUpdate]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,6 +57,15 @@ const LinkPreviewCard = memo(function LinkPreviewCard({
           <span>Link Preview</span>
         </div>
         <div className="flex items-center gap-1">
+          {onUrlUpdate && (
+            <button
+              onClick={() => setShowUTMBuilder(!showUTMBuilder)}
+              className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+              title="Add UTM parameters"
+            >
+              <Link2 className="h-4 w-4" />
+            </button>
+          )}
           {onRefresh && (
             <button
               onClick={onRefresh}
@@ -65,6 +85,17 @@ const LinkPreviewCard = memo(function LinkPreviewCard({
           </button>
         </div>
       </div>
+
+      {/* UTM Builder */}
+      {showUTMBuilder && onUrlUpdate && (
+        <div className="p-3 border-b bg-gray-50">
+          <UTMBuilder
+            url={preview.url}
+            onApply={handleUTMApply}
+            onClose={() => setShowUTMBuilder(false)}
+          />
+        </div>
+      )}
 
       {/* Loading State */}
       {isLoading && (

@@ -328,6 +328,7 @@ export function ContentSection({
                   onRemove={() => linkPreviews.removePreview(url)}
                   onRefresh={() => linkPreviews.refreshPreview(url)}
                   onCustomImageUpload={(file) => linkPreviews.uploadCustomImage(url, file)}
+                  onUrlUpdate={(newUrl) => linkPreviews.updateUrl(url, newUrl)}
                 />
               ))}
             </div>
