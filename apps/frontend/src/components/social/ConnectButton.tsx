@@ -3,6 +3,7 @@ import { SocialPlatform } from '@/types/social.types';
 import { apiClient } from '@/lib/api-client';
 import { InstagramConnectModal } from './InstagramConnectModal';
 import { BlueskyConnectModal } from './BlueskyConnectModal';
+import { MastodonConnectModal } from './MastodonConnectModal';
 
 interface ConnectButtonProps {
   platform: SocialPlatform;
@@ -17,6 +18,7 @@ const platformLabels: Record<SocialPlatform, string> = {
   [SocialPlatform.YOUTUBE]: 'YouTube',
   [SocialPlatform.THREADS]: 'Threads',
   [SocialPlatform.BLUESKY]: 'Bluesky',
+  [SocialPlatform.MASTODON]: 'Mastodon',
   [SocialPlatform.GOOGLE_BUSINESS]: 'Google Business Profile',
   [SocialPlatform.PINTEREST]: 'Pinterest',
 };
@@ -25,6 +27,7 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [showBlueskyModal, setShowBlueskyModal] = useState(false);
+  const [showMastodonModal, setShowMastodonModal] = useState(false);
 
   const handleConnect = async () => {
     // Special handling for Instagram - show options modal
@@ -36,6 +39,12 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
     // Special handling for Bluesky - show credentials modal
     if (platform === SocialPlatform.BLUESKY) {
       setShowBlueskyModal(true);
+      return;
+    }
+
+    // Special handling for Mastodon - show instance selection modal
+    if (platform === SocialPlatform.MASTODON) {
+      setShowMastodonModal(true);
       return;
     }
 
@@ -76,6 +85,13 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
     }
   };
 
+  const handleMastodonSuccess = () => {
+    setShowMastodonModal(false);
+    if (onSuccess) {
+      onSuccess();
+    }
+  };
+
   return (
     <>
       <button
@@ -101,6 +117,15 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
           isOpen={showBlueskyModal}
           onClose={() => setShowBlueskyModal(false)}
           onSuccess={handleBlueskySuccess}
+        />
+      )}
+
+      {/* Mastodon Connect Modal */}
+      {platform === SocialPlatform.MASTODON && (
+        <MastodonConnectModal
+          isOpen={showMastodonModal}
+          onClose={() => setShowMastodonModal(false)}
+          onSuccess={handleMastodonSuccess}
         />
       )}
     </>

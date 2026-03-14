@@ -39,6 +39,10 @@ export interface OAuthStateData {
   providerType?: string; // For Instagram (INSTAGRAM_BUSINESS | INSTAGRAM_BASIC)
   correlationId: string;
   createdAt: string; // ISO timestamp
+  // Mastodon-specific fields
+  instanceUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 /**
@@ -53,6 +57,10 @@ export interface CreateStateOptions {
   codeVerifier?: string;
   providerType?: string;
   correlationId?: string;
+  // Mastodon-specific fields
+  instanceUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 /**
@@ -95,6 +103,9 @@ export class OAuthStateService {
         providerType: options.providerType,
         correlationId,
         createdAt: new Date().toISOString(),
+        instanceUrl: options.instanceUrl,
+        clientId: options.clientId,
+        clientSecret: options.clientSecret,
       };
 
       // Store in Redis with TTL

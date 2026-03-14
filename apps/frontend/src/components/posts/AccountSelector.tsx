@@ -18,6 +18,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.YOUTUBE]: '▶️',
   [SocialPlatform.THREADS]: '@',
   [SocialPlatform.BLUESKY]: '🦋',
+  [SocialPlatform.MASTODON]: '🐘',
   [SocialPlatform.GOOGLE_BUSINESS]: 'G',
   [SocialPlatform.PINTEREST]: 'P',
 };

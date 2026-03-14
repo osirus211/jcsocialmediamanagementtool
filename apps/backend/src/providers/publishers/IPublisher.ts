@@ -69,7 +69,8 @@ export interface IPublisher {
    */
   getLimits?(): {
     maxContentLength: number;
-    maxMediaCount: number;
-    supportedMediaTypes: string[];
+    maxMediaCount?: number;
+    supportedMediaTypes?: string[];
+    [key: string]: any; // Allow additional platform-specific properties
   };
 }

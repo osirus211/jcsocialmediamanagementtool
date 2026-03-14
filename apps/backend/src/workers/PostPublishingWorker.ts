@@ -11,6 +11,13 @@ import { PostPublishAttempt, AttemptStatus } from '../models/PostPublishAttempt'
 import { SocialAccount } from '../models/SocialAccount';
 import { PostPublishingJobData } from '../queue/PostPublishingQueue';
 import { PublisherRegistry } from '../providers/publishers/PublisherRegistry';
+import { TwitterPublisher } from '../providers/publishers/TwitterPublisher';
+import { FacebookPublisher } from '../providers/publishers/FacebookPublisher';
+import { InstagramPublisher } from '../providers/publishers/InstagramPublisher';
+import { LinkedInPublisher } from '../providers/publishers/LinkedInPublisher';
+import { TikTokPublisher } from '../providers/publishers/TikTokPublisher';
+import { GoogleBusinessPublisher } from '../providers/publishers/GoogleBusinessPublisher';
+import { MastodonPublisher } from '../providers/publishers/MastodonPublisher';
 import { publishingLockService } from '../services/PublishingLockService';
 import { classifyPublishingError, PublishingErrorCategory } from '../types/PublishingErrors';
 import { logger } from '../utils/logger';
@@ -30,6 +37,15 @@ export class PostPublishingWorker {
 
   constructor() {
     this.publisherRegistry = new PublisherRegistry();
+    
+    // Register all publishers
+    this.publisherRegistry.register('twitter', new TwitterPublisher());
+    this.publisherRegistry.register('facebook', new FacebookPublisher());
+    this.publisherRegistry.register('instagram', new InstagramPublisher());
+    this.publisherRegistry.register('linkedin', new LinkedInPublisher());
+    this.publisherRegistry.register('tiktok', new TikTokPublisher());
+    this.publisherRegistry.register('google-business', new GoogleBusinessPublisher());
+    this.publisherRegistry.register('mastodon', new MastodonPublisher());
   }
 
   /**
