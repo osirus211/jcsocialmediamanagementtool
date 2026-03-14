@@ -10,6 +10,7 @@ import { SocialPlatform } from '../models/ScheduledPost';
 import { logger } from '../utils/logger';
 import { BadRequestError, NotFoundError } from '../utils/errors';
 import { extractVariables, substituteVariables, VariableSubstitution } from '../utils/templateVariables';
+import { detectLanguage } from '../utils/languageDetection';
 
 export interface CreateTemplateInput {
   workspaceId: string;
@@ -109,6 +110,10 @@ export class PostTemplateService {
 
       // Extract variables from content if not provided
       const extractedVariables = variables || extractVariables(content);
+      
+      // Calculate character count and detect language
+      const characterCount = content.length;
+      const detectedLanguage = detectLanguage(content);
 
       const template = await PostTemplate.create({
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
@@ -130,6 +135,8 @@ export class PostTemplateService {
         tags,
         description,
         previewImage,
+        characterCount,
+        language: detectedLanguage,
       });
 
       logger.info('Post template created', {
@@ -268,6 +275,14 @@ export class PostTemplateService {
         template.content = updates.content;
         // Re-extract variables when content changes
         template.variables = extractVariables(updates.content);
+        // Update character count and language when content changes
+        template.characterCount = updates.content.length;
+        template.language = detectLanguage(updates.content);
+      }
+
+      // Handle explicit variables update
+      if (updates.variables !== undefined) {
+        template.variables = updates.variables;
       }
 
       if (updates.hashtags !== undefined) {

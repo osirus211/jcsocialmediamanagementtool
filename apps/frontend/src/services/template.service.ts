@@ -27,6 +27,8 @@ export interface PostTemplate {
   tags: string[];
   description?: string;
   previewImage?: string;
+  characterCount: number;
+  language?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +60,7 @@ export interface UpdateTemplateInput {
   mediaIds?: string[];
   // New competitive features
   category?: string;
+  variables?: string[];
   rating?: number;
   isFavorite?: boolean;
   isPersonal?: boolean;

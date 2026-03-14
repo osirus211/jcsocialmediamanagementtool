@@ -17,6 +17,7 @@ import { ComposerActions } from './ComposerActions';
 import { AlertBanner } from './AlertBanner';
 import { ToastContainer, ToastMessage } from './ToastContainer';
 import { AdvancedTemplatesPanel } from './AdvancedTemplatesPanel';
+import { SavedCaptionsPanel } from './SavedCaptionsPanel';
 import { PostPreviewPanel } from './preview/PostPreviewPanel';
 import { DraftLockBanner } from './DraftLockBanner';
 import { AIAssistantPanel } from './AIAssistantPanel';
@@ -102,6 +103,7 @@ export function ComposerContainer({
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showSavedCaptions, setShowSavedCaptions] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [autoShortenLinks, setAutoShortenLinks] = useState(false);
@@ -428,6 +430,7 @@ export function ComposerContainer({
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       
       {showTemplates && <AdvancedTemplatesPanel onClose={() => setShowTemplates(false)} />}
+      {showSavedCaptions && <SavedCaptionsPanel onClose={() => setShowSavedCaptions(false)} />}
       
       <div className="max-w-[1600px] mx-auto p-4 sm:p-6">
       <div className="flex flex-col lg:flex-row gap-4">
@@ -717,6 +720,7 @@ export function ComposerContainer({
             onPublish={handlePublish}
             onCancel={handleCancel}
             onTemplates={() => setShowTemplates(true)}
+            onSavedCaptions={() => setShowSavedCaptions(true)}
             onToggleAI={() => setShowAIPanel(!showAIPanel)}
             publishMode={publishMode}
             isLoading={isPublishing}

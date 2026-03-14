@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { PublishMode } from '@/types/composer.types';
-import { Save, Send, X, Loader2, FileText, Link, Calendar, List } from 'lucide-react';
+import { Save, Send, X, Loader2, FileText, Link, Calendar, List, MessageSquare } from 'lucide-react';
 import { AIToggleButton } from './AIToggleButton';
 import { BulkComposer, BulkPost } from './BulkComposer';
 
@@ -9,6 +9,7 @@ interface ComposerActionsProps {
   onPublish: () => void;
   onCancel: () => void;
   onTemplates?: () => void;
+  onSavedCaptions?: () => void;
   onToggleAI?: () => void;
   onBulkComposer?: () => void;
   publishMode: PublishMode;
@@ -27,6 +28,7 @@ const ComposerActions = memo(function ComposerActions({
   onPublish,
   onCancel,
   onTemplates,
+  onSavedCaptions,
   onToggleAI,
   onBulkComposer,
   publishMode,
@@ -142,6 +144,19 @@ const ComposerActions = memo(function ComposerActions({
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
             <span>Templates</span>
+          </button>
+        )}
+
+        {onSavedCaptions && (
+          <button
+            type="button"
+            onClick={onSavedCaptions}
+            disabled={isLoading || isSaving}
+            className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+            aria-label="Open saved captions library"
+          >
+            <MessageSquare className="h-4 w-4" aria-hidden="true" />
+            <span>Captions</span>
           </button>
         )}
 

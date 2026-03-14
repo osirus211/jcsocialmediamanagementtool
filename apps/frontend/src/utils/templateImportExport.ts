@@ -35,6 +35,8 @@ export function exportTemplates(templates: PostTemplate[]): string {
       tags: template.tags,
       description: template.description,
       previewImage: template.previewImage,
+      characterCount: template.characterCount,
+      language: template.language,
       usageCount: 0, // Reset usage count
       lastUsedAt: template.lastUsedAt,
     })),

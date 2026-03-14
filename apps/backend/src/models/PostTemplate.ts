@@ -29,6 +29,8 @@ export interface IPostTemplate extends Document {
   tags: string[]; // Search tags
   description?: string; // Template description
   previewImage?: string; // Template preview
+  characterCount: number; // Character count for quick reference
+  language?: string; // Detected language (en, es, fr, etc.)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -126,6 +128,15 @@ const PostTemplateSchema = new Schema<IPostTemplate>(
     previewImage: {
       type: String,
     },
+    characterCount: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    language: {
+      type: String,
+      maxlength: 10,
+    },
   },
   {
     timestamps: true,
@@ -175,6 +186,8 @@ PostTemplateSchema.methods = {
       tags: obj.tags || [],
       description: obj.description,
       previewImage: obj.previewImage,
+      characterCount: obj.characterCount,
+      language: obj.language,
       createdAt: obj.createdAt,
       updatedAt: obj.updatedAt,
     };
