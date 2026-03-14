@@ -325,6 +325,36 @@ export class OAuthController {
   }
 
   /**
+   * Get TikTok OAuth configuration
+   */
+  private getTikTokConfig(): { clientKey: string; clientSecret: string; redirectUri: string; scopes: string[] } {
+    const clientKey = config.oauth?.tiktok?.clientKey;
+    const clientSecret = config.oauth?.tiktok?.clientSecret;
+    const callbackUrl = config.oauth?.tiktok?.callbackUrl;
+
+    if (!clientKey || !clientSecret) {
+      throw new BadRequestError('TikTok OAuth not configured');
+    }
+
+    // Use explicit callback URL from env, or fallback to constructed URL
+    const redirectUri = callbackUrl || `${config.apiUrl || 'http://localhost:5000'}/api/v1/oauth/tiktok/callback`;
+
+    return {
+      clientKey,
+      clientSecret,
+      redirectUri,
+      scopes: [
+        'user.info.basic',
+        'user.info.profile', 
+        'user.info.stats',
+        'video.upload',
+        'video.publish',
+        'creator.info.basic'
+      ],
+    };
+  }
+
+  /**
    * Generate PKCE code verifier and challenge
    */
   private generatePKCE(): { codeVerifier: string; codeChallenge: string } {
@@ -362,8 +392,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, and Apple platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple' && platform !== 'tiktok') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, Apple, and TikTok platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -630,6 +660,36 @@ export class OAuthController {
         });
 
         authorizationUrl = `https://appleid.apple.com/auth/authorize?${params.toString()}`;
+      } else if (platform === 'tiktok') {
+        // TikTok OAuth with PKCE
+        const tiktokConfig = this.getTikTokConfig();
+
+        // Generate PKCE
+        const { codeVerifier, codeChallenge } = this.generatePKCE();
+
+        // Store state in Redis with IP binding and PKCE verifier
+        state = await oauthStateService.createState(workspaceId, userId, platform, {
+          codeVerifier, // Server-side PKCE storage
+          ipHash, // IP binding
+          metadata: {
+            platform,
+            timestamp: new Date().toISOString(),
+            userAgent: req.headers['user-agent'],
+          },
+        });
+
+        // Build authorization URL
+        const params = new URLSearchParams({
+          client_key: tiktokConfig.clientKey, // TikTok uses client_key instead of client_id
+          redirect_uri: tiktokConfig.redirectUri,
+          response_type: 'code',
+          scope: tiktokConfig.scopes.join(','), // TikTok uses comma-separated scopes
+          state,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        });
+
+        authorizationUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
       }
 
       // Log OAuth initiation
@@ -738,8 +798,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, and Apple platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple' && platform !== 'tiktok') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, Apple, and TikTok platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -908,6 +968,11 @@ export class OAuthController {
       if (platform === 'apple') {
         // Pass the already-consumed stateData to avoid double-consumption
         return await this.handleAppleCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
+      }
+
+      if (platform === 'tiktok') {
+        // Pass the already-consumed stateData to avoid double-consumption
+        return await this.handleTikTokCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
       }
 
       // Get Twitter configuration
@@ -2489,6 +2554,133 @@ export class OAuthController {
       
       res.redirect(
         `${frontendUrl}/social/accounts?error=APPLE_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
+      );
+    }
+  }
+
+  /**
+   * Handle TikTok OAuth callback with PKCE
+   */
+  private async handleTikTokCallback(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    code: string,
+    state: string,
+    consumedState: any,
+    clientIp: string,
+    ipHash: string,
+    debugReport: any,
+    startTime: number
+  ): Promise<void> {
+    const { TikTokOAuthService } = await import('../services/oauth/TikTokOAuthService');
+    
+    // State already consumed by main callback handler - no need to consume again
+    if (!consumedState) {
+      logger.warn('[OAuth] TikTok callback - invalid or expired state', {
+        state: state.substring(0, 10) + '...',
+        ipHash,
+      });
+
+      // Log replay attempt
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'tiktok',
+        action: 'callback',
+        success: false,
+        errorMessage: 'Invalid or expired state - possible replay attack',
+        metadata: {
+          errorCode: OAuthErrorCode.STATE_INVALID,
+          state: state.substring(0, 10) + '...',
+          replayAttempt: true,
+        },
+      });
+
+      const frontendUrl = config.cors.origin;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] TikTok state validation failed', { step: 'tiktok_state_validation' });
+      return res.redirect(
+        `${frontendUrl}/social/accounts?error=${OAuthErrorCode.STATE_INVALID}&message=${encodeURIComponent('Invalid or expired state')}`
+      );
+    }
+    
+    try {
+      logger.debug('[OAuth] TikTok callback initiated', { step: 'tiktok_callback' });
+      
+      // Get TikTok configuration
+      const tiktokConfig = this.getTikTokConfig();
+      
+      // Create TikTok OAuth service
+      const tiktokService = new TikTokOAuthService(
+        tiktokConfig.clientKey,
+        tiktokConfig.clientSecret,
+        tiktokConfig.redirectUri
+      );
+
+      // Get PKCE verifier from state
+      const codeVerifier = consumedState.codeVerifier;
+      if (!codeVerifier) {
+        throw new Error('PKCE code verifier not found in state');
+      }
+
+      // Connect account with PKCE
+      const result = await tiktokService.connectAccount({
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        code,
+        state,
+        codeVerifier,
+        ipAddress: clientIp,
+      });
+
+      debugReport.tokenExchangeSuccess = true;
+      debugReport.userFetched = true;
+      debugReport.dbInsertSuccess = true;
+
+      const duration = Date.now() - startTime;
+      logger.info('[OAuth] TikTok account connected', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        accountId: result.account._id,
+        duration,
+      });
+
+      // Redirect to frontend with success
+      const frontendUrl = config.cors.origin;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=tiktok&account=${result.account._id}`;
+      
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] TikTok callback completed', { step: 'tiktok_callback_complete' });
+      
+      res.redirect(redirectUrl);
+    } catch (error: any) {
+      logger.error('[OAuth] TikTok callback failed', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        error: error.message,
+      });
+
+      // Log failure
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'tiktok',
+        action: 'callback',
+        success: false,
+        errorMessage: error.message,
+      });
+
+      const frontendUrl = config.cors.origin;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] TikTok callback error handled', { step: 'tiktok_error_handler' });
+      
+      res.redirect(
+        `${frontendUrl}/social/accounts?error=TIKTOK_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
       );
     }
   }

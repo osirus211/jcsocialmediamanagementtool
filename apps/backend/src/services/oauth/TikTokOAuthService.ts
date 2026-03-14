@@ -46,6 +46,7 @@ export interface TikTokConnectParams {
   userId: mongoose.Types.ObjectId | string;
   code: string;
   state: string;
+  codeVerifier: string; // Added for PKCE support
   ipAddress: string;
 }
 
@@ -61,22 +62,29 @@ export class TikTokOAuthService {
   }
 
   /**
-   * Initiate TikTok OAuth flow
+   * Initiate TikTok OAuth flow with PKCE
    * 
    * Generates authorization URL with state parameter for CSRF protection
+   * and PKCE challenge for enhanced security
    */
   async initiateOAuth(): Promise<{
     url: string;
     state: string;
+    codeVerifier: string;
   }> {
     try {
-      const { url, state } = await this.provider.getAuthorizationUrl();
+      const result = await this.provider.getAuthorizationUrl();
 
-      logger.info('TikTok OAuth flow initiated', {
-        state: state.substring(0, 10) + '...',
+      logger.info('TikTok OAuth flow initiated with PKCE', {
+        state: result.state.substring(0, 10) + '...',
+        hasPKCE: !!result.codeVerifier,
       });
 
-      return { url, state };
+      return { 
+        url: result.url, 
+        state: result.state,
+        codeVerifier: result.codeVerifier || ''
+      };
     } catch (error: any) {
       logger.error('Failed to initiate TikTok OAuth', {
         error: error.message,
@@ -105,12 +113,12 @@ export class TikTokOAuthService {
         userId: params.userId,
       });
 
-      // Step 1: Exchange code for tokens
-      const tokens = await this.provider.exchangeCodeForToken(
-        params.code,
-        `${config.frontend.url}/api/v1/channels/oauth/callback/tiktok`,
-        params.state
-      );
+      // Step 1: Exchange code for tokens using PKCE
+      const tokens = await this.provider.exchangeCodeForTokenLegacy({
+        code: params.code,
+        state: params.state,
+        codeVerifier: params.codeVerifier,
+      });
 
       // Validate token expiration
       validateTokenExpiration(tokens.expiresAt, 'TikTok token exchange');
@@ -126,8 +134,18 @@ export class TikTokOAuthService {
         expiresAt: tokens.expiresAt,
       });
 
-      // Step 2: Get TikTok user profile
+      // Step 2: Get TikTok user profile and creator info
       const profile = await this.provider.getUserProfile(tokens.accessToken);
+      
+      // Get creator info for enhanced metadata
+      let creatorInfo;
+      try {
+        creatorInfo = await this.provider.getCreatorInfo(tokens.accessToken);
+      } catch (error) {
+        logger.warn('Failed to fetch creator info, continuing without it', {
+          error: (error as Error).message,
+        });
+      }
 
       logger.info('TikTok profile fetched', {
         userId: profile.id,
@@ -161,16 +179,30 @@ export class TikTokOAuthService {
         accessToken: tokens.accessToken, // Encrypted by pre-save hook
         refreshToken: tokens.refreshToken, // Encrypted by pre-save hook
         tokenExpiresAt: tokens.expiresAt,
-        scopes: ['user.info.basic', 'video.upload', 'video.publish'],
+        scopes: ['user.info.basic', 'user.info.profile', 'user.info.stats', 'video.upload', 'video.publish', 'creator.info.basic'],
         status: AccountStatus.ACTIVE,
         connectionVersion: 'v2',
         connectionMetadata,
         metadata: {
-          username: profile.username,
+          username: creatorInfo?.creator_username || profile.username,
           displayName: profile.displayName,
           profileUrl: profile.profileUrl,
           avatarUrl: profile.avatarUrl,
           unionId: profile.metadata?.unionId,
+          bio: profile.metadata?.bio,
+          isVerified: profile.metadata?.isVerified,
+          followerCount: profile.metadata?.followerCount,
+          followingCount: profile.metadata?.followingCount,
+          likesCount: profile.metadata?.likesCount,
+          videoCount: profile.metadata?.videoCount,
+          // Creator-specific metadata
+          creatorUsername: creatorInfo?.creator_username,
+          creatorNickname: creatorInfo?.creator_nickname,
+          privacyLevelOptions: creatorInfo?.privacy_level_options,
+          maxVideoDurationSec: creatorInfo?.max_video_post_duration_sec,
+          defaultCommentDisabled: creatorInfo?.comment_disabled,
+          defaultDuetDisabled: creatorInfo?.duet_disabled,
+          defaultStitchDisabled: creatorInfo?.stitch_disabled,
         },
         lastSyncAt: new Date(),
       });

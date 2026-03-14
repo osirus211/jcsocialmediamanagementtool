@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { socialService, SocialAccount } from '../../services/social.service';
-import { Twitter, Linkedin, Facebook, Instagram, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Twitter, Linkedin, Facebook, Instagram, Music, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { InstagramConnectModal } from '../../components/social/InstagramConnectModal';
 import { LinkedInAccountCard } from '../../components/accounts/LinkedInAccountCard';
 import { logger } from '../../lib/logger';
@@ -34,6 +34,12 @@ const PLATFORM_CONFIG = {
     icon: Instagram,
     color: 'bg-gradient-to-r from-purple-500 to-pink-500',
     hoverColor: 'hover:from-purple-600 hover:to-pink-600',
+  },
+  tiktok: {
+    name: 'TikTok',
+    icon: Music,
+    color: 'bg-black',
+    hoverColor: 'hover:bg-gray-800',
   },
 };
 

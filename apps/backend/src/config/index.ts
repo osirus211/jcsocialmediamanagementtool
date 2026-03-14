@@ -70,6 +70,7 @@ const envSchema = z.object({
   // TikTok
   TIKTOK_CLIENT_KEY: z.string().optional(),
   TIKTOK_CLIENT_SECRET: z.string().optional(),
+  TIKTOK_CALLBACK_URL: z.string().url().optional(),
   
   YOUTUBE_CLIENT_ID: z.string().optional(),
   YOUTUBE_CLIENT_SECRET: z.string().optional(),
@@ -405,6 +406,7 @@ export const config = {
     tiktok: {
       clientKey: env.TIKTOK_CLIENT_KEY,
       clientSecret: env.TIKTOK_CLIENT_SECRET,
+      callbackUrl: env.TIKTOK_CALLBACK_URL,
     },
     youtube: {
       clientId: env.YOUTUBE_CLIENT_ID,

@@ -62,6 +62,10 @@ router.get('/platforms', oauthController.getPlatforms.bind(oauthController));
 router.get('/instagram/authorize', authorizeRateLimit, oauthController.authorize.bind(oauthController));
 router.get('/instagram/callback', callbackRateLimit, oauthController.callback.bind(oauthController));
 
+// TikTok OAuth routes
+router.get('/tiktok/authorize', authorizeRateLimit, oauthController.authorize.bind(oauthController));
+router.get('/tiktok/callback', callbackRateLimit, oauthController.callback.bind(oauthController));
+
 // Instagram-specific endpoints
 router.get('/instagram/connect-options', instagramConnectOptionsRateLimit, oauthController.getInstagramConnectOptions.bind(oauthController));
 router.post('/instagram/connect', instagramConnectRateLimit, oauthController.connectInstagram.bind(oauthController));
