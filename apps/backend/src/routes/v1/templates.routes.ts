@@ -20,12 +20,16 @@ router.use(requireWorkspace);
 // Template CRUD
 router.post('/', validateRequest(createTemplateSchema), postTemplateController.createTemplate.bind(postTemplateController));
 router.get('/', postTemplateController.getTemplates.bind(postTemplateController));
+router.get('/categories', postTemplateController.getCategories.bind(postTemplateController));
+router.get('/tags', postTemplateController.getTags.bind(postTemplateController));
 router.get('/:id', postTemplateController.getTemplate.bind(postTemplateController));
 router.patch('/:id', validateRequest(updateTemplateSchema), postTemplateController.updateTemplate.bind(postTemplateController));
 router.delete('/:id', postTemplateController.deleteTemplate.bind(postTemplateController));
 
-// Apply template (increment usage count)
+// Template actions
 router.post('/:id/apply', postTemplateController.applyTemplate.bind(postTemplateController));
+router.post('/:id/duplicate', postTemplateController.duplicateTemplate.bind(postTemplateController));
+router.post('/suggestions', postTemplateController.getAISuggestions.bind(postTemplateController));
 
 export default router;
 

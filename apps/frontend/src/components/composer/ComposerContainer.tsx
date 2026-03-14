@@ -14,7 +14,7 @@ import { PublishModeSelector } from './PublishModeSelector';
 import { ComposerActions } from './ComposerActions';
 import { AlertBanner } from './AlertBanner';
 import { ToastContainer, ToastMessage } from './ToastContainer';
-import { TemplatesPanel } from './TemplatesPanel';
+import { AdvancedTemplatesPanel } from './AdvancedTemplatesPanel';
 import { PostPreviewPanel } from './preview/PostPreviewPanel';
 import { DraftLockBanner } from './DraftLockBanner';
 import { AIAssistantPanel } from './AIAssistantPanel';
@@ -409,7 +409,7 @@ export function ComposerContainer({
     <>
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       
-      {showTemplates && <TemplatesPanel onClose={() => setShowTemplates(false)} />}
+      {showTemplates && <AdvancedTemplatesPanel onClose={() => setShowTemplates(false)} />}
       
       <div className="max-w-[1600px] mx-auto p-4 sm:p-6">
       <div className="flex flex-col lg:flex-row gap-4">
