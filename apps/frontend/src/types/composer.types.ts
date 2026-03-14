@@ -40,6 +40,15 @@ export interface MediaFile {
   errorMessage?: string;
   thumbnailUrl?: string;
   duration?: number; // Video duration in seconds
+  metadata?: {
+    altText?: string;
+    isThread?: boolean;
+    tweets?: string[];
+    isPoll?: boolean;
+    options?: string[];
+    duration?: string;
+    [key: string]: any;
+  };
 }
 
 export interface Media {

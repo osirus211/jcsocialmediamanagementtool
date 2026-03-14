@@ -14,6 +14,144 @@ export function PlatformPreview({ platform, content, media }: PlatformPreviewPro
 
   // Twitter Preview
   if (platform === 'twitter') {
+    // Check if this is a thread
+    if (media.some(m => m.metadata?.isThread)) {
+      const threadTweets = media.find(m => m.metadata?.isThread)?.metadata?.tweets || [content];
+      
+      return (
+        <div className="space-y-3 max-w-xl">
+          {threadTweets.map((tweetContent: string, index: number) => (
+            <div key={index} className="bg-white border rounded-lg p-4 relative">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
+                    <span className="text-gray-600 font-semibold">U</span>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-gray-900">Your Name</span>
+                    <span className="text-gray-500">@username</span>
+                    <span className="text-gray-500">· now</span>
+                  </div>
+                  <p className={`text-gray-900 whitespace-pre-wrap break-words ${isOverLimit ? 'text-red-600' : ''}`}>
+                    {tweetContent || `Tweet ${index + 1} content...`}
+                  </p>
+                  {index === 0 && completedMedia.length > 0 && (
+                    <div className={`mt-3 grid gap-2 ${completedMedia.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      {completedMedia.slice(0, 4).map((item) => (
+                        <img
+                          key={item.id}
+                          src={item.thumbnailUrl || item.url}
+                          alt=""
+                          className="rounded-lg w-full h-48 object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between mt-3 text-gray-500">
+                    <button className="flex items-center gap-2 hover:text-blue-500">
+                      <MessageCircle className="h-5 w-5" />
+                    </button>
+                    <button className="flex items-center gap-2 hover:text-green-500">
+                      <Repeat2 className="h-5 w-5" />
+                    </button>
+                    <button className="flex items-center gap-2 hover:text-red-500">
+                      <Heart className="h-5 w-5" />
+                    </button>
+                    <button className="flex items-center gap-2 hover:text-blue-500">
+                      <Share className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Thread connection line */}
+              {index < threadTweets.length - 1 && (
+                <div className="absolute left-9 -bottom-3 w-0.5 h-6 bg-gray-300"></div>
+              )}
+              
+              {/* Thread indicator */}
+              {index === 0 && threadTweets.length > 1 && (
+                <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  Thread · {threadTweets.length} tweets
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="text-sm text-gray-500 text-center">
+            {content.length} / {characterLimit} characters total
+            {isOverLimit && <span className="text-red-600 ml-2">Over limit!</span>}
+          </div>
+        </div>
+      );
+    }
+
+    // Check if this is a poll
+    if (media.some(m => m.metadata?.isPoll)) {
+      const pollData = media.find(m => m.metadata?.isPoll)?.metadata;
+      const pollOptions = pollData?.options || ['Option 1', 'Option 2'];
+      
+      return (
+        <div className="bg-white border rounded-lg p-4 max-w-xl">
+          <div className="flex gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
+                <span className="text-gray-600 font-semibold">U</span>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-gray-900">Your Name</span>
+                <span className="text-gray-500">@username</span>
+                <span className="text-gray-500">· now</span>
+              </div>
+              <p className={`text-gray-900 whitespace-pre-wrap break-words mb-3 ${isOverLimit ? 'text-red-600' : ''}`}>
+                {content || 'Your poll question will appear here...'}
+              </p>
+              
+              {/* Poll Options */}
+              <div className="space-y-2 mb-3">
+                {pollOptions.map((option: string, index: number) => (
+                  <div key={index} className="border border-gray-300 rounded-full p-3 hover:bg-gray-50 cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 border-2 border-gray-400 rounded-full"></div>
+                      <span className="text-gray-700">{option}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Poll Info */}
+              <div className="text-sm text-gray-500 mb-3">
+                0 votes · {pollData?.duration || '1 day'} left
+              </div>
+              
+              <div className="flex items-center justify-between mt-3 text-gray-500">
+                <button className="flex items-center gap-2 hover:text-blue-500">
+                  <MessageCircle className="h-5 w-5" />
+                </button>
+                <button className="flex items-center gap-2 hover:text-green-500">
+                  <Repeat2 className="h-5 w-5" />
+                </button>
+                <button className="flex items-center gap-2 hover:text-red-500">
+                  <Heart className="h-5 w-5" />
+                </button>
+                <button className="flex items-center gap-2 hover:text-blue-500">
+                  <Share className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mt-2 text-sm text-gray-500">
+                {content.length} / {characterLimit} characters
+                {isOverLimit && <span className="text-red-600 ml-2">Over limit!</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Regular tweet preview
     return (
       <div className="bg-white border rounded-lg p-4 max-w-xl">
         <div className="flex gap-3">
@@ -34,12 +172,19 @@ export function PlatformPreview({ platform, content, media }: PlatformPreviewPro
             {completedMedia.length > 0 && (
               <div className={`mt-3 grid gap-2 ${completedMedia.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 {completedMedia.slice(0, 4).map((item) => (
-                  <img
-                    key={item.id}
-                    src={item.thumbnailUrl || item.url}
-                    alt=""
-                    className="rounded-lg w-full h-48 object-cover"
-                  />
+                  <div key={item.id} className="relative">
+                    <img
+                      src={item.thumbnailUrl || item.url}
+                      alt=""
+                      className="rounded-lg w-full h-48 object-cover"
+                    />
+                    {/* Alt text indicator */}
+                    {item.metadata?.altText && (
+                      <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+                        ALT
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
