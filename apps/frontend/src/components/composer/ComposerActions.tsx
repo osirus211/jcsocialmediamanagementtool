@@ -1,7 +1,8 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { PublishMode } from '@/types/composer.types';
-import { Save, Send, X, Loader2, FileText, Link } from 'lucide-react';
+import { Save, Send, X, Loader2, FileText, Link, Calendar, List } from 'lucide-react';
 import { AIToggleButton } from './AIToggleButton';
+import { BulkComposer, BulkPost } from './BulkComposer';
 
 interface ComposerActionsProps {
   onSave: () => void;
@@ -9,6 +10,7 @@ interface ComposerActionsProps {
   onCancel: () => void;
   onTemplates?: () => void;
   onToggleAI?: () => void;
+  onBulkComposer?: () => void;
   publishMode: PublishMode;
   isLoading: boolean;
   isSaving: boolean;
@@ -26,6 +28,7 @@ const ComposerActions = memo(function ComposerActions({
   onCancel,
   onTemplates,
   onToggleAI,
+  onBulkComposer,
   publishMode,
   isLoading,
   isSaving,
@@ -36,6 +39,8 @@ const ComposerActions = memo(function ComposerActions({
   urlCount = 0,
   showAIPanel = false,
 }: ComposerActionsProps) {
+  const [showBulkComposer, setShowBulkComposer] = useState(false);
+  
   const handleCancel = useCallback(() => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm(
@@ -45,6 +50,17 @@ const ComposerActions = memo(function ComposerActions({
     }
     onCancel();
   }, [hasUnsavedChanges, onCancel]);
+
+  const handleBulkSchedule = useCallback(async (posts: BulkPost[]) => {
+    // In real app, this would call the bulk scheduling API
+    console.log('Scheduling bulk posts:', posts);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Show success message
+    alert(`Successfully scheduled ${posts.length} posts!`);
+  }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent, action: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -76,6 +92,7 @@ const ComposerActions = memo(function ComposerActions({
   }, [publishButtonText, canPublish, hasUnsavedChanges]);
 
   return (
+    <>
     <div 
       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-4 border-t bg-white sticky bottom-0 z-10"
       role="toolbar"
@@ -135,6 +152,17 @@ const ComposerActions = memo(function ComposerActions({
             disabled={isLoading || isSaving}
           />
         )}
+
+        <button
+          type="button"
+          onClick={() => setShowBulkComposer(true)}
+          disabled={isLoading || isSaving}
+          className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+          aria-label="Open bulk composer"
+        >
+          <List className="h-4 w-4" aria-hidden="true" />
+          <span>Bulk</span>
+        </button>
         
         <button
           type="button"
@@ -179,6 +207,14 @@ const ComposerActions = memo(function ComposerActions({
         </button>
       </div>
     </div>
+
+    {/* Bulk Composer Modal */}
+    <BulkComposer
+      isOpen={showBulkComposer}
+      onClose={() => setShowBulkComposer(false)}
+      onScheduleAll={handleBulkSchedule}
+    />
+    </>
   );
 });
 

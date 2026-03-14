@@ -52,6 +52,10 @@ interface ComposerState {
   categoryId?: string;
   campaignId?: string;
   tags: string[];
+  
+  // First comment (Instagram/Facebook)
+  firstComment?: string;
+  enableFirstComment?: boolean;
 }
 
 /**
@@ -73,6 +77,10 @@ interface ComposerActions {
   addTag: (tag: string) => void;
   removeTag: (tag: string) => void;
   clearTags: () => void;
+  
+  // First comment
+  setFirstComment: (comment: string) => void;
+  setEnableFirstComment: (enabled: boolean) => void;
   
   // Media management
   addMedia: (files: File[]) => Promise<void>;
@@ -132,6 +140,8 @@ const initialState: ComposerState = {
   categoryId: undefined,
   campaignId: undefined,
   tags: [],
+  firstComment: '',
+  enableFirstComment: false,
 };
 
 /**
@@ -242,6 +252,15 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
 
   clearTags: () => {
     set({ tags: [], hasUnsavedChanges: true });
+  },
+
+  // First comment methods
+  setFirstComment: (comment) => {
+    set({ firstComment: comment, hasUnsavedChanges: true });
+  },
+
+  setEnableFirstComment: (enabled) => {
+    set({ enableFirstComment: enabled, hasUnsavedChanges: true });
   },
 
   // ============================================

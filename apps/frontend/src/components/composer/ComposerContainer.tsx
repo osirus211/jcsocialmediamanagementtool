@@ -21,6 +21,7 @@ import CategoryPicker from '../categories/CategoryPicker';
 import CampaignPicker from '../campaigns/CampaignPicker';
 import CategoryBadge from '../categories/CategoryBadge';
 import { categoriesService } from '@/services/categories.service';
+import { FirstCommentSection } from './FirstCommentSection';
 import { X } from 'lucide-react';
 
 interface ComposerContainerProps {
@@ -585,6 +586,9 @@ export function ComposerContainer({
               />
             </section>
 
+            {/* First Comment */}
+            <FirstCommentSection selectedPlatforms={selectedPlatforms} />
+
             {/* Publish Mode */}
             <section aria-labelledby="publish-mode-label">
               <h2 id="publish-mode-label" className="sr-only">Publishing options</h2>
@@ -598,6 +602,7 @@ export function ComposerContainer({
                 availableSlots={availableSlots}
                 onFetchSlots={fetchQueueSlots}
                 isLoadingSlots={isLoadingSlots}
+                selectedPlatforms={selectedPlatforms}
               />
             </section>
 

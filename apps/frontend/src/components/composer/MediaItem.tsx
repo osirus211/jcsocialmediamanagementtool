@@ -1,8 +1,10 @@
 import { MediaFile } from '@/types/composer.types';
-import { X, RefreshCw, AlertCircle, Scissors, Image } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, Scissors, Image, Crop, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { VideoTrimmer } from '../media/VideoTrimmer';
 import { VideoThumbnailSelector } from '../media/VideoThumbnailSelector';
+import { MediaCropModal } from './MediaCropModal';
+import { AltTextModal } from './AltTextModal';
 
 interface MediaItemProps {
   media: MediaFile;
@@ -23,6 +25,8 @@ export function MediaItem({
 }: MediaItemProps) {
   const [showTrimmer, setShowTrimmer] = useState(false);
   const [showThumbnailSelector, setShowThumbnailSelector] = useState(false);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [showAltTextModal, setShowAltTextModal] = useState(false);
   
   const isUploading = media.uploadStatus === 'uploading';
   const isError = media.uploadStatus === 'error';
@@ -36,6 +40,36 @@ export function MediaItem({
   };
 
   const handleThumbnailGenerated = (updatedMedia: MediaFile) => {
+    if (onMediaUpdate) {
+      onMediaUpdate(updatedMedia);
+    }
+  };
+
+  const handleImageCropped = (croppedImages: Record<string, string>) => {
+    // Store cropped versions in metadata
+    const updatedMedia: MediaFile = {
+      ...media,
+      metadata: {
+        ...media.metadata,
+        croppedVersions: croppedImages,
+      },
+    };
+    
+    if (onMediaUpdate) {
+      onMediaUpdate(updatedMedia);
+    }
+  };
+
+  const handleAltTextSaved = (altTexts: Record<string, string>) => {
+    const updatedMedia: MediaFile = {
+      ...media,
+      metadata: {
+        ...media.metadata,
+        platformAltTexts: altTexts,
+        altText: Object.values(altTexts)[0] || '', // Use first alt text as global fallback
+      },
+    };
+    
     if (onMediaUpdate) {
       onMediaUpdate(updatedMedia);
     }
@@ -110,6 +144,26 @@ export function MediaItem({
         <p className="text-white text-xs truncate">{media.filename}</p>
       </div>
 
+      {/* Image Controls */}
+      {media.type === 'image' && isCompleted && (
+        <div className="absolute bottom-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => setShowCropModal(true)}
+            className="p-1.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition-colors"
+            title="Crop for platforms"
+          >
+            <Crop className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => setShowAltTextModal(true)}
+            className="p-1.5 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
+            title="Add alt text"
+          >
+            <Eye className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
       {/* Video Controls */}
       {isVideo && isCompleted && (
         <div className="absolute bottom-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -146,6 +200,28 @@ export function MediaItem({
           media={media}
           onThumbnailGenerated={handleThumbnailGenerated}
           onClose={() => setShowThumbnailSelector(false)}
+        />
+      )}
+
+      {/* Image Crop Modal */}
+      {showCropModal && media.type === 'image' && (
+        <MediaCropModal
+          isOpen={showCropModal}
+          imageUrl={media.url}
+          selectedPlatforms={selectedPlatforms as any[]}
+          onCrop={handleImageCropped}
+          onClose={() => setShowCropModal(false)}
+        />
+      )}
+
+      {/* Alt Text Modal */}
+      {showAltTextModal && media.type === 'image' && (
+        <AltTextModal
+          isOpen={showAltTextModal}
+          media={media}
+          selectedPlatforms={selectedPlatforms as any[]}
+          onSave={handleAltTextSaved}
+          onClose={() => setShowAltTextModal(false)}
         />
       )}
     </div>

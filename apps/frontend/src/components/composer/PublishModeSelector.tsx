@@ -1,6 +1,7 @@
 import { PublishMode, QueueSlot } from '@/types/composer.types';
 import { QueueSlotSelector } from './QueueSlotSelector';
-import { Clock, Send, List } from 'lucide-react';
+import { OptimalTimeSuggestions } from './OptimalTimeSuggestions';
+import { Clock, Send, List, TrendingUp } from 'lucide-react';
 
 interface PublishModeSelectorProps {
   mode: PublishMode;
@@ -12,6 +13,7 @@ interface PublishModeSelectorProps {
   availableSlots: QueueSlot[];
   onFetchSlots: () => void;
   isLoadingSlots?: boolean;
+  selectedPlatforms?: string[];
 }
 
 export function PublishModeSelector({
@@ -24,6 +26,7 @@ export function PublishModeSelector({
   availableSlots,
   onFetchSlots,
   isLoadingSlots = false,
+  selectedPlatforms = [],
 }: PublishModeSelectorProps) {
   const handleModeChange = (newMode: PublishMode) => {
     onChange(newMode);
@@ -178,18 +181,27 @@ export function PublishModeSelector({
 
       {/* Schedule Date Picker */}
       {mode === PublishMode.SCHEDULE && (
-        <div className="pl-4 sm:pl-8">
-          <label htmlFor="schedule-datetime" className="block text-sm font-medium text-gray-700 mb-2">
-            Schedule Date & Time
-          </label>
-          <input
-            id="schedule-datetime"
-            type="datetime-local"
-            value={formatDateForInput(scheduledDate)}
-            onChange={(e) => handleDateChange(e.target.value)}
-            min={new Date().toISOString().slice(0, 16)}
-            aria-label="Select date and time for scheduled post"
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        <div className="pl-4 sm:pl-8 space-y-4">
+          <div>
+            <label htmlFor="schedule-datetime" className="block text-sm font-medium text-gray-700 mb-2">
+              Schedule Date & Time
+            </label>
+            <input
+              id="schedule-datetime"
+              type="datetime-local"
+              value={formatDateForInput(scheduledDate)}
+              onChange={(e) => handleDateChange(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              aria-label="Select date and time for scheduled post"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          
+          {/* Optimal Time Suggestions */}
+          <OptimalTimeSuggestions
+            selectedPlatforms={selectedPlatforms as any[]}
+            onTimeSelect={onScheduledDateChange}
+            currentScheduledDate={scheduledDate}
           />
         </div>
       )}
