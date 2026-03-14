@@ -66,7 +66,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
           
           return fullName.includes(query) || firstName.includes(query) || lastName.includes(query);
         })
-        .slice(0, 5)
+        .slice(0, 8) // Show more suggestions
         .map(member => {
           const user = member.userId as any;
           return {
@@ -79,7 +79,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
 
       setSuggestions(filtered);
       setSelectedIndex(0);
-    }, 300);
+    }, 200); // Faster response
 
     return () => clearTimeout(timeoutId);
   }, [mentionQuery, members]);
@@ -200,7 +200,7 @@ export const MentionInput: React.FC<MentionInputProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"
+          className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
         >
           {suggestions.map((suggestion, index) => (
             <div
@@ -210,23 +210,30 @@ export const MentionInput: React.FC<MentionInputProps> = ({
                 index === selectedIndex ? 'bg-blue-50 border-l-2 border-blue-500' : ''
               }`}
             >
-              <div className="flex-shrink-0 w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center mr-2">
+              <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
                 {suggestion.avatar ? (
                   <img
                     src={suggestion.avatar}
                     alt={suggestion.name}
-                    className="w-6 h-6 rounded-full"
+                    className="w-8 h-8 rounded-full"
                   />
                 ) : (
-                  <span className="text-xs font-medium text-gray-600">
+                  <span className="text-sm font-medium text-gray-600">
                     {suggestion.name.charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900">{suggestion.name}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900 truncate">{suggestion.name}</div>
                 <div className="text-xs text-gray-500">@{suggestion.username}</div>
               </div>
+              {index === selectedIndex && (
+                <div className="text-blue-500">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
             </div>
           ))}
         </div>

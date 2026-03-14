@@ -1,41 +1,63 @@
-/**
- * Mentions Routes
- * Social media mention retrieval endpoints
- */
-
 import { Router } from 'express';
-import { MentionController } from '../../controllers/MentionController';
+import { z } from 'zod';
+import { PostCommentService } from '../../services/PostCommentService';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
+import { logger } from '../../utils/logger';
 
 const router = Router();
 
-// Apply auth and workspace middleware to all routes
-router.use(requireAuth);
-router.use(requireWorkspace);
+// Validation schemas
+const getMentionsSchema = z.object({
+  query: z.object({
+    limit: z.string().optional().transform(val => val ? parseInt(val) : 50),
+    offset: z.string().optional().transform(val => val ? parseInt(val) : 0),
+  }),
+});
 
 /**
- * @route   GET /api/v1/mentions/stats
- * @desc    Get mention statistics
- * @access  Private (requires auth + workspace)
- * @query   keyword?, platform?, startDate?, endDate?
+ * GET /mentions
+ * Get all mentions for the current user in the workspace
  */
-router.get('/stats', MentionController.getMentionStats);
+router.get('/', requireAuth, validateRequest(getMentionsSchema), async (req, res): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    const workspaceId = req.workspace?.workspaceId?.toString();
+    const { limit, offset } = req.query as any;
 
-/**
- * @route   GET /api/v1/mentions/:keyword
- * @desc    Get mentions for specific keyword
- * @access  Private (requires auth + workspace)
- * @query   platform?, startDate?, endDate?, limit?
- */
-router.get('/:keyword', MentionController.getMentionsByKeyword);
+    if (!workspaceId || !userId) {
+      res.status(400).json({
+        success: false,
+        error: 'BAD_REQUEST',
+        message: 'Workspace context and authentication required',
+      });
+      return;
+    }
 
-/**
- * @route   GET /api/v1/mentions
- * @desc    Get mentions with pagination
- * @access  Private (requires auth + workspace)
- * @query   keyword?, platform?, startDate?, endDate?, page?, limit?, sortBy?, sortOrder?
- */
-router.get('/', MentionController.getMentions);
+    const mentions = await PostCommentService.getMentions(userId, workspaceId, limit, offset);
+
+    res.json({
+      success: true,
+      data: mentions,
+      pagination: {
+        limit,
+        offset,
+        hasMore: mentions.length === limit,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error getting mentions', {
+      userId: req.user?.userId,
+      workspaceId: req.workspace?.workspaceId,
+      error: error.message,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Failed to get mentions',
+    });
+  }
+});
 
 export default router;

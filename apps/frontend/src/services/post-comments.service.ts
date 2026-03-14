@@ -1,5 +1,18 @@
 import { apiClient } from '../lib/api-client';
 
+export interface Reaction {
+  userId: string;
+  emoji: string;
+  createdAt: string;
+}
+
+export interface Attachment {
+  url: string;
+  type: 'image' | 'file';
+  name?: string;
+  size?: number;
+}
+
 export interface PostComment {
   _id: string;
   postId: string;
@@ -10,6 +23,8 @@ export interface PostComment {
     lastName: string;
     avatar?: string;
   };
+  authorName: string;
+  authorAvatar?: string;
   content: string;
   mentions: string[];
   parentId?: string;
@@ -17,6 +32,8 @@ export interface PostComment {
   resolvedBy?: string;
   resolvedAt?: string;
   editedAt?: string;
+  reactions: Reaction[];
+  attachments: Attachment[];
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +95,37 @@ class PostCommentsService {
   async unresolveComment(postId: string, commentId: string): Promise<PostComment> {
     const response = await apiClient.delete(`/posts/${postId}/comments/${commentId}/resolve`);
     return response.data;
+  }
+
+  /**
+   * Add reaction to a comment
+   */
+  async addReaction(postId: string, commentId: string, emoji: string): Promise<PostComment> {
+    const response = await apiClient.post(`/posts/${postId}/comments/${commentId}/reactions`, { emoji });
+    return response.data;
+  }
+
+  /**
+   * Remove reaction from a comment
+   */
+  async removeReaction(postId: string, commentId: string, emoji: string): Promise<PostComment> {
+    const response = await apiClient.delete(`/posts/${postId}/comments/${commentId}/reactions/${emoji}`);
+    return response.data;
+  }
+
+  /**
+   * Get all mentions for the current user
+   */
+  async getMentions(limit = 50, offset = 0): Promise<{
+    data: PostComment[];
+    pagination: {
+      limit: number;
+      offset: number;
+      hasMore: boolean;
+    };
+  }> {
+    const response = await apiClient.get(`/mentions?limit=${limit}&offset=${offset}`);
+    return response;
   }
 }
 

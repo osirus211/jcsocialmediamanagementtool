@@ -12,6 +12,8 @@ interface CommentItemProps {
   onResolve: (commentId: string) => Promise<void>;
   onUnresolve: (commentId: string) => Promise<void>;
   onReply: (parentId: string, content: string) => Promise<void>;
+  onAddReaction?: (commentId: string, emoji: string) => Promise<void>;
+  onRemoveReaction?: (commentId: string, emoji: string) => Promise<void>;
   isNested?: boolean;
 }
 
@@ -22,6 +24,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   onResolve,
   onUnresolve,
   onReply,
+  onAddReaction,
+  onRemoveReaction,
   isNested = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -29,6 +33,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   const [editContent, setEditContent] = useState(comment.content);
   const [replyContent, setReplyContent] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
 
   const { user } = useAuthStore();
   const { currentWorkspace } = useWorkspaceStore();
@@ -36,6 +41,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   const isAuthor = user?._id === comment.authorId._id;
   const isAdmin = currentWorkspace?.userRole === WorkspaceRole.ADMIN || currentWorkspace?.userRole === WorkspaceRole.OWNER;
   const canDelete = isAuthor || isAdmin;
+
+  const availableEmojis = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -122,6 +129,41 @@ export const CommentItem: React.FC<CommentItemProps> = ({
     }
   };
 
+  const handleReaction = async (emoji: string) => {
+    if (!user || !onAddReaction || !onRemoveReaction) return;
+
+    const existingReaction = comment.reactions.find(
+      r => r.userId === user._id && r.emoji === emoji
+    );
+
+    try {
+      if (existingReaction) {
+        await onRemoveReaction(comment._id, emoji);
+      } else {
+        await onAddReaction(comment._id, emoji);
+      }
+      setShowReactionPicker(false);
+    } catch (error) {
+      console.error('Failed to toggle reaction:', error);
+    }
+  };
+
+  const getReactionCounts = () => {
+    const counts: Record<string, { count: number; userReacted: boolean }> = {};
+    
+    comment.reactions.forEach(reaction => {
+      if (!counts[reaction.emoji]) {
+        counts[reaction.emoji] = { count: 0, userReacted: false };
+      }
+      counts[reaction.emoji].count++;
+      if (reaction.userId === user?._id) {
+        counts[reaction.emoji].userReacted = true;
+      }
+    });
+
+    return counts;
+  };
+
   return (
     <div className={`${isNested ? 'ml-8 border-l-2 border-gray-100 pl-4' : ''} ${comment.isDeleted ? 'opacity-50' : ''}`}>
       <div className={`bg-white rounded-lg p-4 ${comment.isResolved ? 'bg-green-50 border border-green-200' : 'border border-gray-200'}`}>
@@ -204,43 +246,91 @@ export const CommentItem: React.FC<CommentItemProps> = ({
 
         {/* Actions */}
         {!comment.isDeleted && (
-          <div className="flex items-center space-x-4 text-sm">
-            <button
-              onClick={handleResolve}
-              disabled={loading}
-              className={`hover:underline ${comment.isResolved ? 'text-green-600' : 'text-gray-500'}`}
-            >
-              {comment.isResolved ? 'Unresolve' : 'Resolve'}
-            </button>
-            
-            {!isNested && (
+          <>
+            {/* Reactions */}
+            <div className="flex items-center space-x-2 mb-3">
+              {Object.entries(getReactionCounts()).map(([emoji, { count, userReacted }]) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleReaction(emoji)}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm transition-colors ${
+                    userReacted 
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  <span className="text-xs">{count}</span>
+                </button>
+              ))}
+              
+              {/* Reaction picker */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowReactionPicker(!showReactionPicker)}
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-gray-700"
+                  title="Add reaction"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </button>
+                
+                {showReactionPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 flex space-x-1 z-10">
+                    {availableEmojis.map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => handleReaction(emoji)}
+                        className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center text-lg"
+                        title={`React with ${emoji}`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4 text-sm">
               <button
-                onClick={() => setIsReplying(!isReplying)}
-                className="text-gray-500 hover:underline"
-              >
-                Reply
-              </button>
-            )}
-            
-            {isAuthor && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="text-gray-500 hover:underline"
-              >
-                Edit
-              </button>
-            )}
-            
-            {canDelete && (
-              <button
-                onClick={handleDelete}
+                onClick={handleResolve}
                 disabled={loading}
-                className="text-red-500 hover:underline"
+                className={`hover:underline ${comment.isResolved ? 'text-green-600' : 'text-gray-500'}`}
               >
-                Delete
+                {comment.isResolved ? 'Unresolve' : 'Resolve'}
               </button>
-            )}
-          </div>
+              
+              {!isNested && (
+                <button
+                  onClick={() => setIsReplying(!isReplying)}
+                  className="text-gray-500 hover:underline"
+                >
+                  Reply
+                </button>
+              )}
+              
+              {isAuthor && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="text-gray-500 hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+              
+              {canDelete && (
+                <button
+                  onClick={handleDelete}
+                  disabled={loading}
+                  className="text-red-500 hover:underline"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         {/* Reply input */}
@@ -287,6 +377,8 @@ export const CommentItem: React.FC<CommentItemProps> = ({
               onResolve={onResolve}
               onUnresolve={onUnresolve}
               onReply={onReply}
+              onAddReaction={onAddReaction}
+              onRemoveReaction={onRemoveReaction}
               isNested={true}
             />
           ))}

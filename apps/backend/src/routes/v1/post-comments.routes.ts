@@ -308,4 +308,109 @@ router.delete('/:postId/comments/:commentId/resolve', requireAuth, async (req, r
   }
 });
 
+/**
+ * POST /posts/:postId/comments/:commentId/reactions
+ * Add reaction to a comment
+ */
+router.post('/:postId/comments/:commentId/reactions', requireAuth, async (req, res): Promise<void> => {
+  try {
+    const { commentId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Authentication required',
+      });
+      return;
+    }
+
+    if (!emoji || !['👍', '❤️', '😂', '😮', '😢', '😡'].includes(emoji)) {
+      res.status(400).json({
+        success: false,
+        error: 'BAD_REQUEST',
+        message: 'Valid emoji required',
+      });
+      return;
+    }
+
+    const comment = await PostCommentService.addReaction(commentId, userId, emoji);
+
+    res.json({
+      success: true,
+      data: comment,
+    });
+  } catch (error: any) {
+    logger.error('Error adding reaction', {
+      commentId: req.params.commentId,
+      error: error.message,
+    });
+
+    if (error.message === 'Comment not found') {
+      res.status(404).json({
+        success: false,
+        error: 'NOT_FOUND',
+        message: error.message,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Failed to add reaction',
+    });
+  }
+});
+
+/**
+ * DELETE /posts/:postId/comments/:commentId/reactions/:emoji
+ * Remove reaction from a comment
+ */
+router.delete('/:postId/comments/:commentId/reactions/:emoji', requireAuth, async (req, res): Promise<void> => {
+  try {
+    const { commentId, emoji } = req.params;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Authentication required',
+      });
+      return;
+    }
+
+    const comment = await PostCommentService.removeReaction(commentId, userId, emoji);
+
+    res.json({
+      success: true,
+      data: comment,
+    });
+  } catch (error: any) {
+    logger.error('Error removing reaction', {
+      commentId: req.params.commentId,
+      emoji: req.params.emoji,
+      error: error.message,
+    });
+
+    if (error.message === 'Comment not found') {
+      res.status(404).json({
+        success: false,
+        error: 'NOT_FOUND',
+        message: error.message,
+      });
+      return;
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'INTERNAL_ERROR',
+      message: 'Failed to remove reaction',
+    });
+  }
+});
+
 export default router;

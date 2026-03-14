@@ -110,6 +110,26 @@ export const CommentThread: React.FC<CommentThreadProps> = ({ postId, isVisible 
     }
   };
 
+  const handleAddReaction = async (commentId: string, emoji: string) => {
+    try {
+      await postCommentsService.addReaction(postId, commentId, emoji);
+      await loadComments();
+    } catch (error: any) {
+      toast.error('Failed to add reaction');
+      throw error;
+    }
+  };
+
+  const handleRemoveReaction = async (commentId: string, emoji: string) => {
+    try {
+      await postCommentsService.removeReaction(postId, commentId, emoji);
+      await loadComments();
+    } catch (error: any) {
+      toast.error('Failed to remove reaction');
+      throw error;
+    }
+  };
+
   const handleReply = async (parentId: string, content: string) => {
     try {
       await postCommentsService.addComment(postId, {
@@ -188,6 +208,8 @@ export const CommentThread: React.FC<CommentThreadProps> = ({ postId, isVisible 
                   onResolve={handleResolveComment}
                   onUnresolve={handleUnresolveComment}
                   onReply={handleReply}
+                  onAddReaction={handleAddReaction}
+                  onRemoveReaction={handleRemoveReaction}
                 />
               ))}
             </div>

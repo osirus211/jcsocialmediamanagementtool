@@ -90,6 +90,12 @@ export class PostCommentService {
     parentId?: string
   ): Promise<IPostComment> {
     try {
+      // Get author info
+      const author = await User.findById(authorId).select('firstName lastName avatar');
+      if (!author) {
+        throw new Error('Author not found');
+      }
+
       // Extract mentions from content
       const mentionRegex = /@(\w+)/g;
       const mentionMatches = content.match(mentionRegex) || [];
@@ -125,9 +131,13 @@ export class PostCommentService {
         postId: new Types.ObjectId(postId),
         workspaceId: new Types.ObjectId(workspaceId),
         authorId: new Types.ObjectId(authorId),
+        authorName: `${author.firstName} ${author.lastName}`,
+        authorAvatar: author.avatar,
         content,
         mentions: mentionUserIds,
         parentId: parentId ? new Types.ObjectId(parentId) : undefined,
+        reactions: [],
+        attachments: [],
       });
 
       await comment.save();
@@ -370,6 +380,172 @@ export class PostCommentService {
         error: error.message,
       });
       return 0;
+    }
+  }
+
+  /**
+   * Add reaction to a comment
+   */
+  static async addReaction(
+    commentId: string,
+    userId: string,
+    emoji: string
+  ): Promise<IPostComment> {
+    try {
+      const comment = await PostComment.findOne({
+        _id: new Types.ObjectId(commentId),
+        isDeleted: false,
+      });
+
+      if (!comment) {
+        throw new Error('Comment not found');
+      }
+
+      // Remove existing reaction from this user if any
+      comment.reactions = comment.reactions.filter(
+        reaction => reaction.userId.toString() !== userId
+      );
+
+      // Add new reaction
+      comment.reactions.push({
+        userId: new Types.ObjectId(userId),
+        emoji,
+        createdAt: new Date(),
+      });
+
+      await comment.save();
+      return comment;
+    } catch (error: any) {
+      logger.error('Error adding reaction', {
+        commentId,
+        userId,
+        emoji,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove reaction from a comment
+   */
+  static async removeReaction(
+    commentId: string,
+    userId: string,
+    emoji: string
+  ): Promise<IPostComment> {
+    try {
+      const comment = await PostComment.findOne({
+        _id: new Types.ObjectId(commentId),
+        isDeleted: false,
+      });
+
+      if (!comment) {
+        throw new Error('Comment not found');
+      }
+
+      // Remove the specific reaction
+      comment.reactions = comment.reactions.filter(
+        reaction => !(reaction.userId.toString() === userId && reaction.emoji === emoji)
+      );
+
+      await comment.save();
+      return comment;
+    } catch (error: any) {
+      logger.error('Error removing reaction', {
+        commentId,
+        userId,
+        emoji,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all mentions for a user in a workspace
+   */
+  static async getMentions(
+    userId: string,
+    workspaceId: string,
+    limit = 50,
+    offset = 0
+  ): Promise<PopulatedComment[]> {
+    try {
+      const comments = await PostComment.find({
+        workspaceId: new Types.ObjectId(workspaceId),
+        mentions: new Types.ObjectId(userId),
+        isDeleted: false,
+      })
+      .populate('authorId', 'firstName lastName avatar')
+      .populate('postId', 'title content')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(offset)
+      .lean();
+
+      return comments.map(comment => {
+        const authorId = comment.authorId as any;
+        return {
+          ...comment,
+          authorId: {
+            _id: authorId._id.toString(),
+            firstName: authorId.firstName,
+            lastName: authorId.lastName,
+            avatar: authorId.avatar,
+          },
+        } as unknown as PopulatedComment;
+      });
+    } catch (error: any) {
+      logger.error('Error getting mentions', {
+        userId,
+        workspaceId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Extract mentions from content
+   */
+  static extractMentions(content: string): string[] {
+    const mentionRegex = /@(\w+)/g;
+    const matches = content.match(mentionRegex) || [];
+    return matches.map(match => match.substring(1));
+  }
+
+  /**
+   * Notify mentioned users
+   */
+  static async notifyMentionedUsers(
+    mentions: Types.ObjectId[],
+    commentId: string,
+    authorId: string,
+    workspaceId: string
+  ): Promise<void> {
+    try {
+      for (const mentionedUserId of mentions) {
+        if (mentionedUserId.toString() !== authorId) {
+          await (notificationQueue as any).add('notification', {
+            eventType: SystemEvent.MENTION_IN_COMMENT,
+            workspaceId,
+            userId: mentionedUserId.toString(),
+            payload: {
+              commentId,
+              authorId,
+            },
+          });
+        }
+      }
+    } catch (error: any) {
+      logger.error('Error notifying mentioned users', {
+        mentions,
+        commentId,
+        authorId,
+        workspaceId,
+        error: error.message,
+      });
     }
   }
 }
