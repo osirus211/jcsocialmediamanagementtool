@@ -243,3 +243,60 @@ export const workspaceDeleteRateLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Invitation create rate limiter - 20 invites per hour per user
+ */
+export const invitationCreateRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many invitation attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
+
+/**
+ * Invitation resend rate limiter - 10 resends per hour per user
+ */
+export const invitationResendRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many invitation resend attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
+
+/**
+ * Invitation revoke rate limiter - 50 revokes per hour per user
+ */
+export const invitationRevokeRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many invitation revoke attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});

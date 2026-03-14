@@ -340,6 +340,128 @@ The Team`;
       html,
     });
   }
+
+  /**
+   * Send workspace invitation email
+   */
+  async sendInvitationEmail(data: {
+    to: string;
+    inviterName: string;
+    workspaceName: string;
+    role: string;
+    inviteUrl: string;
+    expiresAt: Date;
+  }): Promise<SendEmailResult> {
+    const expiryDate = data.expiresAt.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const subject = `You're invited to join ${data.workspaceName}`;
+    
+    const body = `You're invited to join ${data.workspaceName}
+
+${data.inviterName} has invited you to join ${data.workspaceName} as a ${data.role}.
+
+Accept your invitation: ${data.inviteUrl}
+
+What you'll get access to:
+✓ Collaborative social media management
+✓ Advanced scheduling and analytics
+✓ Team collaboration tools
+
+⏰ This invitation expires on ${expiryDate}
+
+Questions? Contact ${data.inviterName} for more information.
+
+---
+If the link doesn't work, copy and paste: ${data.inviteUrl}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Workspace Invitation</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+        
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px; background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+          <h1 style="color: #2563eb; margin: 0; font-size: 28px; font-weight: 600;">
+            You're invited to join ${data.workspaceName}
+          </h1>
+        </div>
+        
+        <!-- Invitation Details -->
+        <div style="background: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+          <div style="background: #f8fafc; padding: 25px; border-radius: 12px; margin-bottom: 30px; border-left: 4px solid #2563eb;">
+            <p style="margin: 0 0 15px 0; font-size: 16px;">
+              <strong>${data.inviterName}</strong> has invited you to join <strong>${data.workspaceName}</strong> as a <strong>${data.role}</strong>.
+            </p>
+          </div>
+          
+          <!-- Call to Action -->
+          <div style="text-align: center; margin: 40px 0;">
+            <a href="${data.inviteUrl}" 
+               style="background: #2563eb; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);">
+              Accept Invitation
+            </a>
+          </div>
+          
+          <!-- Features Preview -->
+          <div style="margin: 30px 0;">
+            <h3 style="color: #374151; font-size: 18px; margin-bottom: 20px;">What you'll get access to:</h3>
+            <div style="display: grid; gap: 15px;">
+              <div style="display: flex; align-items: center; padding: 10px 0;">
+                <span style="color: #10b981; font-size: 20px; margin-right: 12px;">✓</span>
+                <span>Collaborative social media management</span>
+              </div>
+              <div style="display: flex; align-items: center; padding: 10px 0;">
+                <span style="color: #10b981; font-size: 20px; margin-right: 12px;">✓</span>
+                <span>Advanced scheduling and analytics</span>
+              </div>
+              <div style="display: flex; align-items: center; padding: 10px 0;">
+                <span style="color: #10b981; font-size: 20px; margin-right: 12px;">✓</span>
+                <span>Team collaboration tools</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Expiry Notice -->
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 25px 0;">
+            <p style="margin: 0; color: #92400e; font-size: 14px;">
+              <strong>⏰ This invitation expires on ${expiryDate}</strong><br>
+              Make sure to accept it before then to join the workspace.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); border-top: 1px solid #e5e7eb; text-align: center;">
+          <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0;">
+            If you have any questions, contact <strong>${data.inviterName}</strong>
+          </p>
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            If the button doesn't work, copy and paste this link:<br>
+            <span style="word-break: break-all;">${data.inviteUrl}</span>
+          </p>
+        </div>
+        
+      </body>
+      </html>
+    `;
+
+    return this.sendEmail({
+      to: data.to,
+      subject,
+      body,
+      html,
+    });
+  }
 }
 
 export const emailService = new EmailService();

@@ -9,6 +9,7 @@ import { PermissionsSummaryBadge } from '@/components/settings/PermissionsSummar
 import { DeleteWorkspaceModal } from '@/components/workspace/DeleteWorkspaceModal';
 import { BulkImportModal } from '@/components/workspace/BulkImportModal';
 import { TransferOwnershipModal } from '@/components/workspace/TransferOwnershipModal';
+import { InviteMemberModal } from '@/components/workspace/InviteMemberModal';
 
 /**
  * Workspace Settings Page
@@ -53,6 +54,7 @@ export const WorkspaceSettingsPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false);
+  const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
 
   const workspace = workspaces.find((w) => w._id === workspaceId) || currentWorkspace;
 
@@ -544,15 +546,26 @@ export const WorkspaceSettingsPage = () => {
                   </p>
                 </div>
                 {isAdmin && (
-                  <button
-                    onClick={() => setShowBulkImportModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    Bulk Import
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowInviteMemberModal(true)}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Invite Members
+                    </button>
+                    <button
+                      onClick={() => setShowBulkImportModal(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Bulk Import
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -689,6 +702,12 @@ export const WorkspaceSettingsPage = () => {
           onClose={() => setShowTransferOwnershipModal(false)}
         />
       )}
+
+      {/* Invite Member Modal */}
+      <InviteMemberModal
+        isOpen={showInviteMemberModal}
+        onClose={() => setShowInviteMemberModal(false)}
+      />
     </div>
   );
 };

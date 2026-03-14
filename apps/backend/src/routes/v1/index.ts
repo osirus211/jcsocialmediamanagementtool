@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import workspaceRoutes from './workspace.routes';
+import invitationRoutes from './invitation.routes';
 import postRoutes from './post.routes';
 import socialRoutes from './social.routes';
 import oauthRoutes from './oauth.routes';
@@ -52,6 +53,7 @@ router.get('/', (_req, res) => {
     endpoints: {
       auth: '/api/v1/auth',
       workspaces: '/api/v1/workspaces',
+      invitations: '/api/v1/invitations',
       posts: '/api/v1/posts',
       templates: '/api/v1/templates',
       queueSlots: '/api/v1/queue-slots',
@@ -98,6 +100,7 @@ router.get('/', (_req, res) => {
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/workspaces', workspaceRoutes);
+router.use('/invitations', invitationRoutes); // Public invitation routes
 router.use('/posts', postsRoutes); // New comprehensive posts API
 router.use('/post', postRoutes); // Legacy post API
 router.use('/templates', templatesRoutes); // Phase-2: Post templates

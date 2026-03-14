@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { WorkspaceController } from '../../controllers/WorkspaceController';
+import { InvitationController } from '../../controllers/InvitationController';
 import { requireAuth } from '../../middleware/auth';
 import {
   requireWorkspace,
@@ -21,6 +22,9 @@ import {
   workspaceUpdateRateLimiter,
   workspaceDeleteRateLimiter,
   uploadRateLimiter,
+  invitationCreateRateLimiter,
+  invitationResendRateLimiter,
+  invitationRevokeRateLimiter,
 } from '../../middleware/rateLimiter';
 
 const router = Router();
@@ -152,6 +156,47 @@ router.post(
   requireAuth,
   requireWorkspace,
   WorkspaceController.leaveWorkspace
+);
+
+// Email invitation routes
+// Create email invitation (admin or owner only)
+router.post(
+  '/:workspaceId/invitations',
+  invitationCreateRateLimiter,
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  checkMemberLimit,
+  InvitationController.createInvitation
+);
+
+// Get pending invitations (admin or owner only)
+router.get(
+  '/:workspaceId/invitations',
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  InvitationController.getPendingInvitations
+);
+
+// Resend invitation (admin or owner only)
+router.post(
+  '/:workspaceId/invitations/:token/resend',
+  invitationResendRateLimiter,
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  InvitationController.resendInvitation
+);
+
+// Revoke invitation (admin or owner only)
+router.delete(
+  '/:workspaceId/invitations/:token',
+  invitationRevokeRateLimiter,
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  InvitationController.revokeInvitation
 );
 
 export default router;

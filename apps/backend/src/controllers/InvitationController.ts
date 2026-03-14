@@ -1,0 +1,383 @@
+/**
+ * Invitation Controller
+ * 
+ * Handles workspace invitation endpoints
+ */
+
+import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
+import { workspaceService } from '../services/WorkspaceService';
+import { WorkspaceInvitation } from '../models/WorkspaceInvitation';
+import { logger } from '../utils/logger';
+import { logAudit } from '../utils/auditLogger';
+
+export class InvitationController {
+  /**
+   * Create invitation
+   * POST /api/v1/workspaces/:workspaceId/invitations
+   */
+  static async createInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const { email, role } = req.body;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!email || !role) {
+        res.status(400).json({ error: 'Email and role are required' });
+        return;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({ error: 'Invalid email format' });
+        return;
+      }
+
+      // Validate role
+      if (!['admin', 'member', 'viewer'].includes(role)) {
+        res.status(400).json({ error: 'Invalid role. Must be admin, member, or viewer' });
+        return;
+      }
+
+      const invitation = await workspaceService.inviteByEmail({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        invitedBy: new mongoose.Types.ObjectId(userId),
+        email,
+        role,
+      });
+
+      // Audit log the invitation creation
+      logAudit({
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        action: 'invitation.created',
+        entityType: 'invitation',
+        entityId: invitation._id.toString(),
+        metadata: {
+          invitedEmail: email,
+          role,
+          expiresAt: invitation.expiresAt,
+        },
+        req,
+      });
+
+      res.status(201).json({
+        message: 'Invitation sent successfully',
+        invitation: {
+          _id: invitation._id,
+          email: invitation.invitedEmail,
+          role: invitation.role,
+          status: invitation.status,
+          expiresAt: invitation.expiresAt,
+          createdAt: invitation.createdAt,
+        },
+      });
+    } catch (error: any) {
+      logger.error('Create invitation error:', error);
+      
+      if (error.message.includes('already has a pending invitation')) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('already a member')) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Get pending invitations
+   * GET /api/v1/workspaces/:workspaceId/invitations
+   */
+  static async getPendingInvitations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.user?.userId;
+      const { page = 1, limit = 50 } = req.query;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const skip = (Number(page) - 1) * Number(limit);
+
+      const invitations = await workspaceService.getPendingInvites({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+        limit: Number(limit),
+        skip,
+      });
+
+      // Format response to include token for frontend actions
+      const formattedInvitations = invitations.map(invitation => ({
+        _id: invitation._id,
+        token: invitation.token,
+        invitedEmail: invitation.invitedEmail,
+        role: invitation.role,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
+        createdAt: invitation.createdAt,
+        inviterName: invitation.inviterName,
+      }));
+
+      res.json({
+        invitations: formattedInvitations,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: invitations.length,
+        },
+      });
+    } catch (error: any) {
+      logger.error('Get pending invitations error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Resend invitation
+   * POST /api/v1/workspaces/:workspaceId/invitations/:token/resend
+   */
+  static async resendInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, token } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      await workspaceService.resendInvite({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        token,
+        userId: new mongoose.Types.ObjectId(userId),
+      });
+
+      // Audit log the invitation resend
+      logAudit({
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        action: 'invitation.resent',
+        entityType: 'invitation',
+        metadata: {
+          token: token.substring(0, 8) + '...', // Only log partial token for security
+        },
+        req,
+      });
+
+      res.json({ message: 'Invitation resent successfully' });
+    } catch (error: any) {
+      logger.error('Resend invitation error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('not found')) {
+        res.status(404).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Revoke invitation
+   * DELETE /api/v1/workspaces/:workspaceId/invitations/:token
+   */
+  static async revokeInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, token } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      await workspaceService.revokeInvite({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        token,
+        userId: new mongoose.Types.ObjectId(userId),
+      });
+
+      // Audit log the invitation revocation
+      logAudit({
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        action: 'invitation.revoked',
+        entityType: 'invitation',
+        metadata: {
+          token: token.substring(0, 8) + '...', // Only log partial token for security
+        },
+        req,
+      });
+
+      res.json({ message: 'Invitation revoked successfully' });
+    } catch (error: any) {
+      logger.error('Revoke invitation error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('not found')) {
+        res.status(404).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Validate invitation token (public endpoint)
+   * GET /api/v1/invitations/:token/validate
+   */
+  static async validateInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+
+      const tokenHash = WorkspaceInvitation.hashToken(token);
+      const invitation = await WorkspaceInvitation.findOne({
+        tokenHash,
+        status: 'pending',
+      });
+
+      if (!invitation) {
+        res.status(404).json({ error: 'Invitation not found or expired' });
+        return;
+      }
+
+      if (!invitation.isValid()) {
+        res.status(410).json({ error: 'Invitation has expired' });
+        return;
+      }
+
+      res.json({
+        invitation: {
+          workspaceName: invitation.workspaceName,
+          inviterName: invitation.inviterName,
+          role: invitation.role,
+          expiresAt: invitation.expiresAt,
+          invitedEmail: invitation.invitedEmail,
+          isValid: true,
+        },
+      });
+    } catch (error: any) {
+      logger.error('Validate invitation error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Accept invitation (public endpoint)
+   * POST /api/v1/invitations/:token/accept
+   */
+  static async acceptInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      const { userId, newUserData } = req.body;
+
+      if (!userId && !newUserData) {
+        res.status(400).json({ error: 'Either userId or newUserData must be provided' });
+        return;
+      }
+
+      if (newUserData) {
+        const { name, email, password } = newUserData;
+        if (!name || !email || !password) {
+          res.status(400).json({ error: 'Name, email, and password are required for new users' });
+          return;
+        }
+
+        if (password.length < 8) {
+          res.status(400).json({ error: 'Password must be at least 8 characters long' });
+          return;
+        }
+      }
+
+      const result = await workspaceService.acceptInvite({
+        token,
+        userId: userId ? new mongoose.Types.ObjectId(userId) : undefined,
+        newUserData,
+      });
+
+      // Audit log the invitation acceptance
+      logAudit({
+        userId: result.member.userId,
+        workspaceId: result.workspace._id,
+        action: 'invitation.accepted',
+        entityType: 'invitation',
+        metadata: {
+          token: token.substring(0, 8) + '...', // Only log partial token for security
+          role: result.member.role,
+          isNewUser: result.isNewUser,
+        },
+        req,
+      });
+
+      res.json({
+        message: 'Invitation accepted successfully',
+        workspace: result.workspace,
+        member: result.member,
+        user: result.isNewUser ? {
+          _id: result.member.userId,
+          name: newUserData?.name,
+          email: newUserData?.email,
+        } : undefined,
+        isNewUser: result.isNewUser,
+      });
+    } catch (error: any) {
+      logger.error('Accept invitation error:', error);
+      
+      if (error.message.includes('Invalid or expired')) {
+        res.status(410).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('already exists')) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('already a member')) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      
+      if (error.message.includes('does not match')) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+}
