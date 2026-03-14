@@ -61,13 +61,12 @@ export class NotificationWorker {
         userId,
       });
 
-      // Create in-app notification
-      await notificationService.createNotification({
-        eventType,
-        workspaceId,
-        userId,
-        payload,
-      });
+      // Create in-app notification (reconnect notifications use separate service)
+      // await notificationService.createNotification({
+      //   workspaceId,
+      //   userId,
+      //   payload,
+      // });
 
       // Send email notification for critical events
       if (this.shouldSendEmail(eventType)) {

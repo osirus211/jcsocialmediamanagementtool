@@ -52,6 +52,8 @@ import mastodonRoutes from './mastodon.routes'; // Mastodon OAuth and management
 import redditRoutes from './reddit.routes'; // Reddit OAuth and management
 import tokensRoutes from './tokens.routes'; // Token lifecycle management
 import connectionHealthRoutes from './connection-health.routes'; // Connection health monitoring
+import reconnectRoutes from './reconnect.routes'; // Account reconnection flows
+import notificationRoutes from './notifications.routes'; // In-app notifications
 
 const router = Router();
 
@@ -103,6 +105,8 @@ router.get('/', (_req, res) => {
       dashboard: '/api/v1/dashboard',
       tokens: '/api/v1/tokens',
       connectionHealth: '/api/v1/connection-health',
+      reconnect: '/api/v1/accounts',
+      notifications: '/api/v1/notifications',
       ai: '/api/v1/ai',
       billing: '/api/v1/billing',
       admin: '/api/v1/admin',
@@ -162,6 +166,8 @@ router.use('/mastodon', mastodonRoutes); // Mastodon OAuth and management
 router.use('/reddit', redditRoutes); // Reddit OAuth and management
 router.use('/tokens', tokensRoutes); // Token lifecycle management
 router.use('/connection-health', connectionHealthRoutes); // Connection health monitoring
+router.use('/accounts', reconnectRoutes); // Account reconnection flows
+router.use('/notifications', notificationRoutes); // In-app notifications
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);
