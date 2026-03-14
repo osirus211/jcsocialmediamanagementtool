@@ -11,7 +11,7 @@ import { logger } from '../utils/logger';
 
 export class FacebookProvider extends BaseProvider {
   protected providerName = 'facebook';
-  private readonly apiVersion = 'v18.0';
+  private readonly apiVersion = 'v21.0';
   private readonly apiBaseUrl = `https://graph.facebook.com/${this.apiVersion}`;
 
   async publishPost(params: PublishPostParams): Promise<PublishResult> {

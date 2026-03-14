@@ -26,7 +26,7 @@ export class FacebookPlatformAdapter extends BasePlatformAdapter {
     });
 
     return {
-      authUrl: `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`,
+      authUrl: `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`,
     };
   }
 

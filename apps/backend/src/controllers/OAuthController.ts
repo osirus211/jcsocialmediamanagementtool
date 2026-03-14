@@ -415,7 +415,7 @@ export class OAuthController {
           state,
         });
 
-        authorizationUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+        authorizationUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
       } else if (platform === 'instagram') {
         // Instagram OAuth (uses Facebook Login)
         const instagramConfig = this.getInstagramConfig();
@@ -439,7 +439,7 @@ export class OAuthController {
           state,
         });
 
-        authorizationUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+        authorizationUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
       } else if (platform === 'youtube') {
         // YouTube OAuth
         const youtubeConfig = this.getYouTubeConfig();
@@ -2997,7 +2997,7 @@ export class OAuthController {
               state: stateData.state,
               response_type: 'code',
             });
-            authUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+            authUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
             break;
           }
 
@@ -3010,7 +3010,7 @@ export class OAuthController {
               state: stateData.state,
               response_type: 'code',
             });
-            authUrl = `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`;
+            authUrl = `https://www.facebook.com/v21.0/dialog/oauth?${params.toString()}`;
             break;
           }
 

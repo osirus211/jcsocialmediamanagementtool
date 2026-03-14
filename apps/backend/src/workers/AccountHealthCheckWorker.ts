@@ -240,7 +240,7 @@ export class AccountHealthCheckWorker {
 
         case SocialPlatform.FACEBOOK:
           // Facebook: Debug token
-          await axios.get('https://graph.facebook.com/me', {
+          await axios.get('https://graph.facebook.com/v21.0/me', {
             params: {
               access_token: accessToken,
               fields: 'id',

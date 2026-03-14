@@ -10,7 +10,7 @@ import { ISocialAccount } from '../../models/SocialAccount';
 import { logger } from '../../utils/logger';
 import axios from 'axios';
 
-const INSTAGRAM_API_BASE = 'https://graph.facebook.com/v18.0';
+const INSTAGRAM_API_BASE = 'https://graph.facebook.com/v21.0';
 
 export class InstagramMediaAdapter implements IMediaAdapter {
   readonly platform = 'instagram';

@@ -52,9 +52,9 @@ export interface InstagramAccount {
 }
 
 export class InstagramBusinessProvider extends OAuthProvider {
-  private readonly authUrl = 'https://www.facebook.com/v19.0/dialog/oauth';
-  private readonly tokenUrl = 'https://graph.facebook.com/v19.0/oauth/access_token';
-  private readonly pagesUrl = 'https://graph.facebook.com/v19.0/me/accounts';
+  private readonly authUrl = 'https://www.facebook.com/v21.0/dialog/oauth';
+  private readonly tokenUrl = 'https://graph.facebook.com/v21.0/oauth/access_token';
+  private readonly pagesUrl = 'https://graph.facebook.com/v21.0/me/accounts';
   private readonly errorHandler = new InstagramErrorHandler();
 
   constructor(clientId: string, clientSecret: string, redirectUri: string) {
@@ -186,7 +186,7 @@ export class InstagramBusinessProvider extends OAuthProvider {
     // For Instagram, we need to get the user's Facebook profile first,
     // then get their Instagram Business accounts via Facebook Pages
     try {
-      const response = await axios.get('https://graph.facebook.com/v19.0/me', {
+      const response = await axios.get('https://graph.facebook.com/v21.0/me', {
         params: {
           fields: 'id,name',
           access_token: accessToken,
@@ -242,7 +242,7 @@ export class InstagramBusinessProvider extends OAuthProvider {
         try {
           // Get Instagram Business Account ID for this page
           const igAccountResponse = await axios.get(
-            `https://graph.facebook.com/v19.0/${page.id}`,
+            `https://graph.facebook.com/v21.0/${page.id}`,
             {
               params: {
                 fields: 'instagram_business_account{id,username,name,profile_picture_url,followers_count,follows_count,media_count,biography,website}',
@@ -300,7 +300,7 @@ export class InstagramBusinessProvider extends OAuthProvider {
   ): Promise<InstagramAccount> {
     try {
       const response = await axios.get(
-        `https://graph.facebook.com/v19.0/${instagramAccountId}`,
+        `https://graph.facebook.com/v21.0/${instagramAccountId}`,
         {
           params: {
             fields: 'id,username,name,profile_picture_url,followers_count,follows_count,media_count,biography,website',
@@ -327,7 +327,7 @@ export class InstagramBusinessProvider extends OAuthProvider {
   async revokeToken(accessToken: string): Promise<void> {
     try {
       // Revoke via Facebook Graph API
-      await axios.delete(`https://graph.facebook.com/v19.0/me/permissions`, {
+      await axios.delete(`https://graph.facebook.com/v21.0/me/permissions`, {
         params: {
           access_token: accessToken,
         },
@@ -383,7 +383,7 @@ export class InstagramBusinessProvider extends OAuthProvider {
    */
   async validatePermissions(accessToken: string): Promise<PermissionValidationResult> {
     try {
-      const response = await axios.get('https://graph.facebook.com/v19.0/me/permissions', {
+      const response = await axios.get('https://graph.facebook.com/v21.0/me/permissions', {
         params: {
           access_token: accessToken,
         },

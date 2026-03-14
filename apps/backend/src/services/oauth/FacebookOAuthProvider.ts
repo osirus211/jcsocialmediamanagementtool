@@ -1,7 +1,7 @@
 /**
  * Facebook OAuth 2.0 Provider - PRODUCTION
  * 
- * Implements OAuth 2.0 for Facebook Graph API v19.0
+ * Implements OAuth 2.0 for Facebook Graph API v21.0
  * 
  * Documentation: https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow
  * 
@@ -15,6 +15,10 @@
  * - pages_show_list: List managed pages
  * - pages_read_engagement: Read page engagement metrics
  * - pages_manage_posts: Publish to pages
+ * - pages_manage_engagement: Manage page engagement (comments, reactions)
+ * - publish_to_groups: Publish to groups (optional)
+ * - instagram_basic: Access linked Instagram accounts
+ * - read_insights: Read page and post insights
  * - public_profile: Read user profile
  * - email: Read user email (optional)
  */
@@ -51,10 +55,10 @@ export interface FacebookPage {
 }
 
 export class FacebookOAuthProvider extends OAuthProvider {
-  private readonly authUrl = 'https://www.facebook.com/v19.0/dialog/oauth';
-  private readonly tokenUrl = 'https://graph.facebook.com/v19.0/oauth/access_token';
-  private readonly userUrl = 'https://graph.facebook.com/v19.0/me';
-  private readonly pagesUrl = 'https://graph.facebook.com/v19.0/me/accounts';
+  private readonly authUrl = 'https://www.facebook.com/v21.0/dialog/oauth';
+  private readonly tokenUrl = 'https://graph.facebook.com/v21.0/oauth/access_token';
+  private readonly userUrl = 'https://graph.facebook.com/v21.0/me';
+  private readonly pagesUrl = 'https://graph.facebook.com/v21.0/me/accounts';
   private readonly errorHandler = new FacebookErrorHandler();
 
   constructor(clientId: string, clientSecret: string, redirectUri: string) {
@@ -62,6 +66,10 @@ export class FacebookOAuthProvider extends OAuthProvider {
       'pages_show_list',
       'pages_read_engagement',
       'pages_manage_posts',
+      'pages_manage_engagement',
+      'publish_to_groups',
+      'instagram_basic',
+      'read_insights',
       'public_profile',
       // Note: 'email' is optional and may not be available for all users
     ];
@@ -276,7 +284,7 @@ export class FacebookOAuthProvider extends OAuthProvider {
    */
   async getPageInfo(pageId: string, pageAccessToken: string): Promise<FacebookPage> {
     try {
-      const response = await axios.get(`https://graph.facebook.com/v19.0/${pageId}`, {
+      const response = await axios.get(`https://graph.facebook.com/v21.0/${pageId}`, {
         params: {
           fields: 'id,name,category,picture',
           access_token: pageAccessToken,
@@ -297,7 +305,7 @@ export class FacebookOAuthProvider extends OAuthProvider {
 
   async revokeToken(accessToken: string): Promise<void> {
     try {
-      await axios.delete(`https://graph.facebook.com/v19.0/me/permissions`, {
+      await axios.delete(`https://graph.facebook.com/v21.0/me/permissions`, {
         params: {
           access_token: accessToken,
         },

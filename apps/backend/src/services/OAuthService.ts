@@ -67,8 +67,8 @@ export class OAuthService {
       clientSecret: config.oauth.facebook.clientSecret || 'mock_facebook_secret',
       redirectUri: config.oauth.facebook.redirectUri || 'http://localhost:3000/auth/facebook/callback',
       scopes: ['pages_manage_posts', 'pages_read_engagement'],
-      authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
-      tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
+      authUrl: 'https://www.facebook.com/v21.0/dialog/oauth',
+      tokenUrl: 'https://graph.facebook.com/v21.0/oauth/access_token',
     },
   };
 

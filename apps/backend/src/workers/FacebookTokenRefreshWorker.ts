@@ -389,7 +389,7 @@ export class FacebookTokenRefreshWorker {
    */
   private async exchangeForLongLivedToken(currentToken: string): Promise<{ accessToken: string; expiresAt: Date }> {
     try {
-      const response = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
+      const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
         params: {
           grant_type: 'fb_exchange_token',
           client_id: config.oauth?.facebook?.appId,
@@ -421,7 +421,7 @@ export class FacebookTokenRefreshWorker {
    */
   private async validateScopes(accessToken: string): Promise<boolean> {
     try {
-      const response = await axios.get('https://graph.facebook.com/v19.0/me/permissions', {
+      const response = await axios.get('https://graph.facebook.com/v21.0/me/permissions', {
         params: {
           access_token: accessToken,
         },
@@ -458,7 +458,7 @@ export class FacebookTokenRefreshWorker {
 
     for (const page of pages) {
       try {
-        const response = await axios.get(`https://graph.facebook.com/v19.0/${page.id}`, {
+        const response = await axios.get(`https://graph.facebook.com/v21.0/${page.id}`, {
           params: {
             fields: 'tasks',
             access_token: userAccessToken,

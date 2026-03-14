@@ -44,6 +44,8 @@ import stockPhotosRoutes from './stock-photos.routes'; // Phase-4: Stock photo l
 import gdprRoutes from './gdpr.routes'; // GDPR compliance
 import { onboardingRoutes } from './onboarding.routes'; // User onboarding
 import instagramRoutes from './instagram.routes'; // Instagram-specific features
+import { facebookRoutes } from '../facebook.routes'; // Facebook-specific features
+import { facebookAnalyticsRoutes } from '../analytics/facebook.analytics.routes'; // Facebook analytics
 
 const router = Router();
 
@@ -118,6 +120,7 @@ router.use('/social', socialRoutes);
 router.use('/oauth', oauthRoutes);
 router.use('/ai', aiRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/analytics/facebook', facebookAnalyticsRoutes); // Facebook analytics
 router.use('/analytics/followers', followersRoutes); // Phase-3: Follower analytics
 router.use('/competitors', competitorsRoutes); // Phase-3: Competitor analytics
 router.use('/listening-rules', listeningRulesRoutes); // Phase-4: Social listening
@@ -138,6 +141,7 @@ router.use('/client-portals', clientPortalRoutes); // Phase-4: Client approval p
 router.use('/categories', categoriesRoutes); // Phase-4: Content categories
 router.use('/campaigns', campaignsRoutes); // Phase-4: Campaign tagging
 router.use('/design-integrations', designIntegrationsRoutes); // Phase-4: Canva & Figma integration
+router.use('/facebook', facebookRoutes); // Facebook-specific features
 router.use('/stock-photos', stockPhotosRoutes); // Phase-4: Stock photo library
 router.use('/gdpr', gdprRoutes); // GDPR compliance
 router.use('/onboarding', onboardingRoutes); // User onboarding

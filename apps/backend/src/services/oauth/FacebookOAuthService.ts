@@ -41,7 +41,16 @@ export interface FacebookConnectResult {
 
 export class FacebookOAuthService {
   private provider: FacebookOAuthProvider;
-  private readonly REQUIRED_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'public_profile'];
+  private readonly REQUIRED_SCOPES = [
+    'pages_show_list', 
+    'pages_read_engagement', 
+    'pages_manage_posts', 
+    'pages_manage_engagement',
+    'publish_to_groups',
+    'instagram_basic',
+    'read_insights',
+    'public_profile'
+  ];
 
   constructor(clientId: string, clientSecret: string, redirectUri: string) {
     this.provider = new FacebookOAuthProvider(clientId, clientSecret, redirectUri);
