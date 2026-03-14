@@ -9,6 +9,7 @@ import { ScheduledPost, PostStatus } from '../models/ScheduledPost';
 import { WorkspaceMember, MemberRole } from '../models/WorkspaceMember';
 import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 import { workspacePermissionService, Permission } from './WorkspacePermissionService';
+import { emailNotificationService } from './EmailNotificationService';
 import { logger } from '../utils/logger';
 
 export interface ApprovalQueueItem {
@@ -244,16 +245,45 @@ export class ApprovalQueueService {
     workspaceId: mongoose.Types.ObjectId,
     postId: mongoose.Types.ObjectId
   ): Promise<void> {
-    // Get all admins and owners
-    const approvers = await WorkspaceMember.find({
-      workspaceId,
-      role: { $in: [MemberRole.OWNER, MemberRole.ADMIN] },
-      isActive: true,
-    }).populate('userId', 'email name');
+    try {
+      // Get all admins and owners
+      const approvers = await WorkspaceMember.find({
+        workspaceId,
+        role: { $in: [MemberRole.OWNER, MemberRole.ADMIN] },
+        isActive: true,
+      }).populate('userId', 'email name');
 
-    // TODO: Send notifications (email, in-app, webhook)
-    // For now, just log
-    logger.info(`Notifying ${approvers.length} approvers for post: ${postId}`);
+      // Get post details
+      const post = await ScheduledPost.findById(postId).populate('createdBy', 'name email');
+      if (!post) {
+        logger.error(`Post not found for notification: ${postId}`);
+        return;
+      }
+
+      // Send email notifications to all approvers
+      for (const approver of approvers) {
+        const approverUser = approver.userId as any;
+        if (approverUser?.email) {
+          await emailNotificationService.sendNotification({
+            eventType: 'APPROVAL_REQUIRED' as any,
+            workspaceId: workspaceId.toString(),
+            userId: approverUser._id.toString(),
+            payload: {
+              postId: postId.toString(),
+              content: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+              platform: post.platform,
+              scheduledAt: post.scheduledAt.toISOString(),
+              submitterName: (post.createdBy as any)?.name || 'Unknown',
+              submitterEmail: (post.createdBy as any)?.email || '',
+            },
+          });
+        }
+      }
+
+      logger.info(`Notified ${approvers.length} approvers for post: ${postId}`);
+    } catch (error) {
+      logger.error('Failed to notify approvers:', error);
+    }
   }
 
   /**
@@ -265,9 +295,36 @@ export class ApprovalQueueService {
     status: 'approved' | 'rejected',
     reason?: string
   ): Promise<void> {
-    // TODO: Send notification to creator
-    // For now, just log
-    logger.info(`Notifying creator ${userId} about post ${postId}: ${status}`);
+    try {
+      // Get post details
+      const post = await ScheduledPost.findById(postId);
+      if (!post) {
+        logger.error(`Post not found for creator notification: ${postId}`);
+        return;
+      }
+
+      // Send email notification to creator
+      const event = status === 'approved' ? 'POST_APPROVED' : 'POST_REJECTED';
+      await emailNotificationService.sendNotification({
+        eventType: event as any,
+        workspaceId: post.workspaceId.toString(),
+        userId: userId.toString(),
+        payload: {
+          postId: postId.toString(),
+          content: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+          platform: post.platform,
+          scheduledAt: post.scheduledAt.toISOString(),
+          status,
+          reason: reason || '',
+          approvedBy: post.approvedBy?.toString() || '',
+          rejectedBy: post.rejectedBy?.toString() || '',
+        },
+      });
+
+      logger.info(`Notified creator ${userId} about post ${postId}: ${status}`);
+    } catch (error) {
+      logger.error('Failed to notify creator:', error);
+    }
   }
 
   /**

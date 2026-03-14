@@ -7,18 +7,18 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityStatsBar } from '../../components/activity/ActivityStatsBar';
 import { ActivityFeed } from '../../components/activity/ActivityFeed';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceStore } from '../../store/workspace.store';
 
 export const ActivityPage: React.FC = () => {
-  const { workspace, member } = useWorkspace();
+  const { currentWorkspace } = useWorkspaceStore();
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
 
   useEffect(() => {
     // Check if user has admin access (admin or owner)
-    if (member && (member.role === 'admin' || member.role === 'owner')) {
+    if (currentWorkspace && (currentWorkspace.userRole === 'admin' || currentWorkspace.userRole === 'owner')) {
       setHasAdminAccess(true);
     }
-  }, [member]);
+  }, [currentWorkspace]);
 
   if (!hasAdminAccess) {
     return (

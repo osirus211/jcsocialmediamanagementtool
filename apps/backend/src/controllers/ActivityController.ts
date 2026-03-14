@@ -7,7 +7,7 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { workspaceService } from '../services/WorkspaceService';
-import { ActivityAction } from '../models/WorkspaceActivityLog';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 import { logger } from '../utils/logger';
 import { rateLimitService } from '../services/RateLimitService';
 import { ForbiddenError } from '../utils/errors';
@@ -189,7 +189,7 @@ export class ActivityController {
   static async exportActivityLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const workspaceId = new mongoose.Types.ObjectId(req.workspace!.workspaceId);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const userRole = req.workspace!.role;
 
       // Check if user is admin or owner
@@ -298,7 +298,7 @@ export class ActivityController {
       }
 
       // Log the export activity
-      await workspaceService.logActivity({
+      await WorkspaceActivityLog.create({
         workspaceId,
         userId: new mongoose.Types.ObjectId(userId),
         action: ActivityAction.WORKSPACE_UPDATED,

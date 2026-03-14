@@ -4,7 +4,8 @@ import { BadRequestError, NotFoundError, UnauthorizedError } from '../utils/erro
 import { logger } from '../utils/logger';
 import { usageService } from './UsageService';
 import { workspaceService } from './WorkspaceService';
-import { ActivityAction } from '../models/WorkspaceActivityLog';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
+import mongoose from 'mongoose';
 
 /**
  * Social Account Service
@@ -71,9 +72,9 @@ export class SocialAccountService {
 
         // Log reconnection activity
         if (input.connectedBy) {
-          await workspaceService.logActivity({
-            workspaceId: input.workspaceId,
-            userId: input.connectedBy,
+          await WorkspaceActivityLog.create({
+            workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+            userId: new mongoose.Types.ObjectId(input.connectedBy),
             action: ActivityAction.ACCOUNT_RECONNECTED,
             resourceType: 'SocialAccount',
             resourceId: existing._id,
@@ -118,9 +119,9 @@ export class SocialAccountService {
 
       // Log connection activity
       if (input.connectedBy) {
-        await workspaceService.logActivity({
-          workspaceId: input.workspaceId,
-          userId: input.connectedBy,
+        await WorkspaceActivityLog.create({
+          workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+          userId: new mongoose.Types.ObjectId(input.connectedBy),
           action: ActivityAction.ACCOUNT_CONNECTED,
           resourceType: 'SocialAccount',
           resourceId: account._id,
@@ -253,9 +254,9 @@ export class SocialAccountService {
 
       // Log disconnection activity
       if (userId) {
-        await workspaceService.logActivity({
-          workspaceId: workspaceId,
-          userId: userId,
+        await WorkspaceActivityLog.create({
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          userId: new mongoose.Types.ObjectId(userId),
           action: ActivityAction.ACCOUNT_DISCONNECTED,
           resourceType: 'SocialAccount',
           resourceId: account._id,

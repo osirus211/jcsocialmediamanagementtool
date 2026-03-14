@@ -98,9 +98,10 @@ class ActivityService {
     if (filters?.endDate) queryParams.append('endDate', filters.endDate);
 
     // Create a temporary link to download the file
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
     const url = `/activity/export?${queryParams.toString()}`;
     const link = document.createElement('a');
-    link.href = `${apiClient.defaults.baseURL}${url}`;
+    link.href = `${API_URL}${url}`;
     link.download = `activity-export-${Date.now()}.${format}`;
     document.body.appendChild(link);
     link.click();

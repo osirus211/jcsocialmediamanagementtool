@@ -52,6 +52,7 @@ export const WorkspaceSettingsPage = () => {
   const [description, setDescription] = useState('');
   const [timezone, setTimezone] = useState('UTC');
   const [industry, setIndustry] = useState('');
+  const [requireApproval, setRequireApproval] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<WorkspaceMember | null>(null);
@@ -91,6 +92,7 @@ export const WorkspaceSettingsPage = () => {
       setDescription(workspace.description || '');
       setTimezone(workspace.settings?.timezone || 'UTC');
       setIndustry(workspace.settings?.industry || '');
+      setRequireApproval(workspace.settings?.requireApproval || false);
     }
   }, [workspace]);
 
@@ -141,6 +143,7 @@ export const WorkspaceSettingsPage = () => {
           ...workspace.settings,
           timezone,
           industry: industry || undefined,
+          requireApproval,
         },
       });
       setSuccess('Workspace updated successfully');
@@ -442,6 +445,31 @@ export const WorkspaceSettingsPage = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Post Approval Settings */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h3 className="text-md font-medium text-gray-900 dark:text-white mb-3">
+                    Post Approval Workflow
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <input
+                        id="require-approval"
+                        type="checkbox"
+                        checked={requireApproval}
+                        onChange={(e) => setRequireApproval(e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                        disabled={!isAdmin || isLoading}
+                      />
+                      <label htmlFor="require-approval" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                        Require approval for all posts
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 ml-6">
+                      When enabled, all posts must be approved by an admin or owner before they can be published.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Workspace Logo */}

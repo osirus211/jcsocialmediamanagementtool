@@ -69,6 +69,22 @@ class ApprovalsService {
   async rejectPost(postId: string, reason: string): Promise<void> {
     await apiClient.post(`/approvals/${postId}/reject`, { reason });
   }
+
+  /**
+   * Bulk approve posts
+   */
+  async bulkApprove(postIds: string[]): Promise<{ results: Array<{ postId: string; success: boolean; error?: string }> }> {
+    const response = await apiClient.post('/approvals/bulk-approve', { postIds });
+    return response.data.data;
+  }
+
+  /**
+   * Bulk reject posts
+   */
+  async bulkReject(postIds: string[], reason: string): Promise<{ results: Array<{ postId: string; success: boolean; error?: string }> }> {
+    const response = await apiClient.post('/approvals/bulk-reject', { postIds, reason });
+    return response.data.data;
+  }
 }
 
 export const approvalsService = new ApprovalsService();

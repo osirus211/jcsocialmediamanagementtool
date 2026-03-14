@@ -13,9 +13,9 @@ import { logger } from '../utils/logger';
 import { recordPostScheduled } from '../config/publishingMetrics';
 import { workspacePermissionService, Permission } from './WorkspacePermissionService';
 import { MemberRole } from '../models/WorkspaceMember';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 import { ForbiddenError } from '../utils/errors';
 import { workspaceService } from './WorkspaceService';
-import { ActivityAction } from '../models/WorkspaceActivityLog';
 
 export interface CreatePostInput {
   workspaceId: string;
@@ -119,7 +119,7 @@ export class PostService {
 
     // Log activity
     if (input.createdBy) {
-      await workspaceService.logActivity({
+      await WorkspaceActivityLog.create({
         workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
         userId: new mongoose.Types.ObjectId(input.createdBy),
         action: ActivityAction.POST_CREATED,
@@ -136,6 +136,9 @@ export class PostService {
       });
     }
 
+    // Check if approval is required and auto-approve if not
+    await this.handleApprovalWorkflow(post);
+
     logger.info('Scheduled post created and enqueued', {
       postId: post._id.toString(),
       workspaceId: input.workspaceId,
@@ -144,6 +147,14 @@ export class PostService {
     });
 
     return post;
+  }
+
+  /**
+   * Handle approval workflow for new posts
+   */
+  private async handleApprovalWorkflow(post: IScheduledPost): Promise<void> {
+    const { approvalQueueService } = await import('./ApprovalQueueService');
+    await approvalQueueService.autoApproveIfNotRequired(post._id);
   }
 
   /**
@@ -367,7 +378,7 @@ export class PostService {
     await post.save();
 
     // Log activity
-    await workspaceService.logActivity({
+    await WorkspaceActivityLog.create({
       workspaceId: new mongoose.Types.ObjectId(workspaceId),
       userId: new mongoose.Types.ObjectId(userId),
       action: ActivityAction.POST_UPDATED,
@@ -434,7 +445,7 @@ export class PostService {
     await post.deleteOne();
 
     // Log activity
-    await workspaceService.logActivity({
+    await WorkspaceActivityLog.create({
       workspaceId: new mongoose.Types.ObjectId(workspaceId),
       userId: new mongoose.Types.ObjectId(userId),
       action: ActivityAction.POST_DELETED,
@@ -442,7 +453,6 @@ export class PostService {
       resourceId: new mongoose.Types.ObjectId(postId),
       details: {
         platform: post.platform,
-        contentType: post.contentType,
         wasScheduled: post.status === PostStatus.SCHEDULED,
       },
       ipAddress,

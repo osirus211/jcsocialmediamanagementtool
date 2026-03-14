@@ -15,8 +15,8 @@ export class RateLimitService {
 
   private async initRedis() {
     try {
-      const { redisClient } = await import('../config/redis');
-      this.redis = redisClient;
+      const { getRedisClientSafe } = await import('../config/redis');
+      this.redis = getRedisClientSafe();
     } catch (error) {
       logger.warn('Redis not available for rate limiting, using in-memory fallback');
       // Fallback to in-memory rate limiting

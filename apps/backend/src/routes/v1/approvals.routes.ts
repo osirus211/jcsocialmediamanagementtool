@@ -179,4 +179,92 @@ router.post('/:postId/reject', validateRequest(rejectPostRequestSchema), async (
   }
 });
 
+/**
+ * @route   POST /api/v1/approvals/bulk-approve
+ * @desc    Bulk approve posts
+ * @access  Private
+ */
+router.post('/bulk-approve', async (req, res, next): Promise<any> => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const { postIds } = req.body;
+
+    if (!Array.isArray(postIds) || postIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'postIds array is required',
+      });
+    }
+
+    const results = [];
+    for (const postId of postIds) {
+      try {
+        await approvalQueueService.approvePost({
+          postId: new mongoose.Types.ObjectId(postId),
+          userId,
+        });
+        results.push({ postId, success: true });
+      } catch (error) {
+        results.push({ postId, success: false, error: (error as Error).message });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { results },
+    });
+  } catch (error: unknown) {
+    logger.error('Bulk approve posts error:', error);
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/v1/approvals/bulk-reject
+ * @desc    Bulk reject posts
+ * @access  Private
+ */
+router.post('/bulk-reject', async (req, res, next): Promise<any> => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const { postIds, reason } = req.body;
+
+    if (!Array.isArray(postIds) || postIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'postIds array is required',
+      });
+    }
+
+    if (!reason || typeof reason !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'reason is required',
+      });
+    }
+
+    const results = [];
+    for (const postId of postIds) {
+      try {
+        await approvalQueueService.rejectPost({
+          postId: new mongoose.Types.ObjectId(postId),
+          userId,
+          reason,
+        });
+        results.push({ postId, success: true });
+      } catch (error) {
+        results.push({ postId, success: false, error: (error as Error).message });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { results },
+    });
+  } catch (error: unknown) {
+    logger.error('Bulk reject posts error:', error);
+    next(error);
+  }
+});
+
 export default router;
