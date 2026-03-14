@@ -12,6 +12,7 @@ import adminRoutes from '../admin.routes';
 import composerRoutes from './composer.routes';
 import metricsRoutes from './metrics.routes';
 import googleBusinessRoutes from './googleBusinessRoutes';
+import pinterestRoutes from '../oauth/pinterest.routes';
 import postsRoutes from './posts.routes';
 import mediaRoutes from './media.routes';
 import platformRoutes from './platform.routes';
@@ -118,6 +119,7 @@ router.use('/media', mediaRoutes); // Media API
 router.use('/platforms', platformRoutes); // Platforms API
 router.use('/social', socialRoutes);
 router.use('/oauth', oauthRoutes);
+router.use('/oauth/pinterest', pinterestRoutes); // Pinterest-specific OAuth endpoints
 router.use('/ai', aiRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/analytics/facebook', facebookAnalyticsRoutes); // Facebook analytics

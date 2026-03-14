@@ -22,6 +22,7 @@ import { InstagramBasicDisplayProvider } from './InstagramBasicDisplayProvider';
 import { GoogleBusinessProvider } from './GoogleBusinessProvider';
 import { ThreadsProvider } from './ThreadsProvider';
 import { YouTubeProvider } from './YouTubeProvider';
+import { PinterestOAuthProvider } from '../../providers/oauth/PinterestOAuthProvider';
 import { logger } from '../../utils/logger';
 
 export enum ProviderType {
@@ -30,6 +31,7 @@ export enum ProviderType {
   GOOGLE_BUSINESS = 'GOOGLE_BUSINESS',
   THREADS = 'THREADS',
   YOUTUBE = 'YOUTUBE',
+  PINTEREST = 'PINTEREST',
 }
 
 export class ConfigurationError extends Error {
@@ -197,6 +199,33 @@ export class OAuthProviderFactory {
     }
 
     // Pinterest provider removed due to missing implementation
+
+    // Initialize Pinterest Provider
+    try {
+      const pinterestClientId = config.oauth.pinterest?.appId;
+      const pinterestClientSecret = config.oauth.pinterest?.appSecret;
+      const pinterestRedirectUri = config.oauth.pinterest?.callbackUrl;
+
+      if (!pinterestClientId || !pinterestClientSecret || !pinterestRedirectUri) {
+        logger.warn('Pinterest provider not configured', {
+          clientIdSet: !!pinterestClientId,
+          clientSecretSet: !!pinterestClientSecret,
+          redirectUriSet: !!pinterestRedirectUri,
+        });
+      } else {
+        const pinterestProvider = new PinterestOAuthProvider(
+          pinterestClientId,
+          pinterestClientSecret,
+          pinterestRedirectUri
+        );
+        this.providers.set(ProviderType.PINTEREST, pinterestProvider as any);
+        logger.info('Pinterest provider initialized');
+      }
+    } catch (error: any) {
+      logger.error('Failed to initialize Pinterest provider', {
+        error: error.message,
+      });
+    }
 
     logger.info('OAuth Provider Factory initialized', {
       availableProviders: Array.from(this.providers.keys()),

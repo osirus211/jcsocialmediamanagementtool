@@ -72,6 +72,11 @@ const envSchema = z.object({
   TIKTOK_CLIENT_SECRET: z.string().optional(),
   TIKTOK_CALLBACK_URL: z.string().url().optional(),
   
+  // Pinterest
+  PINTEREST_APP_ID: z.string().optional(),
+  PINTEREST_APP_SECRET: z.string().optional(),
+  PINTEREST_REDIRECT_URI: z.string().url().optional(),
+  
   YOUTUBE_CLIENT_ID: z.string().optional(),
   YOUTUBE_CLIENT_SECRET: z.string().optional(),
   YOUTUBE_CALLBACK_URL: z.string().url().optional(),
@@ -407,6 +412,11 @@ export const config = {
       clientKey: env.TIKTOK_CLIENT_KEY,
       clientSecret: env.TIKTOK_CLIENT_SECRET,
       callbackUrl: env.TIKTOK_CALLBACK_URL,
+    },
+    pinterest: {
+      appId: env.PINTEREST_APP_ID,
+      appSecret: env.PINTEREST_APP_SECRET,
+      callbackUrl: env.PINTEREST_REDIRECT_URI,
     },
     youtube: {
       clientId: env.YOUTUBE_CLIENT_ID,

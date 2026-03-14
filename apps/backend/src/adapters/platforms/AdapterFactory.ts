@@ -55,7 +55,7 @@ export class AdapterFactory {
         return new YouTubeAdapter() as any;
       
       case 'pinterest':
-        return new PinterestAdapter() as any;
+        return new PinterestAdapter(clientId, clientSecret, redirectUri) as any;
       
       default:
         throw new Error(`Unsupported platform: ${platform}`);
@@ -75,7 +75,7 @@ export class AdapterFactory {
       threads: config.oauth.facebook.appId, // Threads uses Facebook OAuth
       bluesky: undefined, // No OAuth config needed
       youtube: undefined, // No OAuth config needed
-      pinterest: undefined, // No OAuth config needed
+      pinterest: config.oauth.pinterest.appId,
     };
 
     const value = configMap[platform];
@@ -100,7 +100,7 @@ export class AdapterFactory {
       threads: config.oauth.facebook.appSecret, // Threads uses Facebook OAuth
       bluesky: undefined, // No OAuth config needed
       youtube: undefined, // No OAuth config needed
-      pinterest: undefined, // No OAuth config needed
+      pinterest: config.oauth.pinterest.appSecret,
     };
 
     const value = configMap[platform];

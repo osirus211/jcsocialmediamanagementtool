@@ -355,6 +355,29 @@ export class OAuthController {
   }
 
   /**
+   * Get Pinterest OAuth configuration
+   */
+  private getPinterestConfig(): { clientId: string; clientSecret: string; redirectUri: string; scopes: string[] } {
+    const clientId = config.oauth?.pinterest?.appId;
+    const clientSecret = config.oauth?.pinterest?.appSecret;
+    const callbackUrl = config.oauth?.pinterest?.callbackUrl;
+
+    if (!clientId || !clientSecret) {
+      throw new BadRequestError('Pinterest OAuth not configured');
+    }
+
+    // Use explicit callback URL from env, or fallback to constructed URL
+    const redirectUri = callbackUrl || `${config.apiUrl || 'http://localhost:5000'}/api/v1/oauth/pinterest/callback`;
+
+    return {
+      clientId,
+      clientSecret,
+      redirectUri,
+      scopes: ['boards:read', 'boards:write', 'pins:read', 'pins:write', 'user_accounts:read', 'ads:read'],
+    };
+  }
+
+  /**
    * Generate PKCE code verifier and challenge
    */
   private generatePKCE(): { codeVerifier: string; codeChallenge: string } {
@@ -392,8 +415,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple' && platform !== 'tiktok') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, Apple, and TikTok platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple' && platform !== 'tiktok' && platform !== 'pinterest') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, Apple, TikTok, and Pinterest platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -690,6 +713,30 @@ export class OAuthController {
         });
 
         authorizationUrl = `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
+      } else if (platform === 'pinterest') {
+        // Pinterest OAuth
+        const pinterestConfig = this.getPinterestConfig();
+
+        // Store state in Redis with IP binding
+        state = await oauthStateService.createState(workspaceId, userId, platform, {
+          ipHash, // IP binding
+          metadata: {
+            platform,
+            timestamp: new Date().toISOString(),
+            userAgent: req.headers['user-agent'],
+          },
+        });
+
+        // Build authorization URL
+        const params = new URLSearchParams({
+          client_id: pinterestConfig.clientId,
+          redirect_uri: pinterestConfig.redirectUri,
+          response_type: 'code',
+          scope: pinterestConfig.scopes.join(','), // Pinterest uses comma-separated scopes
+          state,
+        });
+
+        authorizationUrl = `https://www.pinterest.com/oauth/?${params.toString()}`;
       }
 
       // Log OAuth initiation
@@ -798,8 +845,8 @@ export class OAuthController {
       }
 
       // Validate platform
-      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple' && platform !== 'tiktok') {
-        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, Apple, and TikTok platforms are supported', {
+      if (platform !== 'twitter' && platform !== 'facebook' && platform !== 'instagram' && platform !== 'youtube' && platform !== 'linkedin' && platform !== 'threads' && platform !== 'google-business' && platform !== 'google' && platform !== 'github' && platform !== 'apple' && platform !== 'tiktok' && platform !== 'pinterest') {
+        throw new BadRequestError('Only Twitter, Facebook, Instagram, YouTube, LinkedIn, Threads, Google Business Profile, Google, GitHub, Apple, TikTok, and Pinterest platforms are supported', {
           code: OAuthErrorCode.INVALID_PLATFORM,
         });
       }
@@ -973,6 +1020,11 @@ export class OAuthController {
       if (platform === 'tiktok') {
         // Pass the already-consumed stateData to avoid double-consumption
         return await this.handleTikTokCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
+      }
+
+      if (platform === 'pinterest') {
+        // Pass the already-consumed stateData to avoid double-consumption
+        return await this.handlePinterestCallback(req, res, next, code as string, state as string, stateData, clientIp, ipHash, debugReport, startTime);
       }
 
       // Get Twitter configuration
@@ -2681,6 +2733,143 @@ export class OAuthController {
       
       res.redirect(
         `${frontendUrl}/social/accounts?error=TIKTOK_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
+      );
+    }
+  }
+
+  /**
+   * Handle Pinterest OAuth callback
+   */
+  private async handlePinterestCallback(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    code: string,
+    state: string,
+    consumedState: any,
+    clientIp: string,
+    ipHash: string,
+    debugReport: any,
+    startTime: number
+  ): Promise<void> {
+    const { PinterestOAuthService } = await import('../services/oauth/PinterestOAuthService');
+    
+    // State already consumed by main callback handler - no need to consume again
+    if (!consumedState) {
+      logger.warn('[OAuth] Pinterest callback - invalid or expired state', {
+        state: state.substring(0, 10) + '...',
+        ipHash,
+      });
+
+      // Log replay attempt
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'pinterest',
+        action: 'callback',
+        success: false,
+        errorMessage: 'Invalid or expired state - possible replay attack',
+        metadata: {
+          errorCode: OAuthErrorCode.STATE_INVALID,
+          state: state.substring(0, 10) + '...',
+          replayAttempt: true,
+        },
+      });
+
+      const frontendUrl = config.cors.origin;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] Pinterest state validation failed', { step: 'pinterest_state_validation' });
+      return res.redirect(
+        `${frontendUrl}/social/accounts?error=${OAuthErrorCode.STATE_INVALID}&message=${encodeURIComponent('Invalid or expired state')}`
+      );
+    }
+    
+    try {
+      logger.debug('[OAuth] Pinterest callback initiated', { step: 'pinterest_callback' });
+      
+      // Get Pinterest configuration
+      const pinterestConfig = this.getPinterestConfig();
+      
+      // Create Pinterest OAuth service
+      const pinterestService = new PinterestOAuthService(
+        pinterestConfig.clientId,
+        pinterestConfig.clientSecret,
+        pinterestConfig.redirectUri
+      );
+
+      // Connect account
+      const account = await pinterestService.handleCallback(
+        code,
+        state,
+        consumedState.userId,
+        consumedState.workspaceId
+      );
+
+      debugReport.tokenExchangeSuccess = true;
+      debugReport.userFetched = true;
+      debugReport.dbInsertSuccess = true;
+
+      const duration = Date.now() - startTime;
+      logger.info('[OAuth] Pinterest account connected', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        accountId: account._id,
+        username: account.accountName,
+        duration,
+      });
+
+      // Log success
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'pinterest',
+        action: 'callback',
+        success: true,
+        metadata: {
+          accountId: account._id,
+          username: account.accountName,
+          duration,
+        },
+      });
+
+      // Redirect to frontend with success
+      const frontendUrl = config.cors.origin;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=pinterest&account=${account._id}`;
+      
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] Pinterest callback completed', { step: 'pinterest_callback_complete' });
+      
+      res.redirect(redirectUrl);
+    } catch (error: any) {
+      logger.error('[OAuth] Pinterest callback failed', {
+        workspaceId: consumedState.workspaceId,
+        userId: consumedState.userId,
+        error: error.message,
+      });
+
+      // Log failure
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        userId: consumedState.userId,
+        workspaceId: consumedState.workspaceId,
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        resource: 'pinterest',
+        action: 'callback',
+        success: false,
+        errorMessage: error.message,
+      });
+
+      const frontendUrl = config.cors.origin;
+      debugReport.finalResponseStatus = 302;
+      logger.debug('[OAuth] Pinterest callback error handled', { step: 'pinterest_error_handler' });
+      
+      res.redirect(
+        `${frontendUrl}/social/accounts?error=PINTEREST_OAUTH_FAILED&message=${encodeURIComponent(error.message)}`
       );
     }
   }
