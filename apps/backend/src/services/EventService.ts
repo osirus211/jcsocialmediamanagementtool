@@ -52,6 +52,12 @@ export enum SystemEvent {
   // Comment events
   COMMENT_ADDED = 'comment_added',
   MENTION_IN_COMMENT = 'mention_in_comment',
+  
+  // Task events
+  TASK_ASSIGNED = 'task_assigned',
+  TASK_UPDATED = 'task_updated',
+  TASK_DUE_SOON = 'task_due_soon',
+  TASK_OVERDUE = 'task_overdue',
 }
 
 export interface EventPayload {

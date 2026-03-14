@@ -17,6 +17,7 @@ import mediaRoutes from './media.routes';
 import platformRoutes from './platform.routes';
 import dashboardRoutes from './dashboard.routes';
 import apiKeysRoutes from './apiKeys.routes';
+import taskRoutes from './tasks.routes'; // Task management
 import templatesRoutes from './templates.routes'; // Phase-2: Post templates
 import queueSlotsRoutes from './queue-slots.routes'; // Phase-2: Queue slots
 import linksRoutes from './links.routes'; // Phase-2: Link shortening
@@ -55,6 +56,7 @@ router.get('/', (_req, res) => {
       workspaces: '/api/v1/workspaces',
       invitations: '/api/v1/invitations',
       posts: '/api/v1/posts',
+      tasks: '/api/v1/tasks',
       templates: '/api/v1/templates',
       queueSlots: '/api/v1/queue-slots',
       links: '/api/v1/links',
@@ -104,6 +106,7 @@ router.use('/workspaces', workspaceRoutes);
 router.use('/invitations', invitationRoutes); // Public invitation routes
 router.use('/posts', postsRoutes); // New comprehensive posts API
 router.use('/post', postRoutes); // Legacy post API
+router.use('/tasks', taskRoutes); // Task management
 router.use('/templates', templatesRoutes); // Phase-2: Post templates
 router.use('/queue-slots', queueSlotsRoutes); // Phase-2: Queue slots
 router.use('/links', linksRoutes); // Phase-2: Link shortening
