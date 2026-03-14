@@ -171,6 +171,16 @@ class DraftsService {
       throw error;
     }
   }
+
+  /**
+   * Auto-save draft content (alias for compatibility)
+   */
+  async autoSaveDraft(
+    id: string,
+    data: { content: string; platformContent?: PlatformContent[]; version?: number }
+  ): Promise<AutoSaveResult> {
+    return this.autoSave(id, data.content, data.platformContent, data.version);
+  }
 }
 
 export const draftsService = new DraftsService();

@@ -7,6 +7,7 @@
 
 import mongoose from 'mongoose';
 import { Post, PostStatus } from '../models/Post';
+import { DraftVersionService } from './DraftVersionService';
 import { logger } from '../utils/logger';
 
 const LOCK_DURATION_MS = 60 * 1000; // 60 seconds
@@ -250,6 +251,15 @@ export class DraftCollaborationService {
       if (!updatedPost) {
         throw new Error('Failed to save draft');
       }
+
+      // Create version history entry
+      await DraftVersionService.autoCreateVersion(
+        postId,
+        updatedPost.workspaceId.toString(),
+        userId,
+        content,
+        platformContent
+      );
 
       logger.debug('Draft auto-saved successfully', {
         postId,

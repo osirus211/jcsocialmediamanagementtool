@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { Server } from 'http';
 import { loadSecrets } from './config/secrets';
+import { initializeDraftSocket } from './services/DraftCollaborationSocket';
 
 console.log('🔧 server.ts: Loading modules...');
 
@@ -817,6 +818,18 @@ const startServer = async () => {
       logger.info(`📊 Metrics: http://localhost:${PORT}/metrics`);
       logger.info(`📚 API v1: http://localhost:${PORT}/api/v1`);
     });
+
+    // Initialize Socket.io for real-time draft collaboration
+    console.log('🔧 Initializing Socket.io for draft collaboration...');
+    try {
+      initializeDraftSocket(serverInstance);
+      console.log('✅ Socket.io initialized for draft collaboration');
+      logger.info('✅ Socket.io initialized for draft collaboration');
+    } catch (error) {
+      console.log('❌ Socket.io initialization failed:', error);
+      logger.error('❌ Socket.io initialization failed:', error);
+      logger.warn('Continuing without real-time collaboration features');
+    }
 
     // Graceful shutdown handlers
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

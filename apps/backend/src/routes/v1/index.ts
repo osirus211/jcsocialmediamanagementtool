@@ -64,6 +64,10 @@ import relatedHashtagsRoutes from './related-hashtags.routes'; // Related hashta
 import hashtagHistoryRoutes from './hashtag-history.routes'; // Hashtag usage history
 import trendingHashtagsRoutes from './trending-hashtags.routes'; // Trending hashtags
 import competitorHashtagAnalysisRoutes from './competitor-hashtag-analysis.routes'; // Competitor hashtag analysis
+import draftCommentsRoutes from './draft-comments.routes'; // Draft comments
+import draftVersionsRoutes from './draft-versions.routes'; // Draft versions
+import draftSharesRoutes from './draft-shares.routes'; // Draft shares
+
 import giphyRoutes from '../giphy'; // Giphy GIF search
 
 const router = Router();
@@ -101,6 +105,10 @@ router.get('/', (_req, res) => {
       approvals: '/api/v1/approvals',
       activity: '/api/v1/activity',
       drafts: '/api/v1/drafts',
+      draftComments: '/api/v1/drafts/:draftId/comments',
+      draftVersions: '/api/v1/drafts/:draftId/versions',
+      draftShares: '/api/v1/drafts/:draftId/shares',
+      sharedDraft: '/api/v1/shared/draft/:shareToken',
       accountPermissions: '/api/v1/account-permissions',
       postComments: '/api/v1/posts/:postId/comments',
       clientPortal: '/api/v1/client-portal',
@@ -172,6 +180,10 @@ router.use('/webhooks/outbound', webhooksOutboundRoutes); // Outbound webhooks
 router.use('/approvals', approvalsRoutes); // Phase-4: Post approval workflow
 router.use('/activity', activityRoutes); // Phase-4: Team activity feed
 router.use('/drafts', draftsRoutes); // Phase-4: Collaborative draft editing
+router.use('/drafts', draftCommentsRoutes); // Draft comments
+router.use('/drafts', draftVersionsRoutes); // Draft versions
+router.use('/drafts', draftSharesRoutes); // Draft shares
+router.use('/', draftSharesRoutes); // Public shared draft routes
 router.use('/account-permissions', accountPermissionsRoutes); // Phase-4: Granular permissions
 router.use('/posts', postCommentsRoutes); // Phase-4: In-line post comments
 router.use('/client-portal', clientPortalRoutes); // Phase-4: Client approval portal
