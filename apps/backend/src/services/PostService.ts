@@ -25,7 +25,7 @@ export interface CreatePostInput {
   mediaUrls?: string[]; // Deprecated: use mediaIds instead
   mediaIds?: string[]; // New: reference to Media model
   scheduledAt: Date;
-  contentType?: 'post' | 'story' | 'reel';
+  contentType?: 'post' | 'story' | 'reel' | 'thread';
   storyOptions?: {
     expiresAt?: Date;
     link?: string;
@@ -33,6 +33,21 @@ export interface CreatePostInput {
   reelOptions?: {
     audioName?: string;
     shareToFeed?: boolean;
+  };
+  threadOptions?: {
+    tweets: Array<{
+      id: string;
+      content: string;
+      mediaIds: string[];
+      altTexts: string[];
+    }>;
+    autoNumbering: boolean;
+    numberingStyle: '1/n' | '1.' | 'none';
+    delayBetweenTweets: number;
+    connectToTweet?: string;
+    enableBluesky: boolean;
+    enableMastodon: boolean;
+    enableThreads: boolean;
   };
   // Activity logging context
   createdBy?: string;

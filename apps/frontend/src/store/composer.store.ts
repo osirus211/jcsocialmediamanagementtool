@@ -42,10 +42,27 @@ interface ComposerState {
   saveError?: string;
   hasUnsavedChanges: boolean;
   
-  // Content type (post/story/reel)
-  contentType: 'post' | 'story' | 'reel';
+  // Content type (post/story/reel/thread)
+  contentType: 'post' | 'story' | 'reel' | 'thread';
   reelOptions: {
     shareToFeed: boolean;
+  };
+  
+  // Thread-specific content
+  threadTweets: Array<{
+    id: string;
+    content: string;
+    mediaIds: string[];
+    altTexts: string[];
+  }>;
+  threadOptions: {
+    autoNumbering: boolean;
+    numberingStyle: '1/n' | '1.' | 'none';
+    delayBetweenTweets: number;
+    connectToTweet?: string;
+    enableBluesky: boolean;
+    enableMastodon: boolean;
+    enableThreads: boolean;
   };
   
   // Content organization
@@ -72,8 +89,12 @@ interface ComposerActions {
   setPublishMode: (mode: PublishMode) => void;
   setScheduledDate: (date: Date | undefined) => void;
   setQueueSlot: (slot: QueueSlot | undefined) => void;
-  setContentType: (type: 'post' | 'story' | 'reel') => void;
+  setContentType: (type: 'post' | 'story' | 'reel' | 'thread') => void;
   setReelShareToFeed: (shareToFeed: boolean) => void;
+  
+  // Thread management
+  setThreadTweets: (tweets: Array<{ id: string; content: string; mediaIds: string[]; altTexts: string[]; }>) => void;
+  setThreadOptions: (options: Partial<ComposerState['threadOptions']>) => void;
   
   // Content organization
   setCategory: (categoryId: string | undefined) => void;
@@ -146,6 +167,15 @@ const initialState: ComposerState = {
   contentType: 'post',
   reelOptions: {
     shareToFeed: true,
+  },
+  threadTweets: [{ id: '1', content: '', mediaIds: [], altTexts: [] }],
+  threadOptions: {
+    autoNumbering: true,
+    numberingStyle: '1/n',
+    delayBetweenTweets: 5,
+    enableBluesky: false,
+    enableMastodon: false,
+    enableThreads: false,
   },
   categoryId: undefined,
   campaignId: undefined,
@@ -232,6 +262,18 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
   setReelShareToFeed: (shareToFeed) => {
     set((state) => ({
       reelOptions: { ...state.reelOptions, shareToFeed },
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  // Thread management methods
+  setThreadTweets: (tweets) => {
+    set({ threadTweets: tweets, hasUnsavedChanges: true });
+  },
+
+  setThreadOptions: (options) => {
+    set((state) => ({
+      threadOptions: { ...state.threadOptions, ...options },
       hasUnsavedChanges: true,
     }));
   },

@@ -6,6 +6,7 @@ import { LinkPreviewCard } from './LinkPreviewCard';
 import { PlatformSpecificSettings } from './PlatformSpecificSettings';
 import { EnhancedCharacterCounter } from './EnhancedCharacterCounter';
 import { TwitterCharacterOptimizer } from './TwitterCharacterOptimizer';
+import { EnhancedTwitterThreadComposer } from './EnhancedTwitterThreadComposer';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useLinkPreview } from '@/hooks/useLinkPreview';
 import { getSuggestedAdaptations } from '@/utils/contentAdaptation';
@@ -33,6 +34,11 @@ export function ContentSection({
   const setEnablePlatformCustomization = useComposerStore(state => state.setEnablePlatformCustomization);
   const copyFromBaseContent = useComposerStore(state => state.copyFromBaseContent);
   const resetPlatformContent = useComposerStore(state => state.resetPlatformContent);
+  const contentType = useComposerStore(state => state.contentType);
+  const threadTweets = useComposerStore(state => state.threadTweets);
+  const threadOptions = useComposerStore(state => state.threadOptions);
+  const setThreadTweets = useComposerStore(state => state.setThreadTweets);
+  const setThreadOptions = useComposerStore(state => state.setThreadOptions);
   
   const [activePlatform, setActivePlatform] = useState<SocialPlatform | null>(
     platforms.length > 0 ? platforms[0] : null
@@ -259,51 +265,60 @@ export function ContentSection({
             </div>
           </div>
 
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              id="post-content"
-              value={currentContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                enablePlatformCustomization && activePlatform && !platformContent[activePlatform]
-                  ? `Customize content for ${activePlatform} or use main content...`
-                  : "What's on your mind?"
-              }
-              rows={6}
-              aria-label={
-                enablePlatformCustomization && activePlatform
-                  ? `${activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} post content`
-                  : 'Post content'
-              }
-              aria-describedby="character-count"
-              aria-invalid={isOverLimit}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                isOverLimit ? 'border-red-500' : ''
-              }`}
+          {/* Thread Composer or Regular Content Editor */}
+          {contentType === 'thread' ? (
+            <EnhancedTwitterThreadComposer
+              onThreadChange={setThreadTweets}
+              onOptionsChange={setThreadOptions}
+              selectedPlatforms={platforms}
             />
-            
-            {/* Emoji Picker */}
-            <EmojiPicker
-              isOpen={showEmojiPicker}
-              onEmojiSelect={handleEmojiSelect}
-              onClose={() => setShowEmojiPicker(false)}
-            />
-            
-            {/* Mention Autocomplete */}
-            <MentionAutocomplete
-              isOpen={mentions.isOpen}
-              suggestions={mentions.suggestions}
-              selectedIndex={mentions.selectedIndex}
-              position={mentions.position}
-              onSelect={mentions.handleMentionSelect}
-              onClose={mentions.closeMentions}
-            />
-          </div>
+          ) : (
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                id="post-content"
+                value={currentContent}
+                onChange={(e) => handleContentChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  enablePlatformCustomization && activePlatform && !platformContent[activePlatform]
+                    ? `Customize content for ${activePlatform} or use main content...`
+                    : "What's on your mind?"
+                }
+                rows={6}
+                aria-label={
+                  enablePlatformCustomization && activePlatform
+                    ? `${activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} post content`
+                    : 'Post content'
+                }
+                aria-describedby="character-count"
+                aria-invalid={isOverLimit}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                  isOverLimit ? 'border-red-500' : ''
+                }`}
+              />
+              
+              {/* Emoji Picker */}
+              <EmojiPicker
+                isOpen={showEmojiPicker}
+                onEmojiSelect={handleEmojiSelect}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+              
+              {/* Mention Autocomplete */}
+              <MentionAutocomplete
+                isOpen={mentions.isOpen}
+                suggestions={mentions.suggestions}
+                selectedIndex={mentions.selectedIndex}
+                position={mentions.position}
+                onSelect={mentions.handleMentionSelect}
+                onClose={mentions.closeMentions}
+              />
+            </div>
+          )}
           
-          {/* Link Previews */}
-          {linkPreviews.previews.length > 0 && (
+          {/* Link Previews - Only for non-thread content */}
+          {contentType !== 'thread' && linkPreviews.previews.length > 0 && (
             <div className="space-y-3 mt-4">
               {linkPreviews.previews.map(({ url, preview, isLoading }) => (
                 <LinkPreviewCard
@@ -318,32 +333,37 @@ export function ContentSection({
             </div>
           )}
           
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-xs text-gray-500">
-              {enablePlatformCustomization && activePlatform && !platformContent[activePlatform] && (
-                <span className="text-blue-600">Using main content</span>
+          {/* Character Counter and Optimizer - Only for non-thread content */}
+          {contentType !== 'thread' && (
+            <>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-xs text-gray-500">
+                  {enablePlatformCustomization && activePlatform && !platformContent[activePlatform] && (
+                    <span className="text-blue-600">Using main content</span>
+                  )}
+                </span>
+                
+                {/* Enhanced Character Counter */}
+                <EnhancedCharacterCounter
+                  content={currentContent}
+                  platforms={enablePlatformCustomization && activePlatform ? [activePlatform] : platforms}
+                  activePlatform={activePlatform}
+                  showMultiPlatform={!enablePlatformCustomization && platforms.length > 1}
+                  className="flex-shrink-0"
+                />
+              </div>
+              
+              {/* Twitter Character Optimizer */}
+              {((enablePlatformCustomization && activePlatform === 'twitter') || 
+                (!enablePlatformCustomization && platforms.includes('twitter'))) && 
+               (characterStatus.severity === 'warning' || characterStatus.severity === 'error') && (
+                <TwitterCharacterOptimizer
+                  content={currentContent}
+                  onContentChange={handleContentChange}
+                  characterLimit={maxLength}
+                />
               )}
-            </span>
-            
-            {/* Enhanced Character Counter */}
-            <EnhancedCharacterCounter
-              content={currentContent}
-              platforms={enablePlatformCustomization && activePlatform ? [activePlatform] : platforms}
-              activePlatform={activePlatform}
-              showMultiPlatform={!enablePlatformCustomization && platforms.length > 1}
-              className="flex-shrink-0"
-            />
-          </div>
-          
-          {/* Twitter Character Optimizer */}
-          {((enablePlatformCustomization && activePlatform === 'twitter') || 
-            (!enablePlatformCustomization && platforms.includes('twitter'))) && 
-           (characterStatus.severity === 'warning' || characterStatus.severity === 'error') && (
-            <TwitterCharacterOptimizer
-              content={currentContent}
-              onContentChange={handleContentChange}
-              characterLimit={maxLength}
-            />
+            </>
           )}
         </div>
 

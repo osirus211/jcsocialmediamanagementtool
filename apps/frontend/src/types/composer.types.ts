@@ -161,6 +161,21 @@ export interface ComposerState {
   // Content
   mainContent: string;
   platformContent: Record<SocialPlatform, string>;
+  contentType: 'post' | 'story' | 'reel' | 'thread';
+  
+  // Thread-specific content
+  threadTweets: Array<{
+    id: string;
+    content: string;
+    mediaIds: string[];
+    altTexts: string[];
+  }>;
+  threadOptions: {
+    autoNumbering: boolean;
+    numberingStyle: '1/n' | '1.' | 'none';
+    delayBetweenTweets: number; // seconds
+    connectToTweet?: string; // Tweet ID to reply to
+  };
   
   // Media
   media: MediaFile[];

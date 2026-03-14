@@ -1,13 +1,14 @@
 import { useComposerStore } from '@/store/composer.store';
 import { useSocialAccountStore } from '@/store/social.store';
 
-type ContentType = 'post' | 'story' | 'reel';
+type ContentType = 'post' | 'story' | 'reel' | 'thread';
 
 interface ContentTypeOption {
   type: ContentType;
   label: string;
   icon: string;
   constraints?: string;
+  platforms?: string[];
 }
 
 const contentTypes: ContentTypeOption[] = [
@@ -17,16 +18,25 @@ const contentTypes: ContentTypeOption[] = [
     icon: '📝',
   },
   {
+    type: 'thread',
+    label: 'Thread',
+    icon: '🧵',
+    constraints: 'Multi-tweet story · Auto-numbering · Drag & drop',
+    platforms: ['twitter', 'bluesky', 'mastodon', 'threads'],
+  },
+  {
     type: 'story',
     label: 'Story',
     icon: '⭕',
     constraints: 'Vertical video or image · Disappears in 24h',
+    platforms: ['instagram'],
   },
   {
     type: 'reel',
     label: 'Reel',
     icon: '🎬',
     constraints: 'Vertical video only · 15–90 seconds',
+    platforms: ['instagram'],
   },
 ];
 
@@ -34,15 +44,20 @@ export function ContentTypeSelector() {
   const { contentType, setContentType, selectedAccounts } = useComposerStore();
   const { accounts } = useSocialAccountStore();
 
-  // Check if Instagram is in selected platforms
-  const hasInstagram = accounts
+  // Get selected platforms
+  const selectedPlatforms = accounts
     .filter((acc) => selectedAccounts.includes(acc._id))
-    .some((acc) => acc.platform.toLowerCase() === 'instagram');
+    .map((acc) => acc.platform.toLowerCase());
 
-  // Only show Story and Reel if Instagram is selected
-  const availableTypes = hasInstagram
-    ? contentTypes
-    : contentTypes.filter((t) => t.type === 'post');
+  // Filter content types based on selected platforms
+  const availableTypes = contentTypes.filter((contentType) => {
+    if (contentType.type === 'post') return true; // Post is always available
+    
+    if (!contentType.platforms) return false;
+    
+    // Check if any selected platform supports this content type
+    return contentType.platforms.some(platform => selectedPlatforms.includes(platform));
+  });
 
   if (availableTypes.length === 1) {
     return null; // Don't show selector if only one option

@@ -130,7 +130,54 @@ const PostPreviewPanel = memo(function PostPreviewPanel() {
       {/* Preview Content */}
       <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
         <div className="flex justify-center">
-          {activeTab === 'twitter' && (
+          {activeTab === 'twitter' && contentType === 'thread' && (
+            <div className="w-full max-w-[500px]">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  🧵 Thread Preview
+                </h3>
+                <div className="space-y-3">
+                  {useComposerStore.getState().threadTweets.map((tweet, index) => (
+                    <div key={tweet.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+                          U
+                        </div>
+                        {index < useComposerStore.getState().threadTweets.length - 1 && (
+                          <div className="w-0.5 h-8 bg-gray-300 mt-2"></div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-gray-900">Your Name</span>
+                          <span className="text-gray-500 text-sm">@username</span>
+                          <span className="text-gray-500 text-sm">·</span>
+                          <span className="text-gray-500 text-sm">now</span>
+                        </div>
+                        <div className="text-gray-900 whitespace-pre-wrap break-words">
+                          {useComposerStore.getState().threadOptions.autoNumbering && useComposerStore.getState().threadTweets.length > 1 && (
+                            <span className="text-blue-600 font-medium">
+                              {useComposerStore.getState().threadOptions.numberingStyle === '1/n' 
+                                ? `${index + 1}/${useComposerStore.getState().threadTweets.length} `
+                                : `${index + 1}. `
+                              }
+                            </span>
+                          )}
+                          {tweet.content || <span className="text-gray-400 italic">Empty tweet</span>}
+                        </div>
+                        {index < useComposerStore.getState().threadTweets.length - 1 && (
+                          <div className="mt-2 text-blue-500 text-sm">
+                            Show this thread
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {activeTab === 'twitter' && contentType !== 'thread' && (
             <TwitterPreview
               content={getContent('twitter')}
               media={media}
@@ -153,7 +200,7 @@ const PostPreviewPanel = memo(function PostPreviewPanel() {
               media={media}
               accountUsername={getAccountInfo('instagram')?.accountId}
               accountAvatar={getAccountInfo('instagram')?.metadata?.avatarUrl}
-              contentType={contentType}
+              contentType={contentType === 'thread' ? 'post' : contentType}
             />
           )}
           {activeTab === 'facebook' && (
