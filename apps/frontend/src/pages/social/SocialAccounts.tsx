@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { socialService, SocialAccount } from '../../services/social.service';
 import { Twitter, Linkedin, Facebook, Instagram, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { InstagramConnectModal } from '../../components/social/InstagramConnectModal';
+import { LinkedInAccountCard } from '../../components/accounts/LinkedInAccountCard';
 import { logger } from '../../lib/logger';
 
 /**
@@ -103,11 +104,7 @@ export function SocialAccounts() {
     loadAccounts();
   };
 
-  const handleDisconnect = async (accountId: string, platform: string) => {
-    if (!confirm(`Are you sure you want to disconnect this ${platform} account?`)) {
-      return;
-    }
-
+  const handleDisconnect = async (accountId: string, platform?: string) => {
     try {
       await socialService.disconnectAccount(accountId);
       await loadAccounts();
@@ -116,8 +113,8 @@ export function SocialAccounts() {
     }
   };
 
-  const getConnectedAccount = (platform: string) => {
-    return accounts.find((acc) => acc.platform === platform);
+  const getConnectedAccounts = (platform: string) => {
+    return accounts.filter((acc) => acc.platform === platform);
   };
 
   if (loading) {
@@ -151,8 +148,63 @@ export function SocialAccounts() {
         <div className="space-y-4">
           {Object.entries(PLATFORM_CONFIG).map(([platform, config]) => {
             const Icon = config.icon;
-            const connectedAccount = getConnectedAccount(platform);
+            const connectedAccounts = getConnectedAccounts(platform);
             const isConnecting = connectingPlatform === platform;
+
+            // Special handling for LinkedIn - show individual account cards
+            if (platform === 'linkedin' && connectedAccounts.length > 0) {
+              return (
+                <div key={platform} className="space-y-4">
+                  {/* Platform Header */}
+                  <div className="flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${config.color} text-white`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{config.name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {connectedAccounts.length} account{connectedAccounts.length !== 1 ? 's' : ''} connected
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleConnect(platform)}
+                      disabled={isConnecting}
+                      className={`px-3 py-2 ${config.color} text-white rounded-lg ${config.hoverColor} transition flex items-center gap-2 disabled:opacity-50 text-sm`}
+                    >
+                      {isConnecting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          Add Account
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* LinkedIn Account Cards */}
+                  {connectedAccounts.map((account) => (
+                    <LinkedInAccountCard
+                      key={account._id}
+                      account={{
+                        ...account,
+                        connectedAt: account.connectedAt.toString(),
+                      }}
+                      onDisconnect={handleDisconnect}
+                    />
+                  ))}
+                </div>
+              );
+            }
+
+            // Default platform card for other platforms or when no accounts connected
+            const hasConnectedAccount = connectedAccounts.length > 0;
+            const firstAccount = connectedAccounts[0];
 
             return (
               <div
@@ -166,13 +218,13 @@ export function SocialAccounts() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{config.name}</h3>
-                      {connectedAccount ? (
+                      {hasConnectedAccount ? (
                         <div className="mt-1">
                           <p className="text-sm text-gray-600">
-                            @{connectedAccount.username}
+                            @{firstAccount.username}
                           </p>
                           <p className="text-xs text-gray-500">
-                            Connected {new Date(connectedAccount.connectedAt).toLocaleDateString()}
+                            Connected {new Date(firstAccount.connectedAt).toLocaleDateString()}
                           </p>
                         </div>
                       ) : (
@@ -182,9 +234,13 @@ export function SocialAccounts() {
                   </div>
 
                   <div>
-                    {connectedAccount ? (
+                    {hasConnectedAccount ? (
                       <button
-                        onClick={() => handleDisconnect(connectedAccount._id, platform)}
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to disconnect this ${platform} account?`)) {
+                            handleDisconnect(firstAccount._id, platform);
+                          }
+                        }}
                         className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition flex items-center gap-2"
                       >
                         <Trash2 className="w-4 h-4" />

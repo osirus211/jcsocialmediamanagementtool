@@ -13,11 +13,19 @@ import { requireWorkspace, requirePermission } from '../../middleware/tenant';
 import { Permission } from '../../services/WorkspacePermissionService';
 import { z } from 'zod';
 
+// Import platform-specific analytics routes
+import { facebookAnalyticsRoutes } from '../analytics/facebook.analytics.routes';
+import linkedinAnalyticsRoutes from '../analytics/linkedin.analytics.routes';
+
 const router = Router();
 
 // Apply auth and workspace middleware to all routes
 router.use(requireAuth);
 router.use(requireWorkspace);
+
+// Platform-specific analytics routes
+router.use('/facebook', facebookAnalyticsRoutes);
+router.use('/linkedin', linkedinAnalyticsRoutes);
 
 /**
  * @route   GET /api/v1/analytics/overview

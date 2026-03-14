@@ -40,7 +40,11 @@ export class LinkedInOAuthProvider extends OAuthProvider {
       'openid',
       'profile',
       'email',
-      'w_member_social', // Post content
+      'w_member_social', // Post content as personal profile
+      'r_organization_social', // Read company page info
+      'w_organization_social', // Post content as company page
+      'r_basicprofile', // Basic profile access
+      'rw_organization_admin', // Organization admin access
     ];
     super(clientId, clientSecret, redirectUri, scopes);
   }

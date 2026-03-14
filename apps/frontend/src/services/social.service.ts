@@ -10,10 +10,25 @@ export interface SocialAccount {
   platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram' | 'github' | 'apple';
   platformUserId: string;
   username: string;
-  displayName: string;
+  displayName?: string;
+  accountName: string;
   profileImageUrl?: string;
   isActive: boolean;
   connectedAt: Date;
+  metadata?: {
+    accountType?: 'personal' | 'organization';
+    avatarUrl?: string;
+    logoUrl?: string;
+    profileUrl?: string;
+    websiteUrl?: string;
+    followerCount?: number;
+    vanityName?: string;
+    email?: string;
+    givenName?: string;
+    familyName?: string;
+    locale?: string;
+    emailVerified?: boolean;
+  };
 }
 
 export const socialService = {
