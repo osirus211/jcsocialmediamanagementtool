@@ -24,6 +24,28 @@ interface ComposerState {
   // Media
   media: MediaFile[];
   
+  // Carousel functionality
+  isCarousel: boolean;
+  carouselItems: Array<{
+    id: string;
+    order: number;
+    mediaUrl: string;
+    mediaType: 'image' | 'video';
+    caption?: string;
+    altText?: string;
+    link?: string; // LinkedIn only
+    file?: File;
+  }>;
+  coverSlideIndex: number;
+  
+  // PDF Carousel (LinkedIn)
+  pdfCarousel: {
+    enabled: boolean;
+    file: File | null;
+    title: string;
+    description: string;
+  };
+  
   // Accounts
   selectedAccounts: string[];
   
@@ -119,6 +141,21 @@ interface ComposerActions {
   resetPlatformContent: (platform: SocialPlatform) => void;
   setPlatformSettings: (platform: SocialPlatform, settings: any) => void;
   
+  // Carousel management
+  setIsCarousel: (enabled: boolean) => void;
+  setCarouselItems: (items: ComposerState['carouselItems']) => void;
+  addCarouselItem: (item: Omit<ComposerState['carouselItems'][0], 'id' | 'order'>) => void;
+  updateCarouselItem: (id: string, updates: Partial<ComposerState['carouselItems'][0]>) => void;
+  removeCarouselItem: (id: string) => void;
+  reorderCarouselItems: (startIndex: number, endIndex: number) => void;
+  setCoverSlideIndex: (index: number) => void;
+  
+  // PDF Carousel management
+  setPDFCarouselEnabled: (enabled: boolean) => void;
+  setPDFCarouselFile: (file: File | null) => void;
+  setPDFCarouselTitle: (title: string) => void;
+  setPDFCarouselDescription: (description: string) => void;
+  
   // Media management
   addMedia: (files: File[]) => Promise<void>;
   removeMedia: (mediaId: string) => void;
@@ -186,6 +223,20 @@ const initialState: ComposerState = {
   categoryId: undefined,
   campaignId: undefined,
   tags: [],
+  
+  // Carousel state
+  isCarousel: false,
+  carouselItems: [],
+  coverSlideIndex: 0,
+  
+  // PDF Carousel state
+  pdfCarousel: {
+    enabled: false,
+    file: null,
+    title: '',
+    description: '',
+  },
+  
   firstComment: undefined,
   enableFirstComment: false,
   enablePlatformCustomization: false,
@@ -417,6 +468,119 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         ...state.platformSettings,
         [platform]: settings,
       },
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  // ============================================
+  // CAROUSEL MANAGEMENT
+  // ============================================
+
+  setIsCarousel: (enabled) => {
+    set({ 
+      isCarousel: enabled, 
+      hasUnsavedChanges: true,
+      // Reset PDF carousel if enabling regular carousel
+      pdfCarousel: enabled ? { enabled: false, file: null, title: '', description: '' } : get().pdfCarousel,
+    });
+  },
+
+  setCarouselItems: (items) => {
+    set({ carouselItems: items, hasUnsavedChanges: true });
+  },
+
+  addCarouselItem: (item) => {
+    const state = get();
+    const newItem = {
+      ...item,
+      id: `carousel-${Date.now()}-${Math.random()}`,
+      order: state.carouselItems.length,
+    };
+    
+    set({
+      carouselItems: [...state.carouselItems, newItem],
+      hasUnsavedChanges: true,
+    });
+  },
+
+  updateCarouselItem: (id, updates) => {
+    set((state) => ({
+      carouselItems: state.carouselItems.map(item =>
+        item.id === id ? { ...item, ...updates } : item
+      ),
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  removeCarouselItem: (id) => {
+    set((state) => {
+      const newItems = state.carouselItems
+        .filter(item => item.id !== id)
+        .map((item, index) => ({ ...item, order: index }));
+      
+      // Adjust cover slide index if needed
+      const newCoverIndex = state.coverSlideIndex >= newItems.length 
+        ? Math.max(0, newItems.length - 1) 
+        : state.coverSlideIndex;
+      
+      return {
+        carouselItems: newItems,
+        coverSlideIndex: newCoverIndex,
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  reorderCarouselItems: (startIndex, endIndex) => {
+    set((state) => {
+      const newItems = Array.from(state.carouselItems);
+      const [reorderedItem] = newItems.splice(startIndex, 1);
+      newItems.splice(endIndex, 0, reorderedItem);
+      
+      // Update order numbers
+      const updatedItems = newItems.map((item, index) => ({
+        ...item,
+        order: index,
+      }));
+      
+      return {
+        carouselItems: updatedItems,
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  setCoverSlideIndex: (index) => {
+    set({ coverSlideIndex: index, hasUnsavedChanges: true });
+  },
+
+  // PDF Carousel methods
+  setPDFCarouselEnabled: (enabled) => {
+    set({ 
+      pdfCarousel: { ...get().pdfCarousel, enabled },
+      // Reset regular carousel if enabling PDF carousel
+      isCarousel: enabled ? false : get().isCarousel,
+      hasUnsavedChanges: true,
+    });
+  },
+
+  setPDFCarouselFile: (file) => {
+    set((state) => ({
+      pdfCarousel: { ...state.pdfCarousel, file },
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  setPDFCarouselTitle: (title) => {
+    set((state) => ({
+      pdfCarousel: { ...state.pdfCarousel, title },
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  setPDFCarouselDescription: (description) => {
+    set((state) => ({
+      pdfCarousel: { ...state.pdfCarousel, description },
       hasUnsavedChanges: true,
     }));
   },
@@ -680,6 +844,14 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
         categoryId: state.categoryId,
         campaignId: state.campaignId,
         tags: state.tags,
+        
+        // Carousel data
+        isCarousel: state.isCarousel,
+        carouselItems: state.carouselItems.length > 0 ? state.carouselItems : undefined,
+        coverSlideIndex: state.coverSlideIndex,
+        
+        // PDF Carousel data
+        pdfCarousel: state.pdfCarousel.enabled ? state.pdfCarousel : undefined,
       };
 
       let savedDraft;

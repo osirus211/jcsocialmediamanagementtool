@@ -13,7 +13,7 @@ import axios from 'axios';
 
 const INSTAGRAM_API_BASE = 'https://graph.instagram.com/v21.0';
 const MAX_CONTENT_LENGTH = 2200;
-const MAX_MEDIA_COUNT = 10;
+const MAX_MEDIA_COUNT = 20; // Instagram supports up to 20 carousel items
 const MAX_HASHTAGS = 30;
 
 interface InstagramMediaContainer {
@@ -175,12 +175,24 @@ export class InstagramPublisher extends BasePublisher {
     const instagramAccountId = account.providerUserId;
 
     try {
+      // Use carousel items if available, otherwise fall back to mediaIds
+      const carouselItems = post?.carouselItems || [];
+      const mediaToProcess = carouselItems.length > 0 ? carouselItems : mediaIds.map((url: string, index: number) => ({
+        order: index,
+        mediaUrl: url,
+        mediaType: this.isVideoUrl(url) ? 'video' : 'image',
+        altText: post?.instagramOptions?.carouselItems?.[index]?.altText,
+        userTags: post?.instagramOptions?.carouselItems?.[index]?.userTags,
+      }));
+
+      // Sort by order to ensure correct sequence
+      const sortedItems = mediaToProcess.sort((a: any, b: any) => a.order - b.order);
+
       // Create individual media containers for each item
       const childContainers: string[] = [];
 
-      for (let i = 0; i < mediaIds.length; i++) {
-        const mediaUrl = mediaIds[i];
-        const isVideo = this.isVideoUrl(mediaUrl);
+      for (const item of sortedItems) {
+        const isVideo = item.mediaType === 'video' || this.isVideoUrl(item.mediaUrl);
 
         const containerPayload: Record<string, any> = {
           access_token: accessToken,
@@ -189,20 +201,20 @@ export class InstagramPublisher extends BasePublisher {
 
         if (isVideo) {
           containerPayload.media_type = 'VIDEO';
-          containerPayload.video_url = mediaUrl;
+          containerPayload.video_url = item.mediaUrl;
         } else {
           containerPayload.media_type = 'IMAGE';
-          containerPayload.image_url = mediaUrl;
+          containerPayload.image_url = item.mediaUrl;
         }
 
         // Add alt text for this specific item
-        if (post && 'instagramOptions' in post && post.instagramOptions?.carouselItems?.[i]?.altText) {
-          containerPayload.alt_text = post.instagramOptions.carouselItems[i].altText;
+        if (item.altText) {
+          containerPayload.alt_text = item.altText;
         }
 
         // Add user tags for this specific item
-        if (post && 'instagramOptions' in post && post.instagramOptions?.carouselItems?.[i]?.userTags?.length) {
-          containerPayload.user_tags = post.instagramOptions.carouselItems[i].userTags.map((tag: any) => ({
+        if (item.userTags?.length) {
+          containerPayload.user_tags = item.userTags.map((tag: any) => ({
             user: { username: tag.username },
             x: tag.x,
             y: tag.y,
@@ -266,14 +278,24 @@ export class InstagramPublisher extends BasePublisher {
       logger.info('Instagram carousel published successfully', {
         postId,
         accountId: account._id.toString(),
-        itemCount: mediaIds.length,
+        itemCount: sortedItems.length,
         hasFirstComment: !!firstComment,
+        hasPerSlideAltText: sortedItems.some((item: any) => !!item.altText),
       });
 
       return {
         platformPostId: postId,
         url: `https://instagram.com/p/${postId}`,
-        metadata: { ...publishResponse.data, contentType: 'carousel', itemCount: mediaIds.length },
+        metadata: { 
+          ...publishResponse.data, 
+          contentType: 'carousel', 
+          itemCount: sortedItems.length,
+          carouselItems: sortedItems.map((item: any) => ({
+            mediaType: item.mediaType,
+            hasAltText: !!item.altText,
+            hasUserTags: !!(item.userTags?.length),
+          })),
+        },
       };
     } catch (error: any) {
       this.handleApiError(error, 'publishCarousel');

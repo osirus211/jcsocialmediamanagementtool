@@ -77,6 +77,7 @@ export class TikTokPublisher extends BasePublisher {
         result = await this.publishPhotos(account, {
           content,
           photoUrls: mediaUrls.filter((url: string) => this.isImageUrl(url)),
+          carouselItems: (options as any).post?.carouselItems,
         });
       }
 
@@ -160,13 +161,14 @@ export class TikTokPublisher extends BasePublisher {
   }
 
   /**
-   * Publish photos to TikTok (Photo Mode)
+   * Publish photos to TikTok (Photo Mode) with enhanced carousel features
    */
   private async publishPhotos(
     account: ISocialAccount,
     options: {
       content: string;
       photoUrls: string[];
+      carouselItems?: any[];
       privacyLevel?: 'PUBLIC_TO_EVERYONE' | 'MUTUAL_FOLLOW_FRIENDS' | 'SELF_ONLY';
       disableComment?: boolean;
       photoCoverIndex?: number;
@@ -174,14 +176,29 @@ export class TikTokPublisher extends BasePublisher {
   ): Promise<PublishResult> {
     const accessToken = account.getDecryptedAccessToken();
 
-    if (options.photoUrls.length > MAX_PHOTO_COUNT) {
+    // Use carousel items if available for enhanced features
+    const items = options.carouselItems || options.photoUrls.map((url, index) => ({
+      order: index,
+      mediaUrl: url,
+      mediaType: 'image',
+    }));
+
+    // Sort by order and limit to TikTok's limit
+    const sortedItems = items
+      .sort((a: any, b: any) => a.order - b.order)
+      .slice(0, MAX_PHOTO_COUNT);
+
+    if (sortedItems.length > MAX_PHOTO_COUNT) {
       throw new Error(`TikTok supports maximum ${MAX_PHOTO_COUNT} photos per post`);
     }
 
+    const photoUrls = sortedItems.map((item: any) => item.mediaUrl);
+
     logger.info('Publishing TikTok photos', {
       accountId: account._id,
-      photoCount: options.photoUrls.length,
+      photoCount: photoUrls.length,
       contentLength: options.content.length,
+      hasCoverSelection: options.photoCoverIndex !== undefined,
     });
 
     // Initialize photo upload
@@ -189,7 +206,7 @@ export class TikTokPublisher extends BasePublisher {
       accessToken,
       {
         source: 'PULL_FROM_URL',
-        photoImages: options.photoUrls,
+        photoImages: photoUrls,
         photoCoverIndex: options.photoCoverIndex || 0,
       },
       {
@@ -214,8 +231,9 @@ export class TikTokPublisher extends BasePublisher {
     logger.info('TikTok photos published successfully', {
       accountId: account._id,
       publishId: uploadInit.publishId,
-      photoCount: options.photoUrls.length,
+      photoCount: photoUrls.length,
       postUrl: result.postUrl,
+      coverIndex: options.photoCoverIndex || 0,
     });
 
     return result;

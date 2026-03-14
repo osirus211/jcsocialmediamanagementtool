@@ -45,6 +45,20 @@ export interface ReelOptions {
   shareToFeed?: boolean;
 }
 
+export interface CarouselItem {
+  order: number;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  caption?: string; // Per-slide caption
+  altText?: string;
+  link?: string; // LinkedIn only
+  userTags?: Array<{
+    username: string;
+    x: number;
+    y: number;
+  }>;
+}
+
 export interface InstagramOptions {
   useFirstComment?: boolean;
   altText?: string;
@@ -86,6 +100,12 @@ export interface IPost extends Document {
   platformContent: PlatformContent[]; // NEW: Per-platform content
   mediaUrls: string[];
   mediaIds: mongoose.Types.ObjectId[]; // NEW: Reference to Media model
+  
+  // Carousel fields
+  isCarousel?: boolean;
+  carouselItems?: CarouselItem[];
+  coverSlideIndex?: number; // Which slide to use as cover/thumbnail
+  
   status: PostStatus;
   publishMode?: PublishMode; // NEW: How post should be published
   contentType?: ContentType; // NEW: Post type (post/story/reel)
@@ -215,15 +235,50 @@ const PostSchema = new Schema<IPost>(
       default: [],
       validate: {
         validator: function (urls: string[]) {
-          return urls.length <= 10; // Max 10 media files
+          return urls.length <= 35; // Max 35 media files (TikTok limit)
         },
-        message: 'Maximum 10 media files allowed',
+        message: 'Maximum 35 media files allowed',
       },
     },
     mediaIds: {
       type: [Schema.Types.ObjectId],
       ref: 'Media',
       default: [],
+    },
+    
+    // Carousel fields
+    isCarousel: {
+      type: Boolean,
+      default: false,
+    },
+    carouselItems: {
+      type: [
+        {
+          order: { type: Number, required: true },
+          mediaUrl: { type: String, required: true },
+          mediaType: { type: String, enum: ['image', 'video'], required: true },
+          caption: { type: String, maxlength: 2200 },
+          altText: { type: String, maxlength: 100 },
+          link: { type: String }, // LinkedIn only
+          userTags: [{
+            username: { type: String, required: true },
+            x: { type: Number, required: true, min: 0, max: 1 },
+            y: { type: Number, required: true, min: 0, max: 1 },
+          }],
+        },
+      ],
+      default: [],
+      validate: {
+        validator: function (items: any[]) {
+          return items.length <= 35; // Max 35 slides (TikTok limit)
+        },
+        message: 'Maximum 35 carousel items allowed',
+      },
+    },
+    coverSlideIndex: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     status: {
       type: String,

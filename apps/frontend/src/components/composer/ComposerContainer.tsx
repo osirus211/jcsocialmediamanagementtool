@@ -10,6 +10,8 @@ import { AccountSelector } from '../posts/AccountSelector';
 import { ContentTypeSelector } from './ContentTypeSelector';
 import { ContentSection } from './ContentSection';
 import { MediaUploadSection } from './MediaUploadSection';
+import { CarouselComposer } from './CarouselComposer';
+import { PDFCarouselComposer } from './PDFCarouselComposer';
 import { PublishModeSelector } from './PublishModeSelector';
 import { ComposerActions } from './ComposerActions';
 import { AlertBanner } from './AlertBanner';
@@ -53,6 +55,13 @@ export function ComposerContainer({
   const categoryId = useComposerStore(state => state.categoryId);
   const campaignId = useComposerStore(state => state.campaignId);
   const tags = useComposerStore(state => state.tags);
+  
+  // Carousel state
+  const isCarousel = useComposerStore(state => state.isCarousel);
+  const carouselItems = useComposerStore(state => state.carouselItems);
+  const coverSlideIndex = useComposerStore(state => state.coverSlideIndex);
+  const pdfCarousel = useComposerStore(state => state.pdfCarousel);
+  
   const setContent = useComposerStore(state => state.setContent);
   const setSelectedAccounts = useComposerStore(state => state.setSelectedAccounts);
   const setPublishMode = useComposerStore(state => state.setPublishMode);
@@ -75,6 +84,15 @@ export function ComposerContainer({
   const copyFromBaseContent = useComposerStore(state => state.copyFromBaseContent);
   const resetPlatformContent = useComposerStore(state => state.resetPlatformContent);
   const reset = useComposerStore(state => state.reset);
+  
+  // Carousel actions
+  const setIsCarousel = useComposerStore(state => state.setIsCarousel);
+  const setCarouselItems = useComposerStore(state => state.setCarouselItems);
+  const setCoverSlideIndex = useComposerStore(state => state.setCoverSlideIndex);
+  const setPDFCarouselEnabled = useComposerStore(state => state.setPDFCarouselEnabled);
+  const setPDFCarouselFile = useComposerStore(state => state.setPDFCarouselFile);
+  const setPDFCarouselTitle = useComposerStore(state => state.setPDFCarouselTitle);
+  const setPDFCarouselDescription = useComposerStore(state => state.setPDFCarouselDescription);
 
   const { accounts } = useSocialAccountStore();
   const [isPublishing, setIsPublishing] = useState(false);
@@ -590,17 +608,76 @@ export function ComposerContainer({
               />
             </section>
 
-            {/* Media Upload */}
+            {/* Media Upload / Carousel */}
             <section aria-labelledby="media-section-label">
               <h2 id="media-section-label" className="sr-only">Media attachments</h2>
-              <MediaUploadSection
-                media={media}
-                selectedPlatforms={selectedPlatforms}
-                onUpload={addMedia}
-                onRemove={removeMedia}
-                onMediaUpdate={updateMedia}
-                onMediaReplace={replaceMedia}
-              />
+              
+              {/* Carousel Toggle */}
+              <div className="mb-4">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isCarousel}
+                      onChange={(e) => setIsCarousel(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Create Carousel/Slideshow</span>
+                  </label>
+                  
+                  {selectedPlatforms.includes('linkedin') && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pdfCarousel.enabled}
+                        onChange={(e) => setPDFCarouselEnabled(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">LinkedIn PDF Carousel</span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Carousel Builder */}
+              {isCarousel && (
+                <CarouselComposer
+                  isEnabled={isCarousel}
+                  onToggle={setIsCarousel}
+                  items={carouselItems}
+                  onItemsChange={setCarouselItems}
+                  selectedPlatforms={selectedPlatforms}
+                  coverSlideIndex={coverSlideIndex}
+                  onCoverSlideChange={setCoverSlideIndex}
+                />
+              )}
+
+              {/* PDF Carousel Builder */}
+              {pdfCarousel.enabled && (
+                <PDFCarouselComposer
+                  isEnabled={pdfCarousel.enabled}
+                  onToggle={setPDFCarouselEnabled}
+                  pdfFile={pdfCarousel.file}
+                  onPDFChange={setPDFCarouselFile}
+                  title={pdfCarousel.title}
+                  onTitleChange={setPDFCarouselTitle}
+                  description={pdfCarousel.description}
+                  onDescriptionChange={setPDFCarouselDescription}
+                  selectedPlatforms={selectedPlatforms}
+                />
+              )}
+
+              {/* Regular Media Upload (when not using carousel) */}
+              {!isCarousel && !pdfCarousel.enabled && (
+                <MediaUploadSection
+                  media={media}
+                  selectedPlatforms={selectedPlatforms}
+                  onUpload={addMedia}
+                  onRemove={removeMedia}
+                  onMediaUpdate={updateMedia}
+                  onMediaReplace={replaceMedia}
+                />
+              )}
             </section>
 
             {/* First Comment */}

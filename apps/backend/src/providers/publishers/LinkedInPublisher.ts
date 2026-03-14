@@ -25,6 +25,9 @@ interface LinkedInMediaAsset {
   status: string;
   media?: string;
   altText?: string;
+  title?: string; // For documents
+  description?: string; // For documents
+  caption?: string; // For per-image captions
 }
 
 interface LinkedInUploadResponse {
@@ -170,15 +173,23 @@ export class LinkedInPublisher extends BasePublisher {
   }
 
   /**
-   * Publish document post (PDF, etc.)
+   * Publish PDF document as carousel (LinkedIn converts PDFs to image carousel)
    */
-  async publishDocumentPost(account: ISocialAccount, post: { content: string; documentUrl: string }): Promise<PublishPostResult> {
+  async publishPDFCarousel(account: ISocialAccount, post: { content: string; documentUrl: string; title?: string; description?: string }): Promise<PublishPostResult> {
     const accessToken = this.getAccessToken(account);
     const authorUrn = this.getAuthorUrn(account);
 
     try {
-      // Upload document
+      // Upload document - LinkedIn will automatically convert PDF pages to carousel
       const documentAsset = await this.uploadDocument(accessToken, authorUrn, post.documentUrl);
+
+      // Add document metadata
+      if (post.title) {
+        documentAsset.title = post.title;
+      }
+      if (post.description) {
+        documentAsset.description = post.description;
+      }
 
       // Build UGC post with document
       const payload = this.buildUGCPost(authorUrn, post.content, [documentAsset]);
@@ -193,17 +204,23 @@ export class LinkedInPublisher extends BasePublisher {
 
       const postId = response.data.id;
 
-      logger.info('LinkedIn document post published successfully', {
+      logger.info('LinkedIn PDF carousel published successfully', {
         postId,
         accountId: account._id.toString(),
+        hasTitle: !!post.title,
+        hasDescription: !!post.description,
       });
 
       return {
         platformPostId: postId,
-        metadata: response.data,
+        metadata: {
+          ...response.data,
+          contentType: 'pdf-carousel',
+          documentUrl: post.documentUrl,
+        },
       };
     } catch (error: any) {
-      this.handleApiError(error, 'publishDocumentPost');
+      this.handleApiError(error, 'publishPDFCarousel');
     }
   }
 
@@ -220,13 +237,69 @@ export class LinkedInPublisher extends BasePublisher {
   }
 
   /**
-   * Publish multi-image post (carousel)
+   * Publish multi-image post (carousel) with enhanced features
    */
-  async publishMultiImagePost(account: ISocialAccount, post: { content: string; imageUrls: string[] }): Promise<PublishPostResult> {
-    return this.publishImagePost(account, { 
-      content: post.content, 
-      imageUrls: post.imageUrls 
+  async publishMultiImagePost(account: ISocialAccount, post: { content: string; imageUrls: string[]; carouselItems?: any[] }): Promise<PublishPostResult> {
+    const accessToken = this.getAccessToken(account);
+    const authorUrn = this.getAuthorUrn(account);
+    
+    // Use carousel items if available for enhanced features
+    const items = post.carouselItems || post.imageUrls.map((url, index) => ({
+      order: index,
+      mediaUrl: url,
+      mediaType: 'image',
+    }));
+
+    // Sort by order and limit to 9 images (LinkedIn limit)
+    const sortedItems = items
+      .sort((a: any, b: any) => a.order - b.order)
+      .slice(0, 9);
+
+    // Upload images with alt text and captions
+    const uploadedMediaAssets = [];
+    for (const item of sortedItems) {
+      const asset = await this.uploadImage(accessToken, authorUrn, item.mediaUrl);
+      
+      // Add alt text if provided
+      if (item.altText) {
+        asset.altText = item.altText;
+      }
+      
+      // Add caption if provided (LinkedIn supports per-image descriptions)
+      if (item.caption) {
+        asset.caption = item.caption;
+      }
+      
+      uploadedMediaAssets.push(asset);
+    }
+    
+    // Build UGC post with enhanced media
+    const payload = this.buildUGCPost(authorUrn, post.content, uploadedMediaAssets);
+
+    const response = await this.httpClient.post(`${LINKEDIN_API_BASE}/ugcPosts`, payload, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
     });
+
+    logger.info('LinkedIn carousel published successfully', {
+      postId: response.data.id,
+      accountId: account._id.toString(),
+      itemCount: uploadedMediaAssets.length,
+      hasAltText: uploadedMediaAssets.some(asset => !!asset.altText),
+      hasPerImageCaptions: uploadedMediaAssets.some(asset => !!asset.caption),
+    });
+
+    return {
+      platformPostId: response.data.id,
+      metadata: {
+        ...response.data,
+        contentType: 'carousel',
+        itemCount: uploadedMediaAssets.length,
+      },
+    };
   }
 
   /**
@@ -499,7 +572,7 @@ export class LinkedInPublisher extends BasePublisher {
   }
 
   /**
-   * Build UGC post payload
+   * Build UGC post payload with enhanced media support
    */
   private buildUGCPost(authorUrn: string, content: string, mediaAssets: LinkedInMediaAsset[]): any {
     const payload: any = {
@@ -541,6 +614,24 @@ export class LinkedInPublisher extends BasePublisher {
           mediaItem.description = {
             localized: {
               en_US: asset.altText,
+            },
+          };
+        }
+
+        // Add title if available (for documents)
+        if ((asset as any).title) {
+          mediaItem.title = {
+            localized: {
+              en_US: (asset as any).title,
+            },
+          };
+        }
+
+        // Add per-image caption if available
+        if ((asset as any).caption) {
+          mediaItem.description = {
+            localized: {
+              en_US: (asset as any).caption,
             },
           };
         }

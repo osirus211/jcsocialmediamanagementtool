@@ -20,7 +20,7 @@ import { logger } from '../../utils/logger';
 
 const FACEBOOK_API_BASE = 'https://graph.facebook.com/v21.0';
 const MAX_CONTENT_LENGTH = 63206;
-const MAX_MEDIA_COUNT = 10;
+const MAX_MEDIA_COUNT = 30; // Facebook supports up to 30 photos in an album
 
 export interface FacebookPublishOptions extends PublishPostOptions {
   postType?: 'feed' | 'photo' | 'video' | 'reel' | 'story' | 'link' | 'album';
@@ -197,30 +197,49 @@ export class FacebookPublisher extends BasePublisher {
    */
   async publishAlbumPost(account: ISocialAccount, options: FacebookPublishOptions): Promise<PublishPostResult> {
     const { content, mediaIds = [], scheduledPublishTime, published = true, metadata } = options;
+    const post = (options as any).post;
     const accessToken = this.getAccessToken(account);
     const pageId = account.metadata?.pageId || account.providerUserId;
 
-    if (mediaIds.length < 2) {
+    // Use carousel items if available, otherwise fall back to mediaIds
+    const carouselItems = post?.carouselItems || [];
+    const mediaToProcess = carouselItems.length > 0 ? carouselItems : mediaIds.map((url: string, index: number) => ({
+      order: index,
+      mediaUrl: url,
+      mediaType: 'image',
+      altText: (metadata?.altTexts as string[])?.[index],
+    }));
+
+    if (mediaToProcess.length < 2) {
       throw new Error('Album post requires at least 2 media items');
     }
 
-    const altTexts = (metadata?.altTexts as string[]) || [];
+    if (mediaToProcess.length > MAX_MEDIA_COUNT) {
+      throw new Error(`Facebook albums support maximum ${MAX_MEDIA_COUNT} photos`);
+    }
 
-    // Step 1: Upload all photos as unpublished with alt text
+    // Sort by order and limit to Facebook's limit
+    const sortedItems = mediaToProcess
+      .sort((a: any, b: any) => a.order - b.order)
+      .slice(0, MAX_MEDIA_COUNT);
+
+    // Step 1: Upload all photos as unpublished with alt text and captions
     const uploadedMediaIds: string[] = [];
-    for (let i = 0; i < mediaIds.length; i++) {
-      const mediaUrl = mediaIds[i];
-      const altText = altTexts[i];
-
+    for (const item of sortedItems) {
       const photoPayload: any = {
-        url: mediaUrl,
+        url: item.mediaUrl,
         published: false,
         access_token: accessToken,
       };
 
       // Add alt text if provided
-      if (altText) {
-        photoPayload.alt_text_custom = altText;
+      if (item.altText) {
+        photoPayload.alt_text_custom = item.altText;
+      }
+
+      // Add per-photo caption if provided
+      if (item.caption) {
+        photoPayload.caption = item.caption;
       }
 
       const response = await this.httpClient.post(
@@ -254,14 +273,24 @@ export class FacebookPublisher extends BasePublisher {
       postId,
       mediaCount: uploadedMediaIds.length,
       scheduled: !!scheduledPublishTime,
-      hasAltText: altTexts.some(text => !!text),
+      hasAltText: sortedItems.some((item: any) => !!item.altText),
+      hasPerPhotoCaptions: sortedItems.some((item: any) => !!item.caption),
       accountId: account._id.toString(),
     });
 
     return {
       platformPostId: postId,
       url: `https://facebook.com/${postId}`,
-      metadata: response.data,
+      metadata: {
+        ...response.data,
+        contentType: 'album',
+        itemCount: uploadedMediaIds.length,
+        albumItems: sortedItems.map((item: any) => ({
+          mediaType: item.mediaType,
+          hasAltText: !!item.altText,
+          hasCaption: !!item.caption,
+        })),
+      },
     };
   }
 
