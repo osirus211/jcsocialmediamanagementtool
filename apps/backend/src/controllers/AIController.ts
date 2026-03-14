@@ -562,6 +562,219 @@ export class AIController {
   }
 
   /**
+   * Generate caption from image
+   * POST /ai/image-caption
+   */
+  static async generateImageCaption(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { imageUrl, platform, tone, length, context, keywords } = req.body;
+
+      if (!imageUrl || !platform) {
+        res.status(400).json({
+          success: false,
+          message: 'Image URL and platform are required',
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { ImageCaptionService } = await import('../ai/services/image-caption.service');
+
+      const service = new ImageCaptionService(aiModule.getProvider());
+      const result = await service.generateCaptionFromImage({
+        imageUrl,
+        platform,
+        tone: tone || 'casual',
+        length: length || 'medium',
+        context,
+        keywords,
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Image caption generation error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Analyze brand voice
+   * POST /ai/brand-voice
+   */
+  static async analyzeBrandVoice(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { sampleContent, industry, targetAudience, brandPersonality } = req.body;
+
+      if (!sampleContent || !Array.isArray(sampleContent) || sampleContent.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: 'Sample content array is required',
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { BrandVoiceService } = await import('../ai/services/brand-voice.service');
+
+      const service = new BrandVoiceService(aiModule.getProvider());
+      const result = await service.analyzeBrandVoice({
+        workspaceId,
+        sampleContent,
+        industry,
+        targetAudience,
+        brandPersonality,
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Brand voice analysis error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Generate industry templates
+   * POST /ai/templates
+   */
+  static async generateTemplates(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { industry, platform, contentType, tone } = req.body;
+
+      if (!industry || !platform || !contentType) {
+        res.status(400).json({
+          success: false,
+          message: 'Industry, platform, and content type are required',
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { TemplateService } = await import('../ai/services/template.service');
+
+      const service = new TemplateService(aiModule.getProvider());
+      const result = await service.generateTemplates({
+        industry,
+        platform,
+        contentType,
+        tone: tone || 'professional',
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Template generation error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Generate CTAs
+   * POST /ai/cta
+   */
+  static async generateCTAs(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { platform, tone, objective, context } = req.body;
+
+      if (!platform || !objective) {
+        res.status(400).json({
+          success: false,
+          message: 'Platform and objective are required',
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { CTAGeneratorService } = await import('../ai/services/cta-generator.service');
+
+      const service = new CTAGeneratorService(aiModule.getProvider());
+      const result = await service.generateCTAs({
+        platform,
+        tone: tone || 'professional',
+        objective,
+        context,
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('CTA generation error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Suggest emojis
+   * POST /ai/emojis
+   */
+  static async suggestEmojis(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { content, platform, tone, maxEmojis } = req.body;
+
+      if (!content || !platform) {
+        res.status(400).json({
+          success: false,
+          message: 'Content and platform are required',
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { EmojiSuggestionService } = await import('../ai/services/emoji-suggestion.service');
+
+      const service = new EmojiSuggestionService(aiModule.getProvider());
+      const result = await service.suggestEmojis({
+        content,
+        platform,
+        tone: tone || 'casual',
+        maxEmojis,
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Emoji suggestion error:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Generate calendar posts for auto-fill
    * POST /ai/generate-calendar
    */

@@ -91,6 +91,31 @@ router.post('/analyze-sentiment', AIController.analyzeSentiment);
 router.post('/generate-calendar', checkAILimit, validateRequest(generateCalendarSchema), AIController.generateCalendarPosts);
 
 /**
+ * @route   POST /api/v1/ai/image-caption
+ */
+router.post('/image-caption', checkAILimit, AIController.generateImageCaption);
+
+/**
+ * @route   POST /api/v1/ai/brand-voice
+ */
+router.post('/brand-voice', checkAILimit, AIController.analyzeBrandVoice);
+
+/**
+ * @route   POST /api/v1/ai/templates
+ */
+router.post('/templates', checkAILimit, AIController.generateTemplates);
+
+/**
+ * @route   POST /api/v1/ai/cta
+ */
+router.post('/cta', checkAILimit, AIController.generateCTAs);
+
+/**
+ * @route   POST /api/v1/ai/emojis
+ */
+router.post('/emojis', checkAILimit, AIController.suggestEmojis);
+
+/**
  * @route   POST /api/v1/ai/moderate-content
  */
 router.post('/moderate-content', AIController.moderateContent);

@@ -59,6 +59,50 @@ export class OpenAIProvider extends BaseAIProvider {
     }
   }
 
+  async generateVisionCompletion(prompt: string, imageUrl: string, options?: any): Promise<string> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: 'gpt-4-vision-preview',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional social media content creator. Analyze images and generate engaging, platform-optimized captions.',
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageUrl,
+                  detail: options?.detail || 'auto',
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: options?.maxTokens || this.getMaxTokens(),
+        temperature: options?.temperature || this.getTemperature(),
+        ...options,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('No content generated');
+      }
+
+      return content.trim();
+    } catch (error: any) {
+      logger.error('OpenAI vision generation error:', error);
+      throw new Error(`OpenAI vision error: ${error.message}`);
+    }
+  }
+
   getTokenCount(text: string): number {
     // Rough estimation: ~4 characters per token
     // For production, use tiktoken library

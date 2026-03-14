@@ -114,8 +114,64 @@ export interface AIUsageLog {
   timestamp: Date;
 }
 
+export interface ImageCaptionInput {
+  imageUrl: string;
+  platform: SocialPlatform;
+  tone: ContentTone;
+  length: ContentLength;
+  context?: string;
+  keywords?: string[];
+}
+
+export interface ImageCaptionOutput {
+  caption: string;
+  tokensUsed: number;
+  provider: AIProvider;
+  model: string;
+}
+
+export interface BrandVoiceInput {
+  workspaceId: string;
+  sampleContent: string[];
+  industry?: string;
+  targetAudience?: string;
+  brandPersonality?: string[];
+}
+
+export interface BrandVoiceOutput {
+  voiceProfile: {
+    tone: string;
+    style: string;
+    vocabulary: string[];
+    phrases: string[];
+  };
+  tokensUsed: number;
+  provider: AIProvider;
+  model: string;
+}
+
+export interface TemplateGenerationInput {
+  industry: string;
+  platform: SocialPlatform;
+  contentType: 'product' | 'service' | 'announcement' | 'educational' | 'promotional';
+  tone: ContentTone;
+}
+
+export interface TemplateGenerationOutput {
+  templates: {
+    name: string;
+    template: string;
+    placeholders: string[];
+    description: string;
+  }[];
+  tokensUsed: number;
+  provider: AIProvider;
+  model: string;
+}
+
 export interface IAIProvider {
   generateCompletion(prompt: string, options?: any): Promise<string>;
+  generateVisionCompletion?(prompt: string, imageUrl: string, options?: any): Promise<string>;
   getTokenCount(text: string): number;
   getProviderName(): AIProvider;
   getModelName(): string;

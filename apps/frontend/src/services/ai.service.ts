@@ -173,6 +173,92 @@ export interface GenerateCalendarOutput {
   totalGenerated: number;
 }
 
+export interface ImageCaptionInput {
+  imageUrl: string;
+  platform: SocialPlatform;
+  tone?: ContentTone;
+  length?: ContentLength;
+  context?: string;
+  keywords?: string[];
+}
+
+export interface ImageCaptionOutput {
+  caption: string;
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
+export interface BrandVoiceAnalysisInput {
+  sampleContent: string[];
+  industry?: string;
+  targetAudience?: string;
+  brandPersonality?: string[];
+}
+
+export interface BrandVoiceAnalysisOutput {
+  voiceProfile: {
+    tone: string;
+    style: string;
+    vocabulary: string[];
+    phrases: string[];
+  };
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
+export interface TemplateGenerationInput {
+  industry: string;
+  platform: SocialPlatform;
+  contentType: 'product' | 'service' | 'announcement' | 'educational' | 'promotional';
+  tone?: ContentTone;
+}
+
+export interface TemplateGenerationOutput {
+  templates: {
+    name: string;
+    template: string;
+    placeholders: string[];
+    description: string;
+  }[];
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
+export interface CTAGenerationInput {
+  platform: SocialPlatform;
+  tone?: ContentTone;
+  objective: 'engagement' | 'conversion' | 'traffic' | 'awareness' | 'sales';
+  context?: string;
+}
+
+export interface CTAGenerationOutput {
+  ctas: string[];
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
+export interface EmojiSuggestionInput {
+  content: string;
+  platform: SocialPlatform;
+  tone?: ContentTone;
+  maxEmojis?: number;
+}
+
+export interface EmojiSuggestionOutput {
+  emojis: {
+    emoji: string;
+    description: string;
+    relevance: number;
+  }[];
+  tokensUsed: number;
+  provider: string;
+  model: string;
+}
+
 class AIService {
   /**
    * Generate caption variations for a given topic
@@ -353,6 +439,46 @@ class AIService {
    */
   async generateCalendarPosts(input: GenerateCalendarInput): Promise<GenerateCalendarOutput> {
     const response = await apiClient.post('/ai/generate-calendar', input);
+    return response.data;
+  }
+
+  /**
+   * Generate caption from image
+   */
+  async generateImageCaption(input: ImageCaptionInput): Promise<ImageCaptionOutput> {
+    const response = await apiClient.post('/ai/image-caption', input);
+    return response.data;
+  }
+
+  /**
+   * Analyze brand voice from sample content
+   */
+  async analyzeBrandVoice(input: BrandVoiceAnalysisInput): Promise<BrandVoiceAnalysisOutput> {
+    const response = await apiClient.post('/ai/brand-voice', input);
+    return response.data;
+  }
+
+  /**
+   * Generate industry-specific templates
+   */
+  async generateTemplates(input: TemplateGenerationInput): Promise<TemplateGenerationOutput> {
+    const response = await apiClient.post('/ai/templates', input);
+    return response.data;
+  }
+
+  /**
+   * Generate call-to-action phrases
+   */
+  async generateCTAs(input: CTAGenerationInput): Promise<CTAGenerationOutput> {
+    const response = await apiClient.post('/ai/cta', input);
+    return response.data;
+  }
+
+  /**
+   * Suggest relevant emojis for content
+   */
+  async suggestEmojis(input: EmojiSuggestionInput): Promise<EmojiSuggestionOutput> {
+    const response = await apiClient.post('/ai/emojis', input);
     return response.data;
   }
 }
