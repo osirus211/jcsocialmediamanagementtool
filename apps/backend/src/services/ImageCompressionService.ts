@@ -14,7 +14,63 @@ export interface CompressionOptions {
   quality?: number;
   format?: 'jpeg' | 'webp' | 'png';
   progressive?: boolean;
+  preserveExif?: boolean;
+  lossless?: boolean;
+  platform?: string; // Allow any string, validate at runtime
 }
+
+export interface PlatformSpecs {
+  maxSize: number;
+  recommendedWidth: number;
+  recommendedHeight: number;
+  quality: number;
+  format: 'jpeg' | 'webp' | 'png';
+}
+
+export const PLATFORM_SPECS: Record<string, PlatformSpecs> = {
+  instagram: { 
+    maxSize: 8 * 1024 * 1024, 
+    recommendedWidth: 1080, 
+    recommendedHeight: 1080, 
+    quality: 95,
+    format: 'jpeg'
+  },
+  twitter: { 
+    maxSize: 5 * 1024 * 1024, 
+    recommendedWidth: 1200, 
+    recommendedHeight: 675, 
+    quality: 85,
+    format: 'jpeg'
+  },
+  linkedin: { 
+    maxSize: 5 * 1024 * 1024, 
+    recommendedWidth: 1200, 
+    recommendedHeight: 627, 
+    quality: 85,
+    format: 'jpeg'
+  },
+  facebook: { 
+    maxSize: 4 * 1024 * 1024, 
+    recommendedWidth: 1200, 
+    recommendedHeight: 630, 
+    quality: 85,
+    format: 'jpeg'
+  },
+  tiktok: { 
+    maxSize: 72 * 1024 * 1024, 
+    recommendedWidth: 1080, 
+    recommendedHeight: 1920, 
+    quality: 90,
+    format: 'jpeg'
+  },
+  pinterest: { 
+    maxSize: 20 * 1024 * 1024, 
+    recommendedWidth: 1000, 
+    recommendedHeight: 1500, 
+    quality: 90,
+    format: 'jpeg'
+  },
+};
 
 export interface CompressionResult {
   buffer: Buffer;
@@ -45,31 +101,58 @@ export class ImageCompressionService {
     options: CompressionOptions = {}
   ): Promise<CompressionResult> {
     try {
-      const {
+      let {
         maxWidth = 2048,
         maxHeight = 2048,
         quality = 80,
         format = 'webp',
         progressive = true,
+        preserveExif = false,
+        lossless = false,
+        platform,
       } = options;
 
-      let pipeline = sharp(inputBuffer)
-        .resize(maxWidth, maxHeight, {
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .rotate(); // Auto-rotate based on EXIF
+      // Apply platform-specific optimizations
+      if (platform && Object.keys(PLATFORM_SPECS).includes(platform)) {
+        const spec = PLATFORM_SPECS[platform as keyof typeof PLATFORM_SPECS];
+        maxWidth = spec.recommendedWidth;
+        maxHeight = spec.recommendedHeight;
+        quality = spec.quality;
+        format = spec.format;
+      }
+
+      let pipeline = sharp(inputBuffer);
+
+      // Preserve or strip EXIF data
+      if (!preserveExif) {
+        pipeline = pipeline.rotate(); // Auto-rotate and strip EXIF
+      }
+
+      // Resize image
+      pipeline = pipeline.resize(maxWidth, maxHeight, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
 
       // Apply format-specific compression
       switch (format) {
         case 'webp':
-          pipeline = pipeline.webp({ quality });
+          pipeline = pipeline.webp({ 
+            quality: lossless ? 100 : quality,
+            lossless,
+          });
           break;
         case 'jpeg':
-          pipeline = pipeline.jpeg({ quality: quality + 5, progressive }); // Slightly higher quality for JPEG
+          pipeline = pipeline.jpeg({ 
+            quality: quality + 5, // Slightly higher quality for JPEG
+            progressive,
+          });
           break;
         case 'png':
-          pipeline = pipeline.png({ progressive, compressionLevel: 9 });
+          pipeline = pipeline.png({ 
+            progressive, 
+            compressionLevel: lossless ? 0 : 9,
+          });
           break;
       }
 
@@ -86,6 +169,40 @@ export class ImageCompressionService {
     } catch (error) {
       logger.error('Failed to compress image', { error });
       throw new Error(`Image compression failed: ${error}`);
+    }
+  }
+
+  /**
+   * Compress image for specific platform
+   */
+  static async compressForPlatform(
+    inputBuffer: Buffer,
+    platform: keyof typeof PLATFORM_SPECS,
+    customOptions: Partial<CompressionOptions> = {}
+  ): Promise<CompressionResult> {
+    const platformOptions: CompressionOptions = {
+      platform,
+      ...customOptions,
+    };
+
+    return this.compressImage(inputBuffer, platformOptions);
+  }
+
+  /**
+   * Batch compress images with different settings
+   */
+  static async batchCompress(
+    inputBuffer: Buffer,
+    optionsArray: CompressionOptions[]
+  ): Promise<CompressionResult[]> {
+    try {
+      const results = await Promise.all(
+        optionsArray.map(options => this.compressImage(inputBuffer, options))
+      );
+      return results;
+    } catch (error) {
+      logger.error('Failed to batch compress images', { error });
+      throw new Error(`Batch compression failed: ${error}`);
     }
   }
 

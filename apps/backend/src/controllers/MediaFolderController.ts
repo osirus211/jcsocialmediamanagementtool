@@ -5,7 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { mediaFolderService } from '../services/MediaFolderService';
+import { MediaFolderService } from '../services/MediaFolderService';
 import { mediaService } from '../services/MediaService';
 import { logger } from '../utils/logger';
 import { BadRequestError, UnauthorizedError } from '../utils/errors';
@@ -33,16 +33,16 @@ export class MediaFolderController {
         throw new BadRequestError('Folder name is required');
       }
 
-      const folder = await mediaFolderService.createFolder({
+      const folder = await MediaFolderService.createFolder(
         workspaceId,
         userId,
         name,
-        parentFolderId,
-      });
+        parentFolderId
+      );
 
       res.status(201).json({
         success: true,
-        data: folder.toJSON(),
+        data: folder,
       });
     } catch (error) {
       next(error);
@@ -62,14 +62,11 @@ export class MediaFolderController {
         throw new UnauthorizedError('Workspace context required');
       }
 
-      const folders = await mediaFolderService.getFolders(
-        workspaceId,
-        parentFolderId === 'null' ? null : (parentFolderId as string)
-      );
+      const folders = await MediaFolderService.getFolders(workspaceId);
 
       res.status(200).json({
         success: true,
-        data: folders.map(f => f.toJSON()),
+        data: folders,
       });
     } catch (error) {
       next(error);
@@ -90,14 +87,11 @@ export class MediaFolderController {
         throw new UnauthorizedError('Workspace context required');
       }
 
-      const folder = await mediaFolderService.updateFolder(id, workspaceId, {
-        name,
-        parentFolderId,
-      });
+      const folder = await MediaFolderService.renameFolder(id, workspaceId, name);
 
       res.status(200).json({
         success: true,
-        data: folder.toJSON(),
+        data: folder,
       });
     } catch (error) {
       next(error);
@@ -117,7 +111,7 @@ export class MediaFolderController {
         throw new UnauthorizedError('Workspace context required');
       }
 
-      await mediaFolderService.deleteFolder(id, workspaceId);
+      await MediaFolderService.deleteFolder(workspaceId, id);
 
       res.status(200).json({
         success: true,
@@ -142,14 +136,7 @@ export class MediaFolderController {
         throw new UnauthorizedError('Workspace context required');
       }
 
-      // Validate folder exists if provided
-      if (folderId) {
-        const folder = await mediaFolderService.getFolderById(folderId, workspaceId);
-        if (!folder) {
-          throw new BadRequestError('Folder not found');
-        }
-      }
-
+      // Move media to folder
       const media = await mediaService.moveToFolder(id, workspaceId, folderId || null);
 
       if (!media) {

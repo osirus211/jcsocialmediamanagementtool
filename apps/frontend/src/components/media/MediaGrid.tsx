@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Media } from '@/types/composer.types';
-import { Trash2, Check, Play } from 'lucide-react';
+import { Trash2, Check, Play, Copy, Download, MoreHorizontal } from 'lucide-react';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 
 interface MediaGridProps {
@@ -8,7 +8,10 @@ interface MediaGridProps {
   selectedMediaIds?: string[];
   onSelect?: (mediaId: string) => void;
   onDelete?: (mediaId: string) => void;
+  onCopyUrl?: (mediaId: string, url: string) => void;
+  onDownload?: (mediaId: string, url: string, filename: string) => void;
   selectable?: boolean;
+  showBulkActions?: boolean;
 }
 
 /**
@@ -33,11 +36,15 @@ export function MediaGrid({
   selectedMediaIds = [],
   onSelect,
   onDelete,
+  onCopyUrl,
+  onDownload,
   selectable = false,
+  showBulkActions = false,
 }: MediaGridProps) {
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [mediaToDelete, setMediaToDelete] = useState<Media | null>(null);
+  const [hoveredMediaId, setHoveredMediaId] = useState<string | null>(null);
 
   /**
    * Handle media selection
@@ -58,8 +65,38 @@ export function MediaGrid({
   }, []);
 
   /**
-   * Handle delete confirm
+   * Handle copy URL
    */
+  const handleCopyUrl = useCallback(async (media: Media, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCopyUrl) {
+      onCopyUrl(media._id, media.url);
+    } else {
+      try {
+        await navigator.clipboard.writeText(media.url);
+        // Show success toast
+      } catch (err) {
+        console.error('Failed to copy URL:', err);
+      }
+    }
+  }, [onCopyUrl]);
+
+  /**
+   * Handle download
+   */
+  const handleDownload = useCallback((media: Media, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDownload) {
+      onDownload(media._id, media.url, media.filename);
+    } else {
+      const link = document.createElement('a');
+      link.href = media.url;
+      link.download = media.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }, [onDownload]);
   const handleDeleteConfirm = useCallback(async () => {
     if (!mediaToDelete || !onDelete) return;
     
@@ -92,7 +129,9 @@ export function MediaGrid({
             <div
               key={item._id}
               onClick={() => selectable && handleSelect(item._id)}
-              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+              onMouseEnter={() => setHoveredMediaId(item._id)}
+              onMouseLeave={() => setHoveredMediaId(null)}
+              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all group ${
                 selectable ? 'cursor-pointer' : ''
               } ${
                 selected
@@ -115,21 +154,53 @@ export function MediaGrid({
                 </div>
               )}
               
+              {/* Selection checkbox for bulk actions */}
+              {showBulkActions && (
+                <div className="absolute top-2 left-2">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => handleSelect(item._id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </div>
+              )}
+              
               {/* Selection indicator */}
-              {selectable && selected && (
+              {selectable && selected && !showBulkActions && (
                 <div className="absolute top-2 right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                   <Check className="w-4 h-4 text-white" />
                 </div>
               )}
               
-              {/* Delete button */}
-              {onDelete && !selectable && (
-                <button
-                  onClick={(e) => handleDeleteClick(item, e)}
-                  className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+              {/* Action buttons on hover */}
+              {hoveredMediaId === item._id && !selectable && (
+                <div className="absolute top-2 right-2 flex gap-1">
+                  <button
+                    onClick={(e) => handleCopyUrl(item, e)}
+                    className="p-1.5 bg-black bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all"
+                    title="Copy URL"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => handleDownload(item, e)}
+                    className="p-1.5 bg-black bg-opacity-70 text-white rounded-full hover:bg-opacity-90 transition-all"
+                    title="Download"
+                  >
+                    <Download className="w-3 h-3" />
+                  </button>
+                  {onDelete && (
+                    <button
+                      onClick={(e) => handleDeleteClick(item, e)}
+                      className="p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               )}
               
               {/* Hover overlay */}

@@ -48,7 +48,7 @@ export function MediaSelector({
     const fetchMedia = async () => {
       try {
         setIsLoading(true);
-        const response = await composerService.getMediaLibrary(1, 50);
+        const response = await composerService.getMediaLibrary({ page: 1, limit: 50 });
         setMedia(response.media);
       } catch (error) {
         console.error('Fetch media error:', error);
@@ -96,7 +96,7 @@ export function MediaSelector({
     });
 
     // Refresh media library
-    composerService.getMediaLibrary(1, 50).then((response) => {
+    composerService.getMediaLibrary({ page: 1, limit: 50 }).then((response) => {
       setMedia(response.media);
     });
 
@@ -112,7 +112,7 @@ export function MediaSelector({
     handleUploadComplete([file.name]); // Simplified for now
     
     // Refresh media library to include new stock photo
-    composerService.getMediaLibrary(1, 50).then((response) => {
+    composerService.getMediaLibrary({ page: 1, limit: 50 }).then((response) => {
       setMedia(response.media);
     });
   }, [handleUploadComplete]);

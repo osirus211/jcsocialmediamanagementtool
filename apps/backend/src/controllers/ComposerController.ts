@@ -9,6 +9,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { composerService } from '../services/ComposerService';
 import { mediaUploadService } from '../services/MediaUploadService';
+import { ImageCompressionService, PLATFORM_SPECS } from '../services/ImageCompressionService';
+import { mediaStorageService } from '../services/MediaStorageService';
+import { Media } from '../models/Media';
 import { PublishMode } from '../models/Post';
 import { BadRequestError } from '../utils/errors';
 import { getPaginationParams } from '../utils/pagination';
@@ -297,6 +300,305 @@ export class ComposerController {
         success: true,
         slots: slots.map((s) => s.toJSON()),
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Compress media file
+   * POST /api/composer/media/:mediaId/compress
+   */
+  async compressMedia(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { mediaId } = req.params;
+      const { quality, format, maxWidth, maxHeight, platform, preserveExif, lossless } = req.body;
+
+      // Get media from database
+      const media = await Media.findById(mediaId);
+      if (!media) {
+        res.status(404).json({ error: 'Media not found' });
+        return;
+      }
+
+      // Only compress images
+      if (!media.mimeType?.startsWith('image/')) {
+        res.status(400).json({ error: 'Only images can be compressed' });
+        return;
+      }
+
+      // Get file from storage using presigned URL
+      const downloadUrl = await mediaStorageService.generatePresignedDownloadUrl(media.storageKey);
+      const response = await fetch(downloadUrl);
+      const originalBuffer = Buffer.from(await response.arrayBuffer());
+
+      // Compress image
+      const compressionOptions = {
+        quality: quality || 85,
+        format: format || 'webp',
+        maxWidth: maxWidth || 2048,
+        maxHeight: maxHeight || 2048,
+        preserveExif: preserveExif || false,
+        lossless: lossless || false,
+        platform: platform && Object.keys(PLATFORM_SPECS).includes(platform) ? platform : undefined,
+      };
+
+      const compressedResult = await ImageCompressionService.compressImage(
+        originalBuffer,
+        compressionOptions
+      );
+
+      // Generate new key for compressed file
+      const fileExtension = compressedResult.format === 'webp' ? 'webp' : 
+                           compressedResult.format === 'jpeg' ? 'jpg' : 
+                           compressedResult.format;
+      const compressedKey = `${media.storageKey.replace(/\.[^/.]+$/, '')}_compressed.${fileExtension}`;
+
+      // Upload compressed file to storage
+      await mediaStorageService.uploadBuffer(
+        compressedKey,
+        compressedResult.buffer,
+        `image/${compressedResult.format}`
+      );
+
+      const compressedUrl = mediaStorageService.buildCdnUrl(compressedKey);
+
+      // Generate thumbnails for compressed image
+      const thumbnails = await ImageCompressionService.generateThumbnails(
+        compressedResult.buffer,
+        compressedKey
+      );
+
+      // Upload thumbnails
+      const thumbnailUrls: Record<string, string> = {};
+      for (const [size, thumbnail] of Object.entries(thumbnails)) {
+        await mediaStorageService.uploadBuffer(
+          thumbnail.key,
+          thumbnail.buffer,
+          'image/webp'
+        );
+        thumbnailUrls[size] = mediaStorageService.buildCdnUrl(thumbnail.key);
+      }
+
+      // Create new media record for compressed version
+      const compressedMedia = new Media({
+        filename: `compressed_${media.filename}`,
+        originalFilename: media.originalFilename,
+        mimeType: `image/${compressedResult.format}`,
+        mediaType: 'image',
+        size: compressedResult.size,
+        width: compressedResult.width,
+        height: compressedResult.height,
+        storageProvider: 's3',
+        storageKey: compressedKey,
+        storageUrl: compressedUrl,
+        thumbnailUrl: thumbnailUrls.medium,
+        thumbnails: thumbnailUrls,
+        workspaceId: media.workspaceId,
+        userId: media.userId,
+        uploadedBy: media.uploadedBy,
+        tags: [...(media.tags || []), 'compressed'],
+        folderId: media.folderId,
+        status: 'ready',
+        uploadStatus: 'uploaded',
+        processingStatus: 'completed',
+      });
+
+      await compressedMedia.save();
+
+      res.json({
+        success: true,
+        original: {
+          id: media._id,
+          size: media.size,
+          width: media.width,
+          height: media.height,
+        },
+        compressed: {
+          id: compressedMedia._id,
+          size: compressedResult.size,
+          width: compressedResult.width,
+          height: compressedResult.height,
+          url: compressedUrl,
+          compressionRatio: Math.round(((media.size - compressedResult.size) / media.size) * 100),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Batch compress multiple media files
+   * POST /api/composer/media/batch-compress
+   */
+  async batchCompressMedia(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { mediaIds, compressionOptions } = req.body;
+
+      if (!Array.isArray(mediaIds) || mediaIds.length === 0) {
+        res.status(400).json({ error: 'Media IDs array is required' });
+        return;
+      }
+
+      const results = [];
+
+      for (const mediaId of mediaIds) {
+        try {
+          // Get media from database
+          const media = await Media.findById(mediaId);
+          if (!media || !media.mimeType?.startsWith('image/')) {
+            results.push({
+              mediaId,
+              success: false,
+              error: 'Media not found or not an image',
+            });
+            continue;
+          }
+
+          // Download and compress
+          const downloadUrl = await mediaStorageService.generatePresignedDownloadUrl(media.storageKey);
+          const response = await fetch(downloadUrl);
+          const originalBuffer = Buffer.from(await response.arrayBuffer());
+
+          const compressedResult = await ImageCompressionService.compressImage(
+            originalBuffer,
+            compressionOptions
+          );
+
+          // Upload compressed version
+          const fileExtension = compressedResult.format === 'webp' ? 'webp' : 
+                               compressedResult.format === 'jpeg' ? 'jpg' : 
+                               compressedResult.format;
+          const compressedKey = `${media.storageKey.replace(/\.[^/.]+$/, '')}_compressed.${fileExtension}`;
+          
+          await mediaStorageService.uploadBuffer(
+            compressedKey,
+            compressedResult.buffer,
+            `image/${compressedResult.format}`
+          );
+
+          const compressedUrl = mediaStorageService.buildCdnUrl(compressedKey);
+
+          // Generate thumbnails
+          const thumbnails = await ImageCompressionService.generateThumbnails(
+            compressedResult.buffer,
+            compressedKey
+          );
+
+          const thumbnailUrls: Record<string, string> = {};
+          for (const [size, thumbnail] of Object.entries(thumbnails)) {
+            await mediaStorageService.uploadBuffer(
+              thumbnail.key,
+              thumbnail.buffer,
+              'image/webp'
+            );
+            thumbnailUrls[size] = mediaStorageService.buildCdnUrl(thumbnail.key);
+          }
+
+          // Create compressed media record
+          const compressedMedia = new Media({
+            filename: `compressed_${media.filename}`,
+            originalFilename: media.originalFilename,
+            mimeType: `image/${compressedResult.format}`,
+            mediaType: 'image',
+            size: compressedResult.size,
+            width: compressedResult.width,
+            height: compressedResult.height,
+            storageProvider: 's3',
+            storageKey: compressedKey,
+            storageUrl: compressedUrl,
+            thumbnailUrl: thumbnailUrls.medium,
+            thumbnails: thumbnailUrls,
+            workspaceId: media.workspaceId,
+            userId: media.userId,
+            uploadedBy: media.uploadedBy,
+            tags: [...(media.tags || []), 'compressed'],
+            folderId: media.folderId,
+            status: 'ready',
+            uploadStatus: 'uploaded',
+            processingStatus: 'completed',
+          });
+
+          await compressedMedia.save();
+
+          results.push({
+            mediaId,
+            success: true,
+            original: {
+              size: media.size,
+              width: media.width,
+              height: media.height,
+            },
+            compressed: {
+              id: compressedMedia._id,
+              size: compressedResult.size,
+              width: compressedResult.width,
+              height: compressedResult.height,
+              url: compressedUrl,
+              compressionRatio: Math.round(((media.size - compressedResult.size) / media.size) * 100),
+            },
+          });
+        } catch (error) {
+          results.push({
+            mediaId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Compression failed',
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        results,
+        summary: {
+          total: mediaIds.length,
+          successful: results.filter(r => r.success).length,
+          failed: results.filter(r => !r.success).length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get platform-specific compression recommendations
+   * GET /api/composer/compression/recommendations/:platform?
+   */
+  async getCompressionRecommendations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { platform } = req.params;
+
+      if (platform && !Object.keys(PLATFORM_SPECS).includes(platform)) {
+        res.status(400).json({ error: 'Invalid platform' });
+        return;
+      }
+
+      if (platform) {
+        const spec = PLATFORM_SPECS[platform as keyof typeof PLATFORM_SPECS];
+        res.json({
+          platform,
+          recommendations: {
+            maxSize: spec.maxSize,
+            recommendedWidth: spec.recommendedWidth,
+            recommendedHeight: spec.recommendedHeight,
+            quality: spec.quality,
+            format: spec.format,
+          },
+        });
+      } else {
+        res.json({
+          platforms: Object.entries(PLATFORM_SPECS).map(([key, spec]) => ({
+            platform: key,
+            maxSize: spec.maxSize,
+            recommendedWidth: spec.recommendedWidth,
+            recommendedHeight: spec.recommendedHeight,
+            quality: spec.quality,
+            format: spec.format,
+          })),
+        });
+      }
     } catch (error) {
       next(error);
     }

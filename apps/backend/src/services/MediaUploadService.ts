@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { Media, MediaType, MediaStatus, IMedia } from '../models/Media';
 import { logger } from '../utils/logger';
+import { mediaStorageService } from '../services/MediaStorageService';
 import { BadRequestError } from '../utils/errors';
 import { withSpan } from '../config/telemetry';
 import {
@@ -458,8 +459,155 @@ export class MediaUploadService {
   }
 
   /**
-   * Get media library with search and filtering
+   * Bulk delete media
    */
+  async bulkDeleteMedia(workspaceId: string, mediaIds: string[]): Promise<void> {
+    try {
+      const media = await Media.find({
+        _id: { $in: mediaIds.map(id => new mongoose.Types.ObjectId(id)) },
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      });
+
+      // Delete from storage
+      for (const item of media) {
+        try {
+          await mediaStorageService.deleteMedia(item.storageKey);
+        } catch (error) {
+          logger.warn('Failed to delete media from storage', {
+            mediaId: item._id,
+            storageKey: item.storageKey,
+            error: error.message,
+          });
+        }
+      }
+
+      // Delete from database
+      await Media.deleteMany({
+        _id: { $in: mediaIds.map(id => new mongoose.Types.ObjectId(id)) },
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      });
+
+      logger.info('Bulk deleted media', {
+        workspaceId,
+        mediaIds,
+        count: media.length,
+      });
+    } catch (error: any) {
+      logger.error('Bulk delete media failed', {
+        workspaceId,
+        mediaIds,
+        error: error.message,
+      });
+      throw new Error(`Bulk delete failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update media
+   */
+  async updateMedia(workspaceId: string, mediaId: string, updates: any): Promise<IMedia> {
+    try {
+      const media = await Media.findOneAndUpdate(
+        {
+          _id: new mongoose.Types.ObjectId(mediaId),
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        },
+        updates,
+        { new: true }
+      );
+
+      if (!media) {
+        throw new Error('Media not found');
+      }
+
+      logger.info('Media updated', {
+        workspaceId,
+        mediaId,
+        updates,
+      });
+
+      return media as unknown as IMedia;
+    } catch (error: any) {
+      logger.error('Update media failed', {
+        workspaceId,
+        mediaId,
+        updates,
+        error: error.message,
+      });
+      throw new Error(`Update media failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get media by IDs
+   */
+  async getMediaByIds(workspaceId: string, mediaIds: string[]): Promise<IMedia[]> {
+    try {
+      const media = await Media.find({
+        _id: { $in: mediaIds.map(id => new mongoose.Types.ObjectId(id)) },
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      });
+
+      return media as unknown as IMedia[];
+    } catch (error: any) {
+      logger.error('Get media by IDs failed', {
+        workspaceId,
+        mediaIds,
+        error: error.message,
+      });
+      throw new Error(`Get media by IDs failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get storage usage for workspace
+   */
+  async getStorageUsage(workspaceId: string): Promise<{
+    used: number;
+    total: number;
+    images: number;
+    videos: number;
+  }> {
+    try {
+      const [totalUsage, imageUsage, videoUsage] = await Promise.all([
+        Media.aggregate([
+          { $match: { workspaceId: new mongoose.Types.ObjectId(workspaceId) } },
+          { $group: { _id: null, totalSize: { $sum: '$size' } } },
+        ]),
+        Media.aggregate([
+          { 
+            $match: { 
+              workspaceId: new mongoose.Types.ObjectId(workspaceId),
+              mediaType: MediaType.IMAGE,
+            } 
+          },
+          { $group: { _id: null, totalSize: { $sum: '$size' } } },
+        ]),
+        Media.aggregate([
+          { 
+            $match: { 
+              workspaceId: new mongoose.Types.ObjectId(workspaceId),
+              mediaType: MediaType.VIDEO,
+            } 
+          },
+          { $group: { _id: null, totalSize: { $sum: '$size' } } },
+        ]),
+      ]);
+
+      const used = totalUsage[0]?.totalSize || 0;
+      const images = imageUsage[0]?.totalSize || 0;
+      const videos = videoUsage[0]?.totalSize || 0;
+      const total = 5 * 1024 * 1024 * 1024; // 5GB default
+
+      return { used, total, images, videos };
+    } catch (error: any) {
+      logger.error('Get storage usage failed', {
+        workspaceId,
+        error: error.message,
+      });
+      throw new Error(`Get storage usage failed: ${error.message}`);
+    }
+  }
   async getMediaLibrary(options: {
     workspaceId: string;
     search?: string;

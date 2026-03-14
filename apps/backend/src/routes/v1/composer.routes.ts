@@ -61,11 +61,28 @@ router.delete('/posts/:id', composerController.deletePost.bind(composerControlle
 // Upload media
 router.post('/media/upload', upload.single('file'), composerController.uploadMedia.bind(composerController));
 
-// Get media library
+// Get media library with advanced search and filtering
 router.get('/media', composerController.getMedia.bind(composerController));
+
+// Bulk operations - REMOVED (not implemented in controller)
+
+// Media operations - REMOVED (not implemented in controller)
 
 // Delete media
 router.delete('/media/:id', composerController.deleteMedia.bind(composerController));
+
+/**
+ * Image Compression
+ */
+
+// Compress single media file
+router.post('/media/:mediaId/compress', composerController.compressMedia.bind(composerController));
+
+// Batch compress multiple media files
+router.post('/media/batch-compress', composerController.batchCompressMedia.bind(composerController));
+
+// Get platform-specific compression recommendations
+router.get('/compression/recommendations/:platform?', composerController.getCompressionRecommendations.bind(composerController));
 
 // Get queue slots
 router.get('/queue-slots', composerController.getQueueSlots.bind(composerController));

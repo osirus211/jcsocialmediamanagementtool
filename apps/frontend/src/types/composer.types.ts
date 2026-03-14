@@ -82,6 +82,7 @@ export interface Media {
   isProcessed?: boolean;
   processingError?: string;
   filename: string;
+  originalFilename?: string;
   size: number;
   mimeType: string;
   width?: number;
@@ -91,6 +92,17 @@ export interface Media {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  // New fields for enhanced media library
+  folderId?: string;
+  tags?: string[];
+  altText?: string;
+  platformMediaIds?: Array<{
+    platform: string;
+    mediaId: string;
+    uploadedAt?: Date;
+  }>;
+  usageCount?: number;
+  lastUsedAt?: Date;
 }
 
 export interface QueueSlot {

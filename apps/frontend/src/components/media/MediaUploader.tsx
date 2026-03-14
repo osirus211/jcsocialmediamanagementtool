@@ -1,9 +1,13 @@
-import { useCallback, useRef } from 'react';
-import { Upload, X, AlertCircle } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
+import { Upload, X, AlertCircle, Settings } from 'lucide-react';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
+import { CompressionSettings, CompressionOptions } from './CompressionSettings';
+import { CompressionPreview } from './CompressionPreview';
+import { BulkCompressionModal } from './BulkCompressionModal';
 
 interface MediaUploaderProps {
   onUploadComplete?: (mediaIds: string[]) => void;
+  showCompressionSettings?: boolean;
 }
 
 /**
@@ -25,9 +29,21 @@ interface MediaUploaderProps {
  * - Error handling
  * - No UI freeze
  */
-export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
+export function MediaUploader({ onUploadComplete, showCompressionSettings = false }: MediaUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [compressionOptions, setCompressionOptions] = useState<CompressionOptions>({
+    quality: 85,
+    format: 'auto',
+    maxWidth: 2048,
+    maxHeight: 2048,
+    preserveExif: false,
+    lossless: false,
+  });
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [showBulkCompression, setShowBulkCompression] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   
   const {
     uploadingFiles,
@@ -43,12 +59,29 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
     if (!files || files.length === 0) return;
     
     const fileArray = Array.from(files);
+    
+    // If compression settings are enabled and we have images, show compression options
+    if (showCompressionSettings && fileArray.some(f => f.type.startsWith('image/'))) {
+      const imageFiles = fileArray.filter(f => f.type.startsWith('image/'));
+      
+      if (imageFiles.length === 1) {
+        setPreviewFile(imageFiles[0]);
+        setShowSettings(true);
+        return;
+      } else if (imageFiles.length > 1) {
+        setPendingFiles(imageFiles);
+        setShowBulkCompression(true);
+        return;
+      }
+    }
+    
+    // Direct upload without compression
     const uploadedMedia = await uploadFiles(fileArray);
     
     if (uploadedMedia.length > 0 && onUploadComplete) {
       onUploadComplete(uploadedMedia.map((m) => m._id));
     }
-  }, [uploadFiles, onUploadComplete]);
+  }, [uploadFiles, onUploadComplete, showCompressionSettings]);
 
   /**
    * Handle drag events
@@ -93,6 +126,28 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
 
   return (
     <div className="space-y-4">
+      {/* Compression Settings Toggle */}
+      {showCompressionSettings && (
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-gray-700">Upload Settings</h3>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md"
+          >
+            <Settings className="w-4 h-4" />
+            Compression
+          </button>
+        </div>
+      )}
+
+      {/* Compression Settings Panel */}
+      {showSettings && (
+        <CompressionSettings
+          options={compressionOptions}
+          onOptionsChange={setCompressionOptions}
+        />
+      )}
+
       {/* Drop zone */}
       <div
         onDragEnter={handleDragEnter}
@@ -120,6 +175,12 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
           Supported: JPEG, PNG, GIF, WebP, MP4, MOV, AVI, WebM
           <br />
           Max size: 10MB (images), 100MB (videos)
+          {showCompressionSettings && (
+            <>
+              <br />
+              <span className="text-blue-600">✨ Smart compression enabled</span>
+            </>
+          )}
         </p>
         
         <input
@@ -131,6 +192,23 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
           className="hidden"
         />
       </div>
+
+      {/* Single File Compression Preview */}
+      {previewFile && (
+        <CompressionPreview
+          originalFile={previewFile}
+          compressionOptions={compressionOptions}
+          onCompressionComplete={async (compressedFile, stats) => {
+            // Upload the compressed file
+            const uploadedMedia = await uploadFiles([compressedFile]);
+            if (uploadedMedia.length > 0 && onUploadComplete) {
+              onUploadComplete(uploadedMedia.map((m) => m._id));
+            }
+            setPreviewFile(null);
+            setShowSettings(false);
+          }}
+        />
+      )}
 
       {/* Uploading files */}
       {uploadingFiles.length > 0 && (
@@ -193,9 +271,31 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
           ))}
         </div>
       )}
+
+      {/* Bulk Compression Modal */}
+      {showBulkCompression && (
+        <BulkCompressionModal
+          files={pendingFiles}
+          onClose={() => {
+            setShowBulkCompression(false);
+            setPendingFiles([]);
+          }}
+          onComplete={async (results) => {
+            const compressedFiles = results
+              .filter(r => r.compressedFile)
+              .map(r => r.compressedFile!);
+            
+            if (compressedFiles.length > 0) {
+              const uploadedMedia = await uploadFiles(compressedFiles);
+              if (uploadedMedia.length > 0 && onUploadComplete) {
+                onUploadComplete(uploadedMedia.map((m) => m._id));
+              }
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// Add missing import
-import { useState } from 'react';
+
