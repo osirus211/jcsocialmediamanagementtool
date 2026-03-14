@@ -77,13 +77,18 @@ export class PinterestPublisher implements IPublisher {
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
     // Convert options to IPost format for compatibility with existing method
+    const altTexts = (options.metadata?.altTexts as string[]) || [];
     const post = {
       content: options.content,
       mediaUrls: options.mediaIds || [],
-      metadata: options.metadata,
-    } as IPost;
+      metadata: {
+        ...options.metadata,
+        altText: altTexts[0], // Use first alt text for single image pins
+        altTexts, // Keep all alt texts for potential multi-image support
+      },
+    } as Partial<IPost>;
 
-    const result = await this.publish(account, post);
+    const result = await this.publish(account, post as IPost);
     return {
       platformPostId: result.postId,
       url: result.url,

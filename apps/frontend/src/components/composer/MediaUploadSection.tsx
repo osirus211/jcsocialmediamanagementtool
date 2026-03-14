@@ -3,7 +3,7 @@ import { MediaFile, FILE_VALIDATION } from '@/types/composer.types';
 import { MediaItem } from './MediaItem';
 import { DesignImportPanel } from '../media/DesignImportPanel';
 import { StockPhotoPanel } from '../media/StockPhotoPanel';
-import { Upload, Image, Video, Palette, Search } from 'lucide-react';
+import { Upload, Image, Video, Palette, Search, Eye, AlertCircle, Wand2 } from 'lucide-react';
 import { compressImageFile, isImageFile } from '@/utils/imageCompression';
 
 interface MediaUploadSectionProps {
@@ -248,22 +248,90 @@ const MediaUploadSection = memo(function MediaUploadSection({
 
       {/* Media Grid */}
       {media.length > 0 && (
-        <div 
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-          role="list"
-          aria-label="Uploaded media files"
-        >
-          {media.map((item) => (
-            <MediaItem
-              key={item.id}
-              media={item}
-              selectedPlatforms={selectedPlatforms}
-              onRemove={onRemove}
-              onMediaUpdate={handleMediaUpdate}
-              onMediaReplace={onMediaReplace}
-            />
-          ))}
-        </div>
+        <>
+          <div 
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+            role="list"
+            aria-label="Uploaded media files"
+          >
+            {media.map((item) => (
+              <MediaItem
+                key={item.id}
+                media={item}
+                selectedPlatforms={selectedPlatforms}
+                onRemove={onRemove}
+                onMediaUpdate={handleMediaUpdate}
+                onMediaReplace={onMediaReplace}
+              />
+            ))}
+          </div>
+
+          {/* Accessibility Score */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">Accessibility Score</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {(() => {
+                const altTextCount = media.filter(item => 
+                  item.metadata?.altText || 
+                  (item.metadata?.platformAltTexts && Object.values(item.metadata.platformAltTexts).some(text => !!text))
+                ).length;
+                const score = media.length > 0 ? Math.round((altTextCount / media.length) * 100) : 100;
+                const level = score === 100 ? 'excellent' : score >= 50 ? 'good' : 'poor';
+                const color = level === 'excellent' ? 'text-green-600' : level === 'good' ? 'text-yellow-600' : 'text-red-600';
+                
+                return (
+                  <>
+                    <span className={`text-sm font-medium ${color}`}>
+                      {altTextCount}/{media.length} images have alt text
+                    </span>
+                    <div className={`px-2 py-1 text-xs font-medium rounded ${
+                      level === 'excellent' ? 'bg-green-100 text-green-800' :
+                      level === 'good' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {score}% ({level})
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Bulk Alt Text Action */}
+          {(() => {
+            const missingAltText = media.filter(item => 
+              !item.metadata?.altText && 
+              !(item.metadata?.platformAltTexts && Object.values(item.metadata.platformAltTexts).some(text => !!text))
+            );
+            
+            if (missingAltText.length > 0) {
+              return (
+                <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm text-orange-800">
+                      {missingAltText.length} image{missingAltText.length > 1 ? 's' : ''} missing alt text
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // TODO: Implement bulk alt text generation
+                      console.log('Bulk alt text generation for:', missingAltText);
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700"
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Add Alt Text to All
+                  </button>
+                </div>
+              );
+            }
+            return null;
+          })()}
+        </>
       )}
 
       {/* File Count */}

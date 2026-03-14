@@ -73,6 +73,7 @@ export interface PlatformContent {
   platform: string;
   text?: string;
   mediaIds?: string[];
+  altTexts?: string[]; // Alt text for each media item
   enabled: boolean;
 }
 
@@ -203,6 +204,7 @@ const PostSchema = new Schema<IPost>(
           platform: { type: String, required: true },
           text: { type: String },
           mediaIds: { type: [String] },
+          altTexts: { type: [String] }, // Alt text for each media item
           enabled: { type: Boolean, default: true },
         },
       ],

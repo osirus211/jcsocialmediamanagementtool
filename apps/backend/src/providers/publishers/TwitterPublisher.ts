@@ -101,10 +101,12 @@ export class TwitterPublisher extends BasePublisher {
 
         // Add alt text if provided
         if (altTexts.length > 0) {
-          payload.media.tagged_user_ids = altTexts.map((altText, index) => ({
-            media_id: mediaIds[index],
-            alt_text: altText,
-          }));
+          // Note: Alt text must be set during media upload, not during tweet creation
+          // This is handled in the uploadMedia method
+          logger.info('Alt text will be applied during media upload', {
+            altTextCount: altTexts.length,
+            mediaCount: mediaIds.length,
+          });
         }
       }
 

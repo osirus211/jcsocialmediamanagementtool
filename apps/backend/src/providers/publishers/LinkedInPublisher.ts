@@ -24,6 +24,7 @@ interface LinkedInMediaAsset {
   asset: string;
   status: string;
   media?: string;
+  altText?: string;
 }
 
 interface LinkedInUploadResponse {
@@ -42,7 +43,7 @@ export class LinkedInPublisher extends BasePublisher {
   readonly platform = 'linkedin';
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
-    const { content, mediaIds = [] } = options;
+    const { content, mediaIds = [], metadata } = options;
 
     this.validateContentLength(content, MAX_CONTENT_LENGTH);
     this.validateMediaCount(mediaIds, MAX_MEDIA_COUNT);
@@ -51,8 +52,25 @@ export class LinkedInPublisher extends BasePublisher {
     const authorUrn = this.getAuthorUrn(account);
 
     try {
+      // Upload media with alt text if provided
+      const mediaAssets: LinkedInMediaAsset[] = [];
+      if (mediaIds.length > 0) {
+        const altTexts = (metadata?.altTexts as string[]) || [];
+        
+        for (let i = 0; i < mediaIds.length; i++) {
+          const mediaUrl = mediaIds[i];
+          const altText = altTexts[i];
+          
+          const asset = await this.uploadMediaFromUrl(accessToken, authorUrn, mediaUrl);
+          if (altText) {
+            asset.altText = altText;
+          }
+          mediaAssets.push(asset);
+        }
+      }
+
       // Build UGC post payload
-      const payload = this.buildUGCPost(authorUrn, content, []);
+      const payload = this.buildUGCPost(authorUrn, content, mediaAssets);
 
       const response = await this.httpClient.post(`${LINKEDIN_API_BASE}/ugcPosts`, payload, {
         headers: {
@@ -67,6 +85,8 @@ export class LinkedInPublisher extends BasePublisher {
       logger.info('LinkedIn post published successfully', {
         postId,
         accountId: account._id.toString(),
+        hasMedia: mediaAssets.length > 0,
+        hasAltText: mediaAssets.some(asset => !!asset.altText),
       });
 
       return {
@@ -510,10 +530,23 @@ export class LinkedInPublisher extends BasePublisher {
         payload.specificContent['com.linkedin.ugc.ShareContent'].shareMediaCategory = 'IMAGE';
       }
 
-      payload.specificContent['com.linkedin.ugc.ShareContent'].media = mediaAssets.map((asset) => ({
-        status: 'READY',
-        media: asset.asset,
-      }));
+      payload.specificContent['com.linkedin.ugc.ShareContent'].media = mediaAssets.map((asset) => {
+        const mediaItem: any = {
+          status: 'READY',
+          media: asset.asset,
+        };
+
+        // Add alt text if available (LinkedIn uses description field)
+        if (asset.altText) {
+          mediaItem.description = {
+            localized: {
+              en_US: asset.altText,
+            },
+          };
+        }
+
+        return mediaItem;
+      });
     }
 
     return payload;

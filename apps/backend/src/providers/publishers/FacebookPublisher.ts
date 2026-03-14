@@ -144,7 +144,7 @@ export class FacebookPublisher extends BasePublisher {
    * Publish photo post to Facebook page
    */
   async publishPhotoPost(account: ISocialAccount, options: FacebookPublishOptions): Promise<PublishPostResult> {
-    const { content, mediaIds = [], scheduledPublishTime, published = true } = options;
+    const { content, mediaIds = [], scheduledPublishTime, published = true, metadata } = options;
     const accessToken = this.getAccessToken(account);
     const pageId = account.metadata?.pageId || account.providerUserId;
 
@@ -152,12 +152,19 @@ export class FacebookPublisher extends BasePublisher {
       throw new Error('Photo post requires at least one media item');
     }
 
+    const altTexts = (metadata?.altTexts as string[]) || [];
+
     const payload: any = {
       url: mediaIds[0], // Assuming mediaIds contain URLs for photos
       caption: content,
       published,
       access_token: accessToken,
     };
+
+    // Add alt text if provided
+    if (altTexts[0]) {
+      payload.alt_text_custom = altTexts[0];
+    }
 
     if (scheduledPublishTime) {
       payload.scheduled_publish_time = scheduledPublishTime;
@@ -174,6 +181,7 @@ export class FacebookPublisher extends BasePublisher {
     logger.info('Facebook photo post published', {
       postId,
       scheduled: !!scheduledPublishTime,
+      hasAltText: !!altTexts[0],
       accountId: account._id.toString(),
     });
 
@@ -188,7 +196,7 @@ export class FacebookPublisher extends BasePublisher {
    * Publish album (multiple photos) to Facebook page
    */
   async publishAlbumPost(account: ISocialAccount, options: FacebookPublishOptions): Promise<PublishPostResult> {
-    const { content, mediaIds = [], scheduledPublishTime, published = true } = options;
+    const { content, mediaIds = [], scheduledPublishTime, published = true, metadata } = options;
     const accessToken = this.getAccessToken(account);
     const pageId = account.metadata?.pageId || account.providerUserId;
 
@@ -196,16 +204,28 @@ export class FacebookPublisher extends BasePublisher {
       throw new Error('Album post requires at least 2 media items');
     }
 
-    // Step 1: Upload all photos as unpublished
+    const altTexts = (metadata?.altTexts as string[]) || [];
+
+    // Step 1: Upload all photos as unpublished with alt text
     const uploadedMediaIds: string[] = [];
-    for (const mediaUrl of mediaIds) {
+    for (let i = 0; i < mediaIds.length; i++) {
+      const mediaUrl = mediaIds[i];
+      const altText = altTexts[i];
+
+      const photoPayload: any = {
+        url: mediaUrl,
+        published: false,
+        access_token: accessToken,
+      };
+
+      // Add alt text if provided
+      if (altText) {
+        photoPayload.alt_text_custom = altText;
+      }
+
       const response = await this.httpClient.post(
         `${FACEBOOK_API_BASE}/${pageId}/photos`,
-        {
-          url: mediaUrl,
-          published: false,
-          access_token: accessToken,
-        }
+        photoPayload
       );
       uploadedMediaIds.push(response.data.id);
     }
@@ -234,6 +254,7 @@ export class FacebookPublisher extends BasePublisher {
       postId,
       mediaCount: uploadedMediaIds.length,
       scheduled: !!scheduledPublishTime,
+      hasAltText: altTexts.some(text => !!text),
       accountId: account._id.toString(),
     });
 

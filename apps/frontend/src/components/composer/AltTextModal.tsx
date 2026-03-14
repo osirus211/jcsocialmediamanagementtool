@@ -1,5 +1,5 @@
 import { useState, memo, useEffect } from 'react';
-import { X, Eye, AlertCircle, Check } from 'lucide-react';
+import { X, Eye, AlertCircle, Check, Wand2, RefreshCw, Lightbulb } from 'lucide-react';
 import { MediaFile } from '@/types/composer.types';
 import { SocialPlatform } from '@/types/composer.types';
 
@@ -37,6 +37,14 @@ const AltTextModal = memo(function AltTextModal({
   });
   const [useGlobalAltText, setUseGlobalAltText] = useState(true);
   const [globalAltText, setGlobalAltText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{
+    id: number;
+    text: string;
+    style: string;
+    score?: number;
+  }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Initialize alt texts from media metadata
   useEffect(() => {
@@ -67,6 +75,132 @@ const AltTextModal = memo(function AltTextModal({
 
   const getCharacterLimit = (platform: SocialPlatform) => {
     return ALT_TEXT_LIMITS[platform] || 1000;
+  };
+
+  const generateAltText = async (style: 'descriptive' | 'seo' | 'concise' = 'descriptive') => {
+    if (!media.url) return;
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/v1/alttext/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: media.url,
+          platform: selectedPlatforms[0] || 'general',
+          style,
+          maxLength: useGlobalAltText 
+            ? 1000 
+            : getCharacterLimit(selectedPlatforms[0] as SocialPlatform),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate alt text');
+      }
+
+      const data = await response.json();
+      
+      if (useGlobalAltText) {
+        setGlobalAltText(data.data.altText);
+      } else {
+        setAltTexts(prev => ({
+          ...prev,
+          [selectedPlatforms[0]]: data.data.altText,
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to generate alt text:', error);
+      // You might want to show a toast notification here
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateSuggestions = async () => {
+    if (!media.url) return;
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/v1/alttext/suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: media.url,
+          platform: selectedPlatforms[0] || 'general',
+          maxLength: useGlobalAltText 
+            ? 1000 
+            : getCharacterLimit(selectedPlatforms[0] as SocialPlatform),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate suggestions');
+      }
+
+      const data = await response.json();
+      setSuggestions(data.data.suggestions);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error('Failed to generate suggestions:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const validateAltText = async (text: string, platform?: SocialPlatform) => {
+    if (!text.trim()) return null;
+
+    try {
+      const response = await fetch('/api/v1/alttext/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          platform,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to validate alt text');
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Failed to validate alt text:', error);
+      return null;
+    }
+  };
+
+  const applySuggestion = (suggestion: { text: string }) => {
+    if (useGlobalAltText) {
+      setGlobalAltText(suggestion.text);
+    } else {
+      setAltTexts(prev => ({
+        ...prev,
+        [selectedPlatforms[0]]: suggestion.text,
+      }));
+    }
+    setShowSuggestions(false);
+  };
+
+  const getQualityIndicator = (text: string) => {
+    if (!text.trim()) return { level: 'poor', color: 'text-red-600', label: 'Missing' };
+    
+    if (text.length < 10) return { level: 'poor', color: 'text-red-600', label: 'Too short' };
+    if (text.length > 125) return { level: 'good', color: 'text-yellow-600', label: 'Long' };
+    if (text.toLowerCase().startsWith('image of') || text.toLowerCase().startsWith('photo of')) {
+      return { level: 'poor', color: 'text-red-600', label: 'Poor quality' };
+    }
+    
+    return { level: 'excellent', color: 'text-green-600', label: 'Good quality' };
   };
 
   const isOverLimit = (text: string, platform: SocialPlatform) => {
@@ -139,10 +273,37 @@ const AltTextModal = memo(function AltTextModal({
 
           {/* Global Alt Text */}
           {useGlobalAltText && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Alt Text
-              </label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Alt Text
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => generateAltText('descriptive')}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {isGenerating ? (
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-3 w-3" />
+                    )}
+                    AI Generate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={generateSuggestions}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Lightbulb className="h-3 w-3" />
+                    Suggestions
+                  </button>
+                </div>
+              </div>
+              
               <textarea
                 value={globalAltText}
                 onChange={(e) => setGlobalAltText(e.target.value)}
@@ -150,8 +311,32 @@ const AltTextModal = memo(function AltTextModal({
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
-              <div className="text-sm text-gray-500">
-                {globalAltText.length} characters
+              
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">
+                    {globalAltText.length} characters
+                  </span>
+                  <span className={`font-medium ${getQualityIndicator(globalAltText).color}`}>
+                    {getQualityIndicator(globalAltText).label}
+                  </span>
+                </div>
+                
+                {/* Platform support indicators */}
+                <div className="flex items-center gap-1">
+                  {selectedPlatforms.map(platform => (
+                    <span
+                      key={platform}
+                      className={`px-2 py-1 text-xs rounded ${
+                        globalAltText.length <= getCharacterLimit(platform)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {platform}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -198,16 +383,87 @@ const AltTextModal = memo(function AltTextModal({
             </div>
           )}
 
+          {/* AI Suggestions Panel */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-blue-900">AI Suggestions</h4>
+                <button
+                  onClick={() => setShowSuggestions(false)}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {suggestions.map((suggestion) => (
+                  <div
+                    key={suggestion.id}
+                    className="p-2 bg-white rounded border border-blue-200 cursor-pointer hover:bg-blue-50"
+                    onClick={() => applySuggestion(suggestion)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm text-gray-900 flex-1">{suggestion.text}</p>
+                      <span className="text-xs text-blue-600 font-medium ml-2 capitalize">
+                        {suggestion.style}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-gray-500">
+                        {suggestion.text.length} characters
+                      </span>
+                      <span className={`text-xs font-medium ${getQualityIndicator(suggestion.text).color}`}>
+                        {getQualityIndicator(suggestion.text).label}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Tips */}
           <div className="p-3 bg-blue-50 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Alt Text Tips:</h4>
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Alt Text Best Practices (WCAG 2.1):</h4>
             <ul className="text-xs text-blue-800 space-y-1">
               <li>• Be specific and descriptive</li>
               <li>• Include important text that appears in the image</li>
               <li>• Don't start with "Image of..." or "Picture of..."</li>
               <li>• Focus on what's relevant to your post's context</li>
-              <li>• Keep it concise but informative</li>
+              <li>• Keep it concise but informative (10-125 characters ideal)</li>
+              <li>• Include emotions or actions if relevant to the content</li>
             </ul>
+            
+            {/* Platform Support Matrix */}
+            <div className="mt-3 pt-3 border-t border-blue-200">
+              <h5 className="text-xs font-medium text-blue-900 mb-2">Platform Support:</h5>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-blue-800">Instagram: Full support</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-blue-800">Twitter/X: Full support</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-blue-800">LinkedIn: Full support</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-blue-800">Facebook: Full support</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-blue-800">Pinterest: Full support</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  <span className="text-blue-800">TikTok: Limited</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

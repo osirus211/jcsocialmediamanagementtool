@@ -28,6 +28,7 @@ import listeningRulesRoutes from './listening-rules.routes'; // Phase-4: Social 
 import mentionsRoutes from './mentions.routes'; // Phase-4: Mentions
 import trendsRoutes from './trends.routes'; // Phase-4: Trends
 import workflowsRoutes from './workflows.routes'; // Phase-5: Automation workflows
+import alttextRoutes from './alttext.routes'; // Alt text generation and validation
 import rssFeedsRoutes from './rss-feeds.routes'; // Phase-5: RSS feeds
 import evergreenRoutes from './evergreen.routes'; // Phase-5: Evergreen content
 import reportsRoutes from './reports.routes'; // Phase-3: Scheduled reports
@@ -144,6 +145,7 @@ router.use('/tasks', taskRoutes); // Task management
 router.use('/templates', templatesRoutes); // Phase-2: Post templates
 router.use('/queue-slots', queueSlotsRoutes); // Phase-2: Queue slots
 router.use('/links', linksRoutes); // Phase-2: Link shortening
+router.use('/alttext', alttextRoutes); // Alt text generation and validation
 router.use('/media', mediaRoutes); // Media API
 router.use('/platforms', platformRoutes); // Platforms API
 router.use('/social', socialRoutes);

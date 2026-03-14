@@ -128,6 +128,26 @@ export function MediaItem({
         </div>
       )}
 
+      {/* Alt Text Indicator */}
+      {media.type === 'image' && isCompleted && (
+        <div className="absolute top-2 left-2">
+          {(() => {
+            const hasAltText = media.metadata?.altText || 
+              (media.metadata?.platformAltTexts && Object.values(media.metadata.platformAltTexts).some(text => !!text));
+            
+            return (
+              <div className={`px-2 py-1 text-xs font-medium rounded ${
+                hasAltText 
+                  ? 'bg-green-100 text-green-800 border border-green-200' 
+                  : 'bg-orange-100 text-orange-800 border border-orange-200'
+              }`}>
+                {hasAltText ? '✓ Alt text' : '⚠ No alt text'}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Remove Button */}
       {(isCompleted || isError) && (
         <button
