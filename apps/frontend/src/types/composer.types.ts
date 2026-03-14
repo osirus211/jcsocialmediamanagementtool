@@ -31,7 +31,7 @@ export interface PlatformContent {
 export interface MediaFile {
   id: string;
   url: string;
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'gif';
   size: number;
   filename: string;
   mimeType: string;
@@ -47,6 +47,12 @@ export interface MediaFile {
     isPoll?: boolean;
     options?: string[];
     duration?: string;
+    // GIF-specific metadata
+    giphyId?: string;
+    giphyTitle?: string;
+    giphyUrl?: string;
+    width?: number;
+    height?: number;
     // YouTube-specific metadata
     youtubeTitle?: string;
     youtubeDescription?: string;

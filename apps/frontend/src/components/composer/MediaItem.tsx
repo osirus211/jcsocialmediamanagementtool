@@ -94,6 +94,14 @@ export function MediaItem({
         />
       )}
 
+      {media.type === 'gif' && (
+        <img
+          src={media.url}
+          alt={media.metadata?.giphyTitle || media.filename}
+          className="w-full h-full object-cover"
+        />
+      )}
+
       {/* Upload Progress */}
       {isUploading && (
         <div className="absolute inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center">

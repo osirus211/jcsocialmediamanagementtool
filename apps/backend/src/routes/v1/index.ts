@@ -64,6 +64,7 @@ import relatedHashtagsRoutes from './related-hashtags.routes'; // Related hashta
 import hashtagHistoryRoutes from './hashtag-history.routes'; // Hashtag usage history
 import trendingHashtagsRoutes from './trending-hashtags.routes'; // Trending hashtags
 import competitorHashtagAnalysisRoutes from './competitor-hashtag-analysis.routes'; // Competitor hashtag analysis
+import giphyRoutes from '../giphy'; // Giphy GIF search
 
 const router = Router();
 
@@ -133,6 +134,7 @@ router.get('/', (_req, res) => {
       hashtagHistory: '/api/v1/hashtag-history',
       trendingHashtags: '/api/v1/trending-hashtags',
       competitorHashtagAnalysis: '/api/v1/competitor-hashtag-analysis',
+      giphy: '/api/v1/giphy',
     },
   });
 });
@@ -204,5 +206,6 @@ router.use('/related-hashtags', relatedHashtagsRoutes); // Related hashtags disc
 router.use('/hashtag-history', hashtagHistoryRoutes); // Hashtag usage history
 router.use('/trending-hashtags', trendingHashtagsRoutes); // Trending hashtags
 router.use('/competitor-hashtag-analysis', competitorHashtagAnalysisRoutes); // Competitor hashtag analysis
+router.use('/giphy', giphyRoutes); // Giphy GIF search
 
 export default router;

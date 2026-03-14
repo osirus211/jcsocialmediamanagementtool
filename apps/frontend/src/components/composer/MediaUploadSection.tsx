@@ -3,8 +3,9 @@ import { MediaFile, FILE_VALIDATION } from '@/types/composer.types';
 import { MediaItem } from './MediaItem';
 import { DesignImportPanel } from '../media/DesignImportPanel';
 import { StockPhotoPanel } from '../media/StockPhotoPanel';
-import { Upload, Image, Video, Palette, Search, Eye, AlertCircle, Wand2 } from 'lucide-react';
+import { Upload, Image, Video, Palette, Search, Eye, AlertCircle, Wand2, Sparkles } from 'lucide-react';
 import { compressImageFile, isImageFile } from '@/utils/imageCompression';
+import { GiphyPicker } from './GiphyPicker';
 
 interface MediaUploadSectionProps {
   media: MediaFile[];
@@ -28,6 +29,7 @@ const MediaUploadSection = memo(function MediaUploadSection({
   const [isDragging, setIsDragging] = useState(false);
   const [showDesignImport, setShowDesignImport] = useState(false);
   const [showStockPhotos, setShowStockPhotos] = useState(false);
+  const [showGiphyPicker, setShowGiphyPicker] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -163,6 +165,41 @@ const MediaUploadSection = memo(function MediaUploadSection({
     }
   }, [onMediaUpdate]);
 
+  // Handle GIF selection from Giphy
+  const handleGifSelect = useCallback(async (gif: any) => {
+    // Check max files limit
+    if (media.length + 1 > maxFiles) {
+      alert(`You can only upload up to ${maxFiles} files`);
+      return;
+    }
+
+    try {
+      // Create a MediaFile from the selected GIF
+      const gifFile: MediaFile = {
+        id: `gif_${gif.id}`,
+        url: gif.images.original.url,
+        type: 'gif',
+        size: parseInt(gif.images.original.size) || 0,
+        filename: `${gif.title || 'gif'}.gif`,
+        mimeType: 'image/gif',
+        uploadStatus: 'completed',
+        metadata: {
+          width: parseInt(gif.images.original.width),
+          height: parseInt(gif.images.original.height),
+          giphyId: gif.id,
+          giphyTitle: gif.title,
+          giphyUrl: gif.url,
+          altText: gif.title || 'Animated GIF'
+        }
+      };
+
+      onUpload([gifFile as any]); // Type assertion needed due to File vs MediaFile mismatch
+    } catch (error) {
+      console.error('Error adding GIF:', error);
+      alert('Failed to add GIF');
+    }
+  }, [media.length, maxFiles, onUpload]);
+
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-gray-700">
@@ -243,6 +280,14 @@ const MediaUploadSection = memo(function MediaUploadSection({
         >
           <Search className="h-4 w-4" />
           Stock Photos
+        </button>
+
+        <button
+          onClick={() => setShowGiphyPicker(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+        >
+          <Sparkles className="h-4 w-4" />
+          GIFs & Stickers
         </button>
       </div>
 
@@ -354,6 +399,15 @@ const MediaUploadSection = memo(function MediaUploadSection({
         <StockPhotoPanel
           onImport={handleStockPhotoImport}
           onClose={() => setShowStockPhotos(false)}
+        />
+      )}
+
+      {/* Giphy Picker */}
+      {showGiphyPicker && (
+        <GiphyPicker
+          onSelect={handleGifSelect}
+          onClose={() => setShowGiphyPicker(false)}
+          selectedPlatforms={selectedPlatforms}
         />
       )}
     </div>
