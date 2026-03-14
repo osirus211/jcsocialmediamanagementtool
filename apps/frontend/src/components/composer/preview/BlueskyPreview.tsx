@@ -1,11 +1,11 @@
 /**
  * Bluesky Preview Component
- * Renders a Bluesky post card
+ * Renders a Bluesky post card with rich text features
  */
 
 import { memo, useMemo } from 'react';
 import { MediaFile } from '@/types/composer.types';
-import { Heart, MessageCircle, Repeat2, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Repeat2, MoreHorizontal, Link as LinkIcon } from 'lucide-react';
 
 interface BlueskyPreviewProps {
   content: string;
@@ -16,6 +16,66 @@ interface BlueskyPreviewProps {
 }
 
 const BLUESKY_LIMIT = 300;
+
+// Helper function to detect and format rich text
+const formatRichText = (text: string) => {
+  const parts: Array<{ text: string; type: 'text' | 'hashtag' | 'mention' | 'link' }> = [];
+  
+  // Regex patterns for different text types
+  const patterns = [
+    { type: 'hashtag' as const, regex: /#[\w]+/g },
+    { type: 'mention' as const, regex: /@[\w.-]+\.[\w]+/g },
+    { type: 'link' as const, regex: /https?:\/\/[^\s]+/g },
+  ];
+  
+  let lastIndex = 0;
+  const matches: Array<{ start: number; end: number; type: string; text: string }> = [];
+  
+  // Find all matches
+  patterns.forEach(({ type, regex }) => {
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type,
+        text: match[0],
+      });
+    }
+  });
+  
+  // Sort matches by position
+  matches.sort((a, b) => a.start - b.start);
+  
+  // Build parts array
+  matches.forEach((match) => {
+    // Add text before match
+    if (match.start > lastIndex) {
+      parts.push({
+        text: text.slice(lastIndex, match.start),
+        type: 'text',
+      });
+    }
+    
+    // Add the match
+    parts.push({
+      text: match.text,
+      type: match.type as any,
+    });
+    
+    lastIndex = match.end;
+  });
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push({
+      text: text.slice(lastIndex),
+      type: 'text',
+    });
+  }
+  
+  return parts.length > 0 ? parts : [{ text, type: 'text' as const }];
+};
 
 const BlueskyPreview = memo(function BlueskyPreview({
   content,
@@ -29,6 +89,40 @@ const BlueskyPreview = memo(function BlueskyPreview({
     media.filter((m) => m.uploadStatus === 'completed'), 
     [media]
   );
+
+  const richTextParts = useMemo(() => formatRichText(content), [content]);
+
+  const renderRichText = () => {
+    if (!content) {
+      return <span className="text-gray-500">Your Bluesky post will appear here...</span>;
+    }
+
+    return richTextParts.map((part, index) => {
+      switch (part.type) {
+        case 'hashtag':
+          return (
+            <span key={index} className="text-blue-600 hover:underline cursor-pointer">
+              {part.text}
+            </span>
+          );
+        case 'mention':
+          return (
+            <span key={index} className="text-blue-600 hover:underline cursor-pointer">
+              {part.text}
+            </span>
+          );
+        case 'link':
+          return (
+            <span key={index} className="text-blue-600 hover:underline cursor-pointer inline-flex items-center">
+              {part.text}
+              <LinkIcon className="w-3 h-3 ml-1" />
+            </span>
+          );
+        default:
+          return <span key={index}>{part.text}</span>;
+      }
+    });
+  };
 
   return (
     <div className="bg-white border border-gray-300 rounded-lg overflow-hidden w-full max-w-[600px] mx-auto">
@@ -66,7 +160,7 @@ const BlueskyPreview = memo(function BlueskyPreview({
 
             {/* Post Text */}
             <div className={`text-sm mb-3 whitespace-pre-wrap break-words ${isOverLimit ? 'text-red-600' : 'text-gray-900'}`}>
-              {content || 'Your Bluesky post will appear here...'}
+              {renderRichText()}
             </div>
 
             {/* Media Grid */}
@@ -78,11 +172,32 @@ const BlueskyPreview = memo(function BlueskyPreview({
               }`}>
                 {completedMedia.slice(0, 4).map((m, idx) => (
                   <div key={idx} className={completedMedia.length === 1 ? 'aspect-video' : 'aspect-square'}>
-                    <img
-                      src={m.thumbnailUrl || m.url}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                    {m.type.startsWith('image/') ? (
+                      <img
+                        src={m.thumbnailUrl || m.url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : m.type.startsWith('video/') ? (
+                      <div className="relative w-full h-full">
+                        <video
+                          src={m.url}
+                          className="w-full h-full object-cover"
+                          controls={false}
+                          muted
+                        />
+                        {/* Video play indicator */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-12 h-12 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                            <div className="w-0 h-0 border-l-4 border-l-white border-y-2 border-y-transparent ml-1"></div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                        <span className="text-xs">Media</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

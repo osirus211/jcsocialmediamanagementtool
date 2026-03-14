@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SocialPlatform } from '@/types/social.types';
 import { apiClient } from '@/lib/api-client';
 import { InstagramConnectModal } from './InstagramConnectModal';
+import { BlueskyConnectModal } from './BlueskyConnectModal';
 
 interface ConnectButtonProps {
   platform: SocialPlatform;
@@ -23,11 +24,18 @@ const platformLabels: Record<SocialPlatform, string> = {
 export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [showInstagramModal, setShowInstagramModal] = useState(false);
+  const [showBlueskyModal, setShowBlueskyModal] = useState(false);
 
   const handleConnect = async () => {
     // Special handling for Instagram - show options modal
     if (platform === SocialPlatform.INSTAGRAM) {
       setShowInstagramModal(true);
+      return;
+    }
+
+    // Special handling for Bluesky - show credentials modal
+    if (platform === SocialPlatform.BLUESKY) {
+      setShowBlueskyModal(true);
       return;
     }
 
@@ -61,6 +69,13 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
     }
   };
 
+  const handleBlueskySuccess = () => {
+    setShowBlueskyModal(false);
+    if (onSuccess) {
+      onSuccess();
+    }
+  };
+
   return (
     <>
       <button
@@ -77,6 +92,15 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
           isOpen={showInstagramModal}
           onClose={() => setShowInstagramModal(false)}
           onSuccess={handleInstagramSuccess}
+        />
+      )}
+
+      {/* Bluesky Connect Modal */}
+      {platform === SocialPlatform.BLUESKY && (
+        <BlueskyConnectModal
+          isOpen={showBlueskyModal}
+          onClose={() => setShowBlueskyModal(false)}
+          onSuccess={handleBlueskySuccess}
         />
       )}
     </>

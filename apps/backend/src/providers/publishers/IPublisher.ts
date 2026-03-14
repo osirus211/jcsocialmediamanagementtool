@@ -9,6 +9,7 @@ import { ISocialAccount } from '../../models/SocialAccount';
 export interface PublishPostOptions {
   content: string;
   mediaIds?: string[];
+  threadPosts?: string[];
   metadata?: Record<string, any>;
 }
 
