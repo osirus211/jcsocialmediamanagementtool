@@ -25,6 +25,9 @@ import {
   invitationCreateRateLimiter,
   invitationResendRateLimiter,
   invitationRevokeRateLimiter,
+  memberRemoveRateLimiter,
+  memberDeactivateRateLimiter,
+  memberReactivateRateLimiter,
 } from '../../middleware/rateLimiter';
 
 const router = Router();
@@ -127,7 +130,28 @@ router.delete(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  memberRemoveRateLimiter,
   WorkspaceController.removeMember
+);
+
+// Deactivate member (admin or owner only)
+router.patch(
+  '/:workspaceId/members/:userId/deactivate',
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  memberDeactivateRateLimiter,
+  WorkspaceController.deactivateMember
+);
+
+// Reactivate member (admin or owner only)
+router.patch(
+  '/:workspaceId/members/:userId/reactivate',
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  memberReactivateRateLimiter,
+  WorkspaceController.reactivateMember
 );
 
 // Update member role (admin or owner only)

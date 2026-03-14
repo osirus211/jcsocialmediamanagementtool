@@ -323,14 +323,143 @@ export class WorkspaceController {
         return;
       }
 
+      // Get member info before removal for audit log
+      const { WorkspaceMember } = await import('../models/WorkspaceMember');
+      const memberToRemove = await WorkspaceMember.findOne({
+        workspaceId,
+        userId: memberUserId,
+      });
+
       await workspaceService.removeMember({
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
         removedBy: new mongoose.Types.ObjectId(userId),
         userId: new mongoose.Types.ObjectId(memberUserId),
       });
 
+      // Audit log: Member removed
+      const { SecurityAuditService } = await import('../services/SecurityAuditService');
+      const { SecurityEventType } = await import('../models/SecurityEvent');
+      const auditService = new SecurityAuditService();
+      
+      await auditService.logEvent({
+        type: SecurityEventType.ROLE_CHANGE,
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('User-Agent'),
+        resource: 'workspace_member',
+        action: 'remove',
+        success: true,
+        metadata: {
+          removedUserId: memberUserId,
+          removedUserRole: memberToRemove?.role,
+        },
+      });
+
       res.status(200).json({
         message: 'Member removed successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deactivateMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId: memberUserId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      // Get member info before deactivation for audit log
+      const { WorkspaceMember } = await import('../models/WorkspaceMember');
+      const memberToDeactivate = await WorkspaceMember.findOne({
+        workspaceId,
+        userId: memberUserId,
+      });
+
+      await workspaceService.deactivateMember({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        deactivatedBy: new mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(memberUserId),
+      });
+
+      // Audit log: Member deactivated
+      const { SecurityAuditService } = await import('../services/SecurityAuditService');
+      const { SecurityEventType } = await import('../models/SecurityEvent');
+      const auditService = new SecurityAuditService();
+      
+      await auditService.logEvent({
+        type: SecurityEventType.ROLE_CHANGE,
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('User-Agent'),
+        resource: 'workspace_member',
+        action: 'deactivate',
+        success: true,
+        metadata: {
+          deactivatedUserId: memberUserId,
+          deactivatedUserRole: memberToDeactivate?.role,
+        },
+      });
+
+      res.status(200).json({
+        message: 'Member deactivated successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async reactivateMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId: memberUserId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      // Get member info before reactivation for audit log
+      const { WorkspaceMember } = await import('../models/WorkspaceMember');
+      const memberToReactivate = await WorkspaceMember.findOne({
+        workspaceId,
+        userId: memberUserId,
+      });
+
+      await workspaceService.reactivateMember({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        reactivatedBy: new mongoose.Types.ObjectId(userId),
+        userId: new mongoose.Types.ObjectId(memberUserId),
+      });
+
+      // Audit log: Member reactivated
+      const { SecurityAuditService } = await import('../services/SecurityAuditService');
+      const { SecurityEventType } = await import('../models/SecurityEvent');
+      const auditService = new SecurityAuditService();
+      
+      await auditService.logEvent({
+        type: SecurityEventType.ROLE_CHANGE,
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('User-Agent'),
+        resource: 'workspace_member',
+        action: 'reactivate',
+        success: true,
+        metadata: {
+          reactivatedUserId: memberUserId,
+          reactivatedUserRole: memberToReactivate?.role,
+        },
+      });
+
+      res.status(200).json({
+        message: 'Member reactivated successfully',
       });
     } catch (error) {
       next(error);
@@ -362,17 +491,24 @@ export class WorkspaceController {
       });
 
       // Audit log: Member role changed
-      logAudit({
-        userId: req.user?.userId,
-        workspaceId,
-        action: 'member.role_changed',
-        entityType: 'member',
-        entityId: memberUserId,
+      const { SecurityAuditService } = await import('../services/SecurityAuditService');
+      const { SecurityEventType } = await import('../models/SecurityEvent');
+      const auditService = new SecurityAuditService();
+      
+      await auditService.logEvent({
+        type: SecurityEventType.ROLE_CHANGE,
+        userId: new mongoose.Types.ObjectId(req.user?.userId || ''),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('User-Agent'),
+        resource: 'workspace_member',
+        action: 'role_change',
+        success: true,
         metadata: {
+          targetUserId: memberUserId,
           oldRole,
           newRole: role,
         },
-        req,
       });
 
       res.status(200).json({

@@ -151,7 +151,13 @@ router.patch('/:id', requireScope('posts:write'), async (req, res, next): Promis
     if (data.mediaIds !== undefined) updateData.mediaIds = data.mediaIds;
     if (data.scheduledAt !== undefined) updateData.scheduledAt = new Date(data.scheduledAt);
     
-    const post = await postService.updatePost(postId, workspaceId, updateData);
+    const post = await postService.updatePost(
+      postId, 
+      workspaceId, 
+      'system', // API key authenticated - use system user
+      'ADMIN' as any, // API keys have admin-level permissions
+      updateData
+    );
     
     if (!post) {
       res.status(404).json({
@@ -182,7 +188,12 @@ router.delete('/:id', requireScope('posts:write'), async (req, res, next): Promi
     const postId = req.params.id;
     
     try {
-      await postService.deletePost(postId, workspaceId);
+      await postService.deletePost(
+        postId, 
+        workspaceId, 
+        'system', // API key authenticated - use system user
+        'ADMIN' as any // API keys have admin-level permissions
+      );
     } catch (error: any) {
       if (error.message === 'Post not found') {
         res.status(404).json({

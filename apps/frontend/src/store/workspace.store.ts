@@ -24,6 +24,8 @@ interface WorkspaceState {
   workspacesLoaded: boolean;
   members: WorkspaceMember[];
   membersLoaded: boolean;
+  pendingInvites: any[];
+  pendingInvitesLoaded: boolean;
 }
 
 interface WorkspaceActions {
@@ -37,6 +39,8 @@ interface WorkspaceActions {
   setWorkspacesLoaded: (loaded: boolean) => void;
   setMembers: (members: WorkspaceMember[]) => void;
   setMembersLoaded: (loaded: boolean) => void;
+  setPendingInvites: (invites: any[]) => void;
+  setPendingInvitesLoaded: (loaded: boolean) => void;
 
   // Async actions
   fetchWorkspaces: () => Promise<void>;
@@ -48,8 +52,11 @@ interface WorkspaceActions {
   
   // Member actions
   fetchMembers: (workspaceId: string) => Promise<void>;
+  fetchPendingInvites: (workspaceId: string) => Promise<void>;
   inviteMember: (workspaceId: string, input: InviteMemberInput) => Promise<WorkspaceMember>;
   removeMember: (workspaceId: string, userId: string) => Promise<void>;
+  deactivateMember: (workspaceId: string, userId: string) => Promise<void>;
+  reactivateMember: (workspaceId: string, userId: string) => Promise<void>;
   updateMemberRole: (workspaceId: string, userId: string, input: UpdateMemberRoleInput) => Promise<WorkspaceMember>;
   transferOwnership: (workspaceId: string, input: TransferOwnershipInput) => Promise<void>;
   leaveWorkspace: (workspaceId: string) => Promise<void>;
@@ -82,6 +89,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       workspacesLoaded: false,
       members: [],
       membersLoaded: false,
+      pendingInvites: [],
+      pendingInvitesLoaded: false,
 
       // Setters
       setWorkspaces: (workspaces) => set({ workspaces }),
@@ -113,6 +122,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       setMembers: (members) => set({ members }),
 
       setMembersLoaded: (loaded) => set({ membersLoaded: loaded }),
+
+      setPendingInvites: (invites) => set({ pendingInvites: invites }),
+
+      setPendingInvitesLoaded: (loaded) => set({ pendingInvitesLoaded: loaded }),
 
       /**
        * Fetch all workspaces for current user
@@ -285,6 +298,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             currentWorkspaceId: workspace._id,
             members: [], // Clear members from previous workspace
             membersLoaded: false,
+            pendingInvites: [], // Clear pending invites from previous workspace
+            pendingInvitesLoaded: false,
             isLoading: false,
           });
 
@@ -321,6 +336,26 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         } catch (error: any) {
           console.error('Fetch members error:', error);
           set({ membersLoaded: true });
+          throw error;
+        }
+      },
+
+      /**
+       * Fetch pending invites
+       */
+      fetchPendingInvites: async (workspaceId: string) => {
+        try {
+          const response = await apiClient.get<{ invitations: any[] }>(
+            `/workspaces/${workspaceId}/invitations`
+          );
+
+          set({
+            pendingInvites: response.invitations,
+            pendingInvitesLoaded: true,
+          });
+        } catch (error: any) {
+          console.error('Fetch pending invites error:', error);
+          set({ pendingInvitesLoaded: true });
           throw error;
         }
       },
@@ -385,6 +420,72 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }));
         } catch (error: any) {
           console.error('Remove member error:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Deactivate member
+       */
+      deactivateMember: async (workspaceId: string, userId: string) => {
+        try {
+          await apiClient.patch(`/workspaces/${workspaceId}/members/${userId}/deactivate`);
+
+          // Update member status in list
+          set((state) => ({
+            members: state.members.map((m) => {
+              const memberUserId = typeof m.userId === 'string' ? m.userId : m.userId._id;
+              return memberUserId === userId 
+                ? { ...m, isActive: false, status: 'deactivated' as any, deactivatedAt: new Date().toISOString() }
+                : m;
+            }),
+          }));
+
+          // Decrement member count in workspace
+          set((state) => ({
+            workspaces: state.workspaces.map((w) =>
+              w._id === workspaceId ? { ...w, membersCount: Math.max(0, w.membersCount - 1) } : w
+            ),
+            currentWorkspace:
+              state.currentWorkspace?._id === workspaceId
+                ? { ...state.currentWorkspace, membersCount: Math.max(0, state.currentWorkspace.membersCount - 1) }
+                : state.currentWorkspace,
+          }));
+        } catch (error: any) {
+          console.error('Deactivate member error:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Reactivate member
+       */
+      reactivateMember: async (workspaceId: string, userId: string) => {
+        try {
+          await apiClient.patch(`/workspaces/${workspaceId}/members/${userId}/reactivate`);
+
+          // Update member status in list
+          set((state) => ({
+            members: state.members.map((m) => {
+              const memberUserId = typeof m.userId === 'string' ? m.userId : m.userId._id;
+              return memberUserId === userId 
+                ? { ...m, isActive: true, status: 'active' as any, reactivatedAt: new Date().toISOString() }
+                : m;
+            }),
+          }));
+
+          // Increment member count in workspace
+          set((state) => ({
+            workspaces: state.workspaces.map((w) =>
+              w._id === workspaceId ? { ...w, membersCount: w.membersCount + 1 } : w
+            ),
+            currentWorkspace:
+              state.currentWorkspace?._id === workspaceId
+                ? { ...state.currentWorkspace, membersCount: state.currentWorkspace.membersCount + 1 }
+                : state.currentWorkspace,
+          }));
+        } catch (error: any) {
+          console.error('Reactivate member error:', error);
           throw error;
         }
       },
@@ -479,6 +580,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           workspacesLoaded: false,
           members: [],
           membersLoaded: false,
+          pendingInvites: [],
+          pendingInvitesLoaded: false,
         });
       },
 

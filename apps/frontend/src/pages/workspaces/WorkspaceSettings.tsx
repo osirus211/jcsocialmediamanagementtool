@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useAuthStore } from '@/store/auth.store';
-import { WorkspaceRole, WorkspaceMember } from '@/types/workspace.types';
+import { WorkspaceRole, WorkspaceMember, MemberStatus } from '@/types/workspace.types';
 import { QueueSlotSettings } from '@/components/settings/QueueSlotSettings';
 import { MemberPermissionsPanel } from '@/components/settings/MemberPermissionsPanel';
 import { PermissionsSummaryBadge } from '@/components/settings/PermissionsSummaryBadge';
@@ -10,6 +10,7 @@ import { DeleteWorkspaceModal } from '@/components/workspace/DeleteWorkspaceModa
 import { BulkImportModal } from '@/components/workspace/BulkImportModal';
 import { TransferOwnershipModal } from '@/components/workspace/TransferOwnershipModal';
 import { InviteMemberModal } from '@/components/workspace/InviteMemberModal';
+import { MemberRow } from '@/components/workspace/MemberRow';
 
 /**
  * Workspace Settings Page
@@ -32,11 +33,14 @@ export const WorkspaceSettingsPage = () => {
     currentWorkspace,
     members,
     membersLoaded,
+    pendingInvites,
+    pendingInvitesLoaded,
     isLoading,
     fetchWorkspaceById,
     updateWorkspace,
     deleteWorkspace,
     fetchMembers,
+    fetchPendingInvites,
     removeMember,
     updateMemberRole,
     leaveWorkspace,
@@ -55,6 +59,11 @@ export const WorkspaceSettingsPage = () => {
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
+  
+  // Member management state
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [memberRoleFilter, setMemberRoleFilter] = useState<'all' | WorkspaceRole>('all');
+  const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'deactivated'>('all');
 
   const workspace = workspaces.find((w) => w._id === workspaceId) || currentWorkspace;
 
@@ -64,6 +73,16 @@ export const WorkspaceSettingsPage = () => {
       fetchMembers(workspaceId);
     }
   }, [workspaceId, fetchWorkspaceById, fetchMembers]);
+
+  // Fetch pending invites when admin status is determined
+  useEffect(() => {
+    if (workspaceId && workspace) {
+      const isAdminUser = workspace.userRole === WorkspaceRole.ADMIN || workspace.userRole === WorkspaceRole.OWNER;
+      if (isAdminUser) {
+        fetchPendingInvites(workspaceId);
+      }
+    }
+  }, [workspaceId, workspace, fetchPendingInvites]);
 
   useEffect(() => {
     if (workspace) {
@@ -198,23 +217,6 @@ export const WorkspaceSettingsPage = () => {
     }
   };
 
-  const handleRemoveMember = async (member: WorkspaceMember) => {
-    if (!workspaceId) return;
-
-    const memberUserId = typeof member.userId === 'string' ? member.userId : member.userId._id;
-    const memberName = typeof member.userId === 'string' ? 'this member' : `${member.userId.firstName} ${member.userId.lastName}`;
-
-    if (!confirm(`Are you sure you want to remove ${memberName}?`)) {
-      return;
-    }
-
-    try {
-      await removeMember(workspaceId, memberUserId);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to remove member');
-    }
-  };
-
   const handleUpdateMemberRole = async (member: WorkspaceMember, newRole: WorkspaceRole) => {
     if (!workspaceId) return;
 
@@ -226,6 +228,32 @@ export const WorkspaceSettingsPage = () => {
       setError(error.response?.data?.message || 'Failed to update member role');
     }
   };
+
+  // Filter members based on search and filters
+  const filteredMembers = members.filter((member) => {
+    const memberUser = typeof member.userId === 'string' ? null : member.userId;
+    const memberName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : '';
+    const memberEmail = memberUser?.email || '';
+    
+    // Search filter
+    const searchMatch = memberSearchQuery === '' || 
+      memberName.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+      memberEmail.toLowerCase().includes(memberSearchQuery.toLowerCase());
+    
+    // Role filter
+    const roleMatch = memberRoleFilter === 'all' || member.role === memberRoleFilter;
+    
+    // Status filter
+    const statusMatch = memberStatusFilter === 'all' || 
+      (memberStatusFilter === 'active' && member.isActive) ||
+      (memberStatusFilter === 'deactivated' && !member.isActive);
+    
+    return searchMatch && roleMatch && statusMatch;
+  });
+
+  // Separate active and deactivated members
+  const activeMembers = filteredMembers.filter(m => m.isActive);
+  const deactivatedMembers = filteredMembers.filter(m => !m.isActive);
 
   if (!workspace) {
     return (
@@ -536,7 +564,7 @@ export const WorkspaceSettingsPage = () => {
         {activeTab === 'members' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Members
@@ -568,91 +596,167 @@ export const WorkspaceSettingsPage = () => {
                   </div>
                 )}
               </div>
+
+              {/* Search and Filters */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Search */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search members by name or email..."
+                      value={memberSearchQuery}
+                      onChange={(e) => setMemberSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Role Filter */}
+                <select
+                  value={memberRoleFilter}
+                  onChange={(e) => setMemberRoleFilter(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="all">All Roles</option>
+                  <option value={WorkspaceRole.OWNER}>Owner</option>
+                  <option value={WorkspaceRole.ADMIN}>Admin</option>
+                  <option value={WorkspaceRole.MEMBER}>Member</option>
+                  <option value={WorkspaceRole.VIEWER}>Viewer</option>
+                </select>
+
+                {/* Status Filter */}
+                <select
+                  value={memberStatusFilter}
+                  onChange={(e) => setMemberStatusFilter(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="deactivated">Deactivated</option>
+                </select>
+              </div>
             </div>
 
+            {/* Members List */}
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {!membersLoaded ? (
                 <div className="p-6 text-center">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
-              ) : members.length === 0 ? (
+              ) : filteredMembers.length === 0 ? (
                 <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                  No members found
+                  {memberSearchQuery || memberRoleFilter !== 'all' || memberStatusFilter !== 'all' 
+                    ? 'No members match your filters' 
+                    : 'No members found'
+                  }
                 </div>
               ) : (
-                members.map((member) => {
-                  const memberUser = typeof member.userId === 'string' ? null : member.userId;
-                  const memberUserId = typeof member.userId === 'string' ? member.userId : member.userId._id;
-                  const isCurrentUser = memberUserId === user?._id;
+                <>
+                  {/* Active Members */}
+                  {activeMembers.length > 0 && (
+                    <>
+                      {(deactivatedMembers.length > 0 || memberStatusFilter === 'all') && (
+                        <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50">
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                            Active Members ({activeMembers.length})
+                          </h3>
+                        </div>
+                      )}
+                      {activeMembers.map((member) => (
+                        <MemberRow
+                          key={member._id}
+                          member={member}
+                          workspaceId={workspaceId!}
+                          isOwner={isOwner}
+                          isAdmin={isAdmin}
+                          onRoleChange={handleUpdateMemberRole}
+                        />
+                      ))}
+                    </>
+                  )}
 
-                  return (
-                    <div key={member._id} className="p-6 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
-                          {memberUser ? `${memberUser.firstName[0]}${memberUser.lastName[0]}` : '?'}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : 'Unknown User'}
-                            {isCurrentUser && (
-                              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(You)</span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            {memberUser?.email || 'No email'}
-                          </div>
-                        </div>
+                  {/* Deactivated Members */}
+                  {deactivatedMembers.length > 0 && (memberStatusFilter === 'all' || memberStatusFilter === 'deactivated') && (
+                    <>
+                      <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                          Deactivated Members ({deactivatedMembers.length})
+                        </h3>
                       </div>
+                      {deactivatedMembers.map((member) => (
+                        <MemberRow
+                          key={member._id}
+                          member={member}
+                          workspaceId={workspaceId!}
+                          isOwner={isOwner}
+                          isAdmin={isAdmin}
+                          onRoleChange={handleUpdateMemberRole}
+                        />
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
 
-                      <div className="flex items-center gap-3">
-                        {/* Permissions Summary Badge */}
-                        <PermissionsSummaryBadge member={member} />
-
-                        {/* Role Selector */}
-                        {isAdmin && member.role !== WorkspaceRole.OWNER && !isCurrentUser ? (
-                          <select
-                            value={member.role}
-                            onChange={(e) => handleUpdateMemberRole(member, e.target.value as WorkspaceRole)}
-                            className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white capitalize"
-                          >
-                            <option value={WorkspaceRole.ADMIN}>Admin</option>
-                            <option value={WorkspaceRole.MEMBER}>Member</option>
-                            <option value={WorkspaceRole.VIEWER}>Viewer</option>
-                          </select>
-                        ) : (
-                          <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm capitalize">
-                            {member.role}
+            {/* Pending Invites Section */}
+            {isAdmin && (
+              <div className="border-t border-gray-200 dark:border-gray-700">
+                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                    Pending Invites
+                  </h3>
+                </div>
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {!pendingInvitesLoaded ? (
+                    <div className="p-6 text-center">
+                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : pendingInvites.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                      No pending invites
+                    </div>
+                  ) : (
+                    pendingInvites.map((invite) => (
+                      <div key={invite._id} className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                            </svg>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900 dark:text-white">
+                              {invite.invitedEmail}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              Invited as {invite.role} • {new Date(invite.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                            Pending
                           </span>
-                        )}
-
-                        {/* Manage Permissions Button */}
-                        {isAdmin && (member.role === WorkspaceRole.MEMBER || member.role === WorkspaceRole.VIEWER) && (
                           <button
-                            onClick={() => setSelectedMemberForPermissions(member)}
-                            className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                            className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                            title="Revoke invite"
                           >
-                            Manage Permissions
-                          </button>
-                        )}
-
-                        {/* Remove Button */}
-                        {isAdmin && member.role !== WorkspaceRole.OWNER && !isCurrentUser && (
-                          <button
-                            onClick={() => handleRemoveMember(member)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                            title="Remove member"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

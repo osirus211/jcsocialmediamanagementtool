@@ -4,6 +4,7 @@ import { WorkspaceMember, MemberRole } from '../models/WorkspaceMember';
 import { Workspace } from '../models/Workspace';
 import { UnauthorizedError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { logger } from '../utils/logger';
+import { workspacePermissionService, Permission } from '../services/WorkspacePermissionService';
 
 // Extend Express Request to include workspace context
 declare global {
@@ -248,4 +249,36 @@ export const verifyWorkspaceOwnership = async (
     logger.error('Ownership verification error:', error);
     next(error);
   }
+};
+/**
+ * Permission-based authorization middleware
+ * Requires user to have a specific permission in the workspace
+ * 
+ * @param permission - The permission required to access the route
+ */
+export const requirePermission = (permission: Permission) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspace) {
+        throw new UnauthorizedError('Workspace context required');
+      }
+
+      if (!workspacePermissionService.hasPermission(req.workspace.role, permission)) {
+        logger.warn('Insufficient workspace permissions', {
+          userId: req.user?.userId,
+          workspaceId: req.workspace.workspaceId.toString(),
+          userRole: req.workspace.role,
+          requiredPermission: permission,
+        });
+        throw new ForbiddenError(
+          `Access denied. Required permission: ${workspacePermissionService.getPermissionDescription(permission)}`
+        );
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Permission authorization error:', error);
+      next(error);
+    }
+  };
 };

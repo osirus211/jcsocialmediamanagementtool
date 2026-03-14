@@ -9,7 +9,8 @@ import { FollowerAnalyticsService } from '../../services/FollowerAnalyticsServic
 import { HashtagAnalyticsService } from '../../services/HashtagAnalyticsService';
 import { PostROIService } from '../../services/PostROIService';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/tenant';
+import { requireWorkspace, requirePermission } from '../../middleware/tenant';
+import { Permission } from '../../services/WorkspacePermissionService';
 import { z } from 'zod';
 
 const router = Router();
@@ -21,64 +22,64 @@ router.use(requireWorkspace);
 /**
  * @route   GET /api/v1/analytics/overview
  * @desc    Get overview metrics for workspace
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate (optional)
  */
-router.get('/overview', AnalyticsController.getOverview);
+router.get('/overview', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getOverview);
 
 /**
  * @route   GET /api/v1/analytics/platform
  * @desc    Get platform comparison metrics
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate (optional)
  */
-router.get('/platform', AnalyticsController.getPlatformMetrics);
+router.get('/platform', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getPlatformMetrics);
 
 /**
  * @route   GET /api/v1/analytics/growth
  * @desc    Get growth metrics over time
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate (required), interval (optional: day/week/month)
  */
-router.get('/growth', AnalyticsController.getGrowthMetrics);
+router.get('/growth', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getGrowthMetrics);
 
 /**
  * @route   GET /api/v1/analytics/posts
  * @desc    Get top performing posts
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate, limit (optional)
  */
-router.get('/posts', AnalyticsController.getTopPosts);
+router.get('/posts', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getTopPosts);
 
 /**
  * @route   GET /api/v1/analytics/post/:postId
  * @desc    Get analytics for specific post
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  */
-router.get('/post/:postId', AnalyticsController.getPostAnalytics);
+router.get('/post/:postId', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getPostAnalytics);
 
 /**
  * @route   GET /api/v1/analytics/best-times
  * @desc    Get optimal posting times heatmap and AI suggestions
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   platform (optional), workspaceId (required)
  */
-router.get('/best-times', AnalyticsController.getBestTimes);
+router.get('/best-times', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getBestTimes);
 
 /**
  * @route   POST /api/v1/analytics/mock/:postId
  * @desc    Generate mock analytics for a post (development)
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  */
-router.post('/mock/:postId', AnalyticsController.generateMockAnalytics);
+router.post('/mock/:postId', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.generateMockAnalytics);
 
 /**
  * @route   GET /api/v1/analytics/followers/growth
  * @desc    Get follower growth for an account
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   accountId (required), startDate, endDate (optional)
  */
-router.get('/followers/growth', async (req, res) => {
+router.get('/followers/growth', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       accountId: z.string().min(1, 'Account ID is required'),
@@ -99,10 +100,10 @@ router.get('/followers/growth', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/followers/trends
  * @desc    Get follower trends over time for an account
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   accountId (required), startDate, endDate (required), interval (optional)
  */
-router.get('/followers/trends', async (req, res) => {
+router.get('/followers/trends', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       accountId: z.string().min(1, 'Account ID is required'),
@@ -124,10 +125,10 @@ router.get('/followers/trends', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/followers/workspace
  * @desc    Get follower growth for all accounts in workspace
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate (optional)
  */
-router.get('/followers/workspace', async (req, res) => {
+router.get('/followers/workspace', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
@@ -148,10 +149,10 @@ router.get('/followers/workspace', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/hashtags
  * @desc    Get hashtag performance metrics for workspace
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate, limit (optional)
  */
-router.get('/hashtags', async (req, res) => {
+router.get('/hashtags', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
@@ -173,10 +174,10 @@ router.get('/hashtags', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/hashtags/trends
  * @desc    Get hashtag trends over time
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   hashtag (required), startDate, endDate (optional)
  */
-router.get('/hashtags/trends', async (req, res) => {
+router.get('/hashtags/trends', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       hashtag: z.string().min(1, 'Hashtag is required'),
@@ -198,10 +199,10 @@ router.get('/hashtags/trends', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/hashtags/by-platform
  * @desc    Get top hashtags by platform
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   platform (required), limit (optional)
  */
-router.get('/hashtags/by-platform', async (req, res) => {
+router.get('/hashtags/by-platform', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       platform: z.string().min(1, 'Platform is required'),
@@ -222,10 +223,10 @@ router.get('/hashtags/by-platform', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/hashtags/suggestions
  * @desc    Get hashtag suggestions based on performance
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   limit (optional)
  */
-router.get('/hashtags/suggestions', async (req, res) => {
+router.get('/hashtags/suggestions', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 10),
@@ -245,9 +246,9 @@ router.get('/hashtags/suggestions', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/post/:postId/performance
  * @desc    Get comprehensive post performance summary
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  */
-router.get('/post/:postId/performance', async (req, res) => {
+router.get('/post/:postId/performance', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       postId: z.string().min(1, 'Post ID is required'),
@@ -267,10 +268,10 @@ router.get('/post/:postId/performance', async (req, res) => {
 /**
  * @route   PATCH /api/v1/analytics/post/:postId/roi
  * @desc    Update post ROI data
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + EXPORT_ANALYTICS permission)
  * @body    { adSpend?, estimatedRevenue? }
  */
-router.patch('/post/:postId/roi', async (req, res) => {
+router.patch('/post/:postId/roi', requirePermission(Permission.EXPORT_ANALYTICS), async (req, res) => {
   try {
     const paramsSchema = z.object({
       postId: z.string().min(1, 'Post ID is required'),
@@ -295,10 +296,10 @@ router.patch('/post/:postId/roi', async (req, res) => {
 /**
  * @route   GET /api/v1/analytics/posts/top
  * @desc    Get top performing posts
- * @access  Private (requires auth + workspace)
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   sortBy? (engagement|ctr|roi), limit?, startDate?, endDate?
  */
-router.get('/posts/top', async (req, res) => {
+router.get('/posts/top', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
   try {
     const schema = z.object({
       sortBy: z.enum(['engagement', 'ctr', 'roi']).optional().default('engagement'),

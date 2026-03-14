@@ -159,9 +159,15 @@ export class AutomationService {
     scheduledAt: Date
   ): Promise<any | null> {
     try {
-      const post = await this.postService.updatePost(postId, workspaceId, {
-        scheduledAt,
-      } as any);
+      const post = await this.postService.updatePost(
+        postId, 
+        workspaceId, 
+        'automation', // Automation system user
+        'ADMIN' as any, // Automation has admin-level permissions
+        {
+          scheduledAt,
+        } as any
+      );
 
       return post;
     } catch (error) {
@@ -293,8 +299,14 @@ export class AutomationService {
    */
   static async approvePost(workspaceId: string, postId: string): Promise<any | null> {
     try {
-      const post = await this.postService.updatePost(postId, workspaceId, {
-      } as any);
+      const post = await this.postService.updatePost(
+        postId, 
+        workspaceId, 
+        'automation', // Automation system user
+        'ADMIN' as any, // Automation has admin-level permissions
+        {
+        } as any
+      );
 
       return post;
     } catch (error) {

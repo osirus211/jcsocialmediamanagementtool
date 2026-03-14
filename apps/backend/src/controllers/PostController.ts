@@ -177,17 +177,31 @@ export class PostController {
       const { id } = req.params;
       const { workspaceId } = req.query;
       const { content, mediaUrls, scheduledAt } = req.body;
+      const userId = req.user?.userId;
+      const userRole = req.workspace?.role;
+
+      if (!userId || !userRole) {
+        sendError(res, 'UNAUTHORIZED', 'User information not found', 401);
+        return;
+      }
 
       // Update post
-      const post = await postService.updatePost(id, workspaceId as string, {
-        content,
-        mediaUrls,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-      });
+      const post = await postService.updatePost(
+        id, 
+        workspaceId as string, 
+        userId, 
+        userRole, 
+        {
+          content,
+          mediaUrls,
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+        }
+      );
 
       logger.info('Post updated via API', {
         postId: post._id.toString(),
         workspaceId,
+        userId,
       });
 
       sendSuccess(res, post.toJSON());
@@ -202,9 +216,15 @@ export class PostController {
         return;
       }
 
+      if (error.message === 'Insufficient permissions to edit this post') {
+        sendError(res, 'FORBIDDEN', error.message, 403);
+        return;
+      }
+
       logger.error('Failed to update post', {
         error: error.message,
         postId: req.params.id,
+        userId: req.user?.userId,
       });
 
       next(error);
@@ -229,13 +249,21 @@ export class PostController {
 
       const { id } = req.params;
       const { workspaceId } = req.query;
+      const userId = req.user?.userId;
+      const userRole = req.workspace?.role;
+
+      if (!userId || !userRole) {
+        sendError(res, 'UNAUTHORIZED', 'User information not found', 401);
+        return;
+      }
 
       // Delete post
-      await postService.deletePost(id, workspaceId as string);
+      await postService.deletePost(id, workspaceId as string, userId, userRole);
 
       logger.info('Post deleted via API', {
         postId: id,
         workspaceId,
+        userId,
       });
 
       sendSuccess(res, { message: 'Post deleted successfully' });
@@ -250,9 +278,15 @@ export class PostController {
         return;
       }
 
+      if (error.message === 'Insufficient permissions to delete this post') {
+        sendError(res, 'FORBIDDEN', error.message, 403);
+        return;
+      }
+
       logger.error('Failed to delete post', {
         error: error.message,
         postId: req.params.id,
+        userId: req.user?.userId,
       });
 
       next(error);
@@ -460,20 +494,34 @@ export class PostController {
       }
 
       const { workspaceId, postIds } = req.body;
+      const userId = req.user?.userId;
+      const userRole = req.workspace?.role;
+
+      if (!userId || !userRole) {
+        sendError(res, 'UNAUTHORIZED', 'User information not found', 401);
+        return;
+      }
 
       logger.info('Bulk delete request', {
         workspaceId,
+        userId,
         count: postIds.length,
       });
 
       // Bulk delete
-      const result = await postService.bulkDeletePosts(postIds, workspaceId);
+      const result = await postService.bulkDeletePosts(postIds, workspaceId, userId, userRole);
 
       sendSuccess(res, result, 200);
     } catch (error: any) {
+      if (error.message === 'Insufficient permissions to bulk delete posts') {
+        sendError(res, 'FORBIDDEN', error.message, 403);
+        return;
+      }
+
       logger.error('Failed to bulk delete posts', {
         error: error.message,
         body: req.body,
+        userId: req.user?.userId,
       });
 
       next(error);
@@ -500,9 +548,17 @@ export class PostController {
       }
 
       const { workspaceId, postIds, scheduledAt } = req.body;
+      const userId = req.user?.userId;
+      const userRole = req.workspace?.role;
+
+      if (!userId || !userRole) {
+        sendError(res, 'UNAUTHORIZED', 'User information not found', 401);
+        return;
+      }
 
       logger.info('Bulk reschedule request', {
         workspaceId,
+        userId,
         count: postIds.length,
         scheduledAt,
       });
@@ -511,7 +567,9 @@ export class PostController {
       const result = await postService.bulkReschedulePosts(
         postIds,
         new Date(scheduledAt),
-        workspaceId
+        workspaceId,
+        userId,
+        userRole
       );
 
       sendSuccess(res, result, 200);
@@ -519,6 +577,7 @@ export class PostController {
       logger.error('Failed to bulk reschedule posts', {
         error: error.message,
         body: req.body,
+        userId: req.user?.userId,
       });
 
       next(error);

@@ -39,6 +39,7 @@ export enum Permission {
   // Media permissions
   UPLOAD_MEDIA = 'upload_media',
   DELETE_MEDIA = 'delete_media',
+  VIEW_MEDIA = 'view_media',
 }
 
 // Role-based permission mapping
@@ -66,6 +67,7 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     Permission.DELETE_WORKSPACE,
     Permission.UPLOAD_MEDIA,
     Permission.DELETE_MEDIA,
+    Permission.VIEW_MEDIA,
   ],
   
   [MemberRole.ADMIN]: [
@@ -89,6 +91,7 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     Permission.MANAGE_WORKSPACE,
     Permission.UPLOAD_MEDIA,
     Permission.DELETE_MEDIA,
+    Permission.VIEW_MEDIA,
   ],
   
   [MemberRole.EDITOR]: [
@@ -98,11 +101,13 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     Permission.DELETE_OWN_POST,
     Permission.VIEW_ANALYTICS,
     Permission.UPLOAD_MEDIA,
+    Permission.VIEW_MEDIA,
   ],
   
   [MemberRole.VIEWER]: [
     // Read-only access
     Permission.VIEW_ANALYTICS,
+    Permission.VIEW_MEDIA,
   ],
   
   [MemberRole.MEMBER]: [
@@ -112,6 +117,7 @@ const ROLE_PERMISSIONS: Record<MemberRole, Permission[]> = {
     Permission.DELETE_OWN_POST,
     Permission.VIEW_ANALYTICS,
     Permission.UPLOAD_MEDIA,
+    Permission.VIEW_MEDIA,
     Permission.CONNECT_ACCOUNT,
   ],
 };
@@ -262,6 +268,7 @@ export class WorkspacePermissionService {
       [Permission.DELETE_WORKSPACE]: 'Delete workspace',
       [Permission.UPLOAD_MEDIA]: 'Upload media files',
       [Permission.DELETE_MEDIA]: 'Delete media files',
+      [Permission.VIEW_MEDIA]: 'View media files',
     };
 
     return descriptions[permission] || 'Unknown permission';

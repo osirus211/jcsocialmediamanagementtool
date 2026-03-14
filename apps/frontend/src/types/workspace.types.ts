@@ -16,6 +16,7 @@ export enum WorkspaceRole {
 
 export enum MemberStatus {
   ACTIVE = 'active',
+  DEACTIVATED = 'deactivated',
   INVITED = 'invited',
   REMOVED = 'removed',
 }
@@ -60,8 +61,13 @@ export interface WorkspaceMember {
   userId: string | User;
   role: WorkspaceRole;
   status: MemberStatus;
+  isActive: boolean;
   invitedBy?: string | User;
   joinedAt?: string;
+  deactivatedAt?: string;
+  deactivatedBy?: string | User;
+  reactivatedAt?: string;
+  reactivatedBy?: string | User;
   createdAt: string;
   updatedAt: string;
 }

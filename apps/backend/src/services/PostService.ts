@@ -11,6 +11,9 @@ import { SocialAccount } from '../models/SocialAccount';
 import { PostPublishingQueue } from '../queue/PostPublishingQueue';
 import { logger } from '../utils/logger';
 import { recordPostScheduled } from '../config/publishingMetrics';
+import { workspacePermissionService, Permission } from './WorkspacePermissionService';
+import { MemberRole } from '../models/WorkspaceMember';
+import { ForbiddenError } from '../utils/errors';
 
 export interface CreatePostInput {
   workspaceId: string;
@@ -290,6 +293,8 @@ export class PostService {
   async updatePost(
     postId: string,
     workspaceId: string,
+    userId: string,
+    userRole: MemberRole,
     input: UpdatePostInput
   ): Promise<IScheduledPost> {
     const post = await ScheduledPost.findOne({
@@ -299,6 +304,18 @@ export class PostService {
 
     if (!post) {
       throw new Error('Post not found');
+    }
+
+    // Check permission to edit post
+    const canEdit = workspacePermissionService.canPerformAction({
+      role: userRole,
+      permission: Permission.EDIT_POST,
+      resourceOwnerId: post.createdBy?.toString(),
+      userId
+    });
+
+    if (!canEdit) {
+      throw new ForbiddenError('Insufficient permissions to edit this post');
     }
 
     // Only allow updates for scheduled posts
@@ -324,6 +341,7 @@ export class PostService {
     logger.info('Post updated', {
       postId: post._id.toString(),
       workspaceId,
+      userId,
     });
 
     return post;
@@ -332,7 +350,12 @@ export class PostService {
   /**
    * Delete scheduled post
    */
-  async deletePost(postId: string, workspaceId: string): Promise<void> {
+  async deletePost(
+    postId: string, 
+    workspaceId: string, 
+    userId: string, 
+    userRole: MemberRole
+  ): Promise<void> {
     const post = await ScheduledPost.findOne({
       _id: postId,
       workspaceId: new mongoose.Types.ObjectId(workspaceId),
@@ -340,6 +363,18 @@ export class PostService {
 
     if (!post) {
       throw new Error('Post not found');
+    }
+
+    // Check permission to delete post
+    const canDelete = workspacePermissionService.canPerformAction({
+      role: userRole,
+      permission: Permission.DELETE_POST,
+      resourceOwnerId: post.createdBy?.toString(),
+      userId
+    });
+
+    if (!canDelete) {
+      throw new ForbiddenError('Insufficient permissions to delete this post');
     }
 
     // Only allow deletion for scheduled or failed posts
@@ -352,6 +387,7 @@ export class PostService {
     logger.info('Post deleted', {
       postId: post._id.toString(),
       workspaceId,
+      userId,
     });
   }
 
@@ -549,12 +585,23 @@ export class PostService {
     /**
      * Bulk delete posts
      */
-    async bulkDeletePosts(postIds: string[], workspaceId: string): Promise<{
+    async bulkDeletePosts(
+    postIds: string[], 
+    workspaceId: string, 
+    userId: string, 
+    userRole: MemberRole
+  ): Promise<{
       deleted: number;
       failed: Array<{ postId: string; reason: string }>;
     }> {
+      // Check if user has bulk delete permission
+      if (!workspacePermissionService.hasPermission(userRole, Permission.DELETE_POST)) {
+        throw new ForbiddenError('Insufficient permissions to bulk delete posts');
+      }
+
       logger.info('Bulk deleting posts', {
         workspaceId,
+        userId,
         count: postIds.length,
       });
 
@@ -563,7 +610,7 @@ export class PostService {
 
       for (const postId of postIds) {
         try {
-          await this.deletePost(postId, workspaceId);
+          await this.deletePost(postId, workspaceId, userId, userRole);
           deleted.push(postId);
         } catch (error: any) {
           failed.push({
@@ -575,6 +622,7 @@ export class PostService {
 
       logger.info('Bulk delete completed', {
         workspaceId,
+        userId,
         deleted: deleted.length,
         failed: failed.length,
       });
@@ -591,13 +639,16 @@ export class PostService {
     async bulkReschedulePosts(
       postIds: string[],
       scheduledAt: Date,
-      workspaceId: string
+      workspaceId: string,
+      userId: string,
+      userRole: MemberRole
     ): Promise<{
       updated: number;
       failed: Array<{ postId: string; reason: string }>;
     }> {
       logger.info('Bulk rescheduling posts', {
         workspaceId,
+        userId,
         count: postIds.length,
         newScheduledAt: scheduledAt,
       });
@@ -607,7 +658,7 @@ export class PostService {
 
       for (const postId of postIds) {
         try {
-          await this.updatePost(postId, workspaceId, { scheduledAt });
+          await this.updatePost(postId, workspaceId, userId, userRole, { scheduledAt });
           updated.push(postId);
         } catch (error: any) {
           failed.push({
@@ -619,6 +670,7 @@ export class PostService {
 
       logger.info('Bulk reschedule completed', {
         workspaceId,
+        userId,
         updated: updated.length,
         failed: failed.length,
       });

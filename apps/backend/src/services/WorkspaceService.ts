@@ -310,68 +310,15 @@ export class WorkspaceService {
   }
 
   /**
-   * Remove member from workspace
+   * Remove member from workspace (legacy method - now calls fullyRemoveMember)
    */
   async removeMember(params: {
     workspaceId: mongoose.Types.ObjectId;
     removedBy: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
   }): Promise<void> {
-    const { workspaceId, removedBy, userId } = params;
-
-    // Check permission
-    const remover = await this.getMember(workspaceId, removedBy);
-    if (!remover || !workspacePermissionService.hasPermission(remover.role, Permission.REMOVE_MEMBER)) {
-      throw new Error('Insufficient permissions to remove members');
-    }
-
-    // Cannot remove owner
-    const member = await this.getMember(workspaceId, userId);
-    if (!member) {
-      throw new Error('Member not found');
-    }
-
-    if (member.role === MemberRole.OWNER) {
-      throw new Error('Cannot remove workspace owner');
-    }
-
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
-      // Deactivate member
-      await WorkspaceMember.findByIdAndUpdate(
-        member._id,
-        { isActive: false },
-        { session }
-      );
-
-      // Update workspace usage
-      await Workspace.findByIdAndUpdate(
-        workspaceId,
-        { $inc: { 'usage.currentMembers': -1 } },
-        { session }
-      );
-
-      // Log activity
-      await this.logActivity({
-        workspaceId,
-        userId: removedBy,
-        action: ActivityAction.MEMBER_REMOVED,
-        resourceType: 'User',
-        resourceId: userId,
-        session,
-      });
-
-      await session.commitTransaction();
-      logger.info(`Member removed from workspace: ${workspaceId}`);
-    } catch (error) {
-      await session.abortTransaction();
-      logger.error('Failed to remove member:', error);
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    // Use the new fully remove method for backward compatibility
+    return this.fullyRemoveMember(params);
   }
 
   /**
@@ -426,14 +373,330 @@ export class WorkspaceService {
   }
 
   /**
-   * Get workspace members
+   * Deactivate member (suspend without removing)
    */
-  async getMembers(workspaceId: mongoose.Types.ObjectId): Promise<IWorkspaceMember[]> {
-    return WorkspaceMember.find({
+  async deactivateMember(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    deactivatedBy: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+  }): Promise<void> {
+    const { workspaceId, deactivatedBy, userId } = params;
+
+    // Check permission
+    const deactivator = await this.getMember(workspaceId, deactivatedBy);
+    if (!deactivator || !workspacePermissionService.hasPermission(deactivator.role, Permission.REMOVE_MEMBER)) {
+      throw new Error('Insufficient permissions to deactivate members');
+    }
+
+    // Cannot deactivate owner
+    const member = await WorkspaceMember.findOne({
       workspaceId,
-      isActive: true,
-    })
-      .populate('userId', 'name email')
+      userId,
+    });
+
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    if (member.role === MemberRole.OWNER) {
+      throw new Error('Cannot deactivate workspace owner');
+    }
+
+    if (!member.isActive) {
+      throw new Error('Member is already deactivated');
+    }
+
+    // Cannot deactivate yourself
+    if (userId.toString() === deactivatedBy.toString()) {
+      throw new Error('Cannot deactivate yourself. Use leave workspace instead.');
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Deactivate member (keep record but mark inactive)
+      await WorkspaceMember.findByIdAndUpdate(
+        member._id,
+        { 
+          isActive: false,
+          deactivatedAt: new Date(),
+          deactivatedBy: deactivatedBy
+        },
+        { session }
+      );
+
+      // Update workspace usage
+      await Workspace.findByIdAndUpdate(
+        workspaceId,
+        { $inc: { 'usage.currentMembers': -1 } },
+        { session }
+      );
+
+      // Revoke active sessions for this user in this workspace
+      await this.revokeUserSessions(userId, workspaceId);
+
+      // Log activity
+      await this.logActivity({
+        workspaceId,
+        userId: deactivatedBy,
+        action: ActivityAction.MEMBER_REMOVED, // Using existing action
+        resourceType: 'User',
+        resourceId: userId,
+        details: { action: 'deactivated' },
+        session,
+      });
+
+      await session.commitTransaction();
+      logger.info(`Member deactivated in workspace: ${workspaceId}`);
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Failed to deactivate member:', error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Reactivate member
+   */
+  async reactivateMember(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    reactivatedBy: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+  }): Promise<void> {
+    const { workspaceId, reactivatedBy, userId } = params;
+
+    // Check permission
+    const reactivator = await this.getMember(workspaceId, reactivatedBy);
+    if (!reactivator || !workspacePermissionService.hasPermission(reactivator.role, Permission.INVITE_MEMBER)) {
+      throw new Error('Insufficient permissions to reactivate members');
+    }
+
+    // Find deactivated member
+    const member = await WorkspaceMember.findOne({
+      workspaceId,
+      userId,
+    });
+
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    if (member.isActive) {
+      throw new Error('Member is already active');
+    }
+
+    // Check workspace limits
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    if (workspace.usage.currentMembers >= workspace.limits.maxMembers) {
+      throw new Error('Workspace member limit reached');
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Reactivate member
+      await WorkspaceMember.findByIdAndUpdate(
+        member._id,
+        { 
+          isActive: true,
+          reactivatedAt: new Date(),
+          reactivatedBy: reactivatedBy,
+          $unset: { deactivatedAt: 1, deactivatedBy: 1 }
+        },
+        { session }
+      );
+
+      // Update workspace usage
+      await Workspace.findByIdAndUpdate(
+        workspaceId,
+        { $inc: { 'usage.currentMembers': 1 } },
+        { session }
+      );
+
+      // Log activity
+      await this.logActivity({
+        workspaceId,
+        userId: reactivatedBy,
+        action: ActivityAction.MEMBER_INVITED, // Using existing action
+        resourceType: 'User',
+        resourceId: userId,
+        details: { action: 'reactivated' },
+        session,
+      });
+
+      await session.commitTransaction();
+      logger.info(`Member reactivated in workspace: ${workspaceId}`);
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Failed to reactivate member:', error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Fully remove member (delete record and revoke sessions)
+   */
+  async fullyRemoveMember(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    removedBy: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+  }): Promise<void> {
+    const { workspaceId, removedBy, userId } = params;
+
+    // Check permission
+    const remover = await this.getMember(workspaceId, removedBy);
+    if (!remover || !workspacePermissionService.hasPermission(remover.role, Permission.REMOVE_MEMBER)) {
+      throw new Error('Insufficient permissions to remove members');
+    }
+
+    // Cannot remove owner
+    const member = await WorkspaceMember.findOne({
+      workspaceId,
+      userId,
+    });
+
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    if (member.role === MemberRole.OWNER) {
+      throw new Error('Cannot remove workspace owner');
+    }
+
+    // Cannot remove yourself
+    if (userId.toString() === removedBy.toString()) {
+      throw new Error('Cannot remove yourself. Use leave workspace instead.');
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Delete member record completely
+      await WorkspaceMember.findByIdAndDelete(member._id, { session });
+
+      // Update workspace usage if member was active
+      if (member.isActive) {
+        await Workspace.findByIdAndUpdate(
+          workspaceId,
+          { $inc: { 'usage.currentMembers': -1 } },
+          { session }
+        );
+      }
+
+      // Revoke active sessions for this user in this workspace
+      await this.revokeUserSessions(userId, workspaceId);
+
+      // Cancel any pending invitations for this user
+      await this.cancelPendingInvitations(userId, workspaceId, session);
+
+      // Reassign or archive their scheduled posts
+      await this.handleMemberPostsOnRemoval(userId, workspaceId, session);
+
+      // Log activity
+      await this.logActivity({
+        workspaceId,
+        userId: removedBy,
+        action: ActivityAction.MEMBER_REMOVED,
+        resourceType: 'User',
+        resourceId: userId,
+        details: { action: 'fully_removed' },
+        session,
+      });
+
+      await session.commitTransaction();
+      logger.info(`Member fully removed from workspace: ${workspaceId}`);
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Failed to fully remove member:', error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Revoke all active sessions for a user in a workspace
+   */
+  private async revokeUserSessions(userId: mongoose.Types.ObjectId, workspaceId: mongoose.Types.ObjectId): Promise<void> {
+    try {
+      // TODO: Implement session revocation when SessionService is available
+      // For now, we'll log this action for future implementation
+      logger.info(`Session revocation requested for user ${userId} in workspace ${workspaceId}`);
+    } catch (error) {
+      logger.warn('Failed to revoke user sessions:', error);
+      // Don't fail the main operation if session revocation fails
+    }
+  }
+
+  /**
+   * Cancel pending invitations for a user
+   */
+  private async cancelPendingInvitations(userId: mongoose.Types.ObjectId, workspaceId: mongoose.Types.ObjectId, session: mongoose.ClientSession): Promise<void> {
+    try {
+      // Get user email to find invitations
+      const { User } = await import('../models/User');
+      const user = await User.findById(userId);
+      
+      if (user) {
+        await WorkspaceInvitation.updateMany(
+          {
+            workspaceId,
+            invitedEmail: user.email.toLowerCase(),
+            status: InvitationStatus.PENDING
+          },
+          {
+            status: InvitationStatus.REVOKED,
+            revokedAt: new Date()
+          },
+          { session }
+        );
+      }
+    } catch (error) {
+      logger.warn('Failed to cancel pending invitations:', error);
+      // Don't fail the main operation
+    }
+  }
+
+  /**
+   * Handle member's posts when they are removed
+   */
+  private async handleMemberPostsOnRemoval(userId: mongoose.Types.ObjectId, workspaceId: mongoose.Types.ObjectId, session: mongoose.ClientSession): Promise<void> {
+    try {
+      // TODO: Implement post handling when PostService is available
+      // For now, we'll log this action for future implementation
+      logger.info(`Post handling requested for user ${userId} removal from workspace ${workspaceId}`);
+    } catch (error) {
+      logger.warn('Failed to handle member posts on removal:', error);
+      // Don't fail the main operation
+    }
+  }
+
+  /**
+   * Get workspace members (including deactivated ones)
+   */
+  async getMembers(workspaceId: mongoose.Types.ObjectId, includeDeactivated: boolean = true): Promise<IWorkspaceMember[]> {
+    const query: any = { workspaceId };
+    
+    if (!includeDeactivated) {
+      query.isActive = true;
+    }
+
+    return WorkspaceMember.find(query)
+      .populate('userId', 'firstName lastName email avatar')
+      .populate('invitedBy', 'firstName lastName email')
+      .populate('deactivatedBy', 'firstName lastName email')
+      .populate('reactivatedBy', 'firstName lastName email')
       .sort({ role: 1, joinedAt: 1 });
   }
 

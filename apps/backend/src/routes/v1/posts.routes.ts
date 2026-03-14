@@ -8,7 +8,8 @@ import { Router } from 'express';
 import { postController } from '../../controllers/PostController';
 import { bulkUploadController } from '../../controllers/BulkUploadController';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/tenant';
+import { requireWorkspace, requirePermission } from '../../middleware/tenant';
+import { Permission } from '../../services/WorkspacePermissionService';
 import { rateLimit } from 'express-rate-limit';
 import multer from 'multer';
 import {
@@ -134,7 +135,7 @@ router.use(postRateLimiter);
  *       429:
  *         description: Rate limit exceeded
  */
-router.post('/', validateRequest(createPostSchema), (req, res, next) => {
+router.post('/', requirePermission(Permission.CREATE_POST), validateRequest(createPostSchema), (req, res, next) => {
   postController.createPost(req, res, next);
 });
 
@@ -805,7 +806,7 @@ router.post('/bulk/delete', validateBulkDelete, (req, res, next) => {
  *       401:
  *         description: Unauthorized
  */
-router.post('/bulk', (req, res, next) => {
+router.post('/bulk', requirePermission(Permission.CREATE_POST), (req, res, next) => {
   postController.bulkCreatePosts(req, res, next);
 });
 
@@ -988,7 +989,7 @@ router.post('/bulk/update', validateBulkUpdate, (req, res, next) => {
  *       401:
  *         description: Unauthorized
  */
-router.post('/bulk-upload', upload.single('file'), (req, res, next) => {
+router.post('/bulk-upload', requirePermission(Permission.CREATE_POST), upload.single('file'), (req, res, next) => {
   bulkUploadController.uploadCSV(req, res, next);
 });
 

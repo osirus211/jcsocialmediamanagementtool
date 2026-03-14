@@ -53,18 +53,25 @@ export class InvitationController {
       });
 
       // Audit log the invitation creation
-      logAudit({
+      const { SecurityAuditService } = await import('../services/SecurityAuditService');
+      const { SecurityEventType } = await import('../models/SecurityEvent');
+      const auditService = new SecurityAuditService();
+      
+      await auditService.logEvent({
+        type: SecurityEventType.ROLE_CHANGE,
         userId: new mongoose.Types.ObjectId(userId),
         workspaceId: new mongoose.Types.ObjectId(workspaceId),
-        action: 'invitation.created',
-        entityType: 'invitation',
-        entityId: invitation._id.toString(),
+        ipAddress: req.ip || 'unknown',
+        userAgent: req.get('User-Agent'),
+        resource: 'workspace_invitation',
+        action: 'create',
+        success: true,
         metadata: {
           invitedEmail: email,
           role,
           expiresAt: invitation.expiresAt,
+          invitationId: invitation._id.toString(),
         },
-        req,
       });
 
       res.status(201).json({

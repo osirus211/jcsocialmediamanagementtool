@@ -300,3 +300,60 @@ export const invitationRevokeRateLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Member remove rate limiter - 20 removes per hour per user
+ */
+export const memberRemoveRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many member removal attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
+
+/**
+ * Member deactivate rate limiter - 30 deactivations per hour per user
+ */
+export const memberDeactivateRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many member deactivation attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
+
+/**
+ * Member reactivate rate limiter - 30 reactivations per hour per user
+ */
+export const memberReactivateRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: undefined,
+  keyGenerator: (req: Request) => req.user?.userId || req.ip || 'unknown',
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many member reactivation attempts. Please try again later.',
+      retryAfter: 3600,
+    });
+  },
+});
