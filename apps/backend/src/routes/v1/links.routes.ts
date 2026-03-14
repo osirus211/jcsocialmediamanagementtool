@@ -30,3 +30,4 @@ router.get('/:shortCode/stats', shortLinkController.getLinkStats.bind(shortLinkC
 router.delete('/:shortCode', shortLinkController.deleteLink.bind(shortLinkController));
 
 export default router;
+

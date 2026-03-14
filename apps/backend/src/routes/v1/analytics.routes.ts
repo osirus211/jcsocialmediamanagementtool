@@ -328,3 +328,4 @@ router.get('/posts/top', requirePermission(Permission.VIEW_ANALYTICS), async (re
 });
 
 export default router;
+

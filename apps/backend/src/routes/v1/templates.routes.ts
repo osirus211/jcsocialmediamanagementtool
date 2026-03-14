@@ -28,3 +28,4 @@ router.delete('/:id', postTemplateController.deleteTemplate.bind(postTemplateCon
 router.post('/:id/apply', postTemplateController.applyTemplate.bind(postTemplateController));
 
 export default router;
+

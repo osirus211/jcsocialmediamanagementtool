@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import EnhancedHashtagPanel from './EnhancedHashtagPanel';
 
 interface AIAssistantPanelProps {
   selectedPlatforms: SocialPlatform[];
@@ -46,10 +47,6 @@ const AIAssistantPanel = memo(function AIAssistantPanel({ selectedPlatforms, mai
   const [improveInstruction, setImproveInstruction] = useState('');
   const [improvedContent, setImprovedContent] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState<string | null>(null);
-
-  // Hashtags tab state
-  const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
-  const [selectedHashtags, setSelectedHashtags] = useState<Set<string>>(new Set());
 
   // Insights tab state
   const [engagementPrediction, setEngagementPrediction] = useState<EngagementPredictionOutput | null>(null);
@@ -173,27 +170,8 @@ const AIAssistantPanel = memo(function AIAssistantPanel({ selectedPlatforms, mai
   };
 
   const handleGenerateHashtags = async () => {
-    if (!mainContent.trim()) {
-      setError('No content available. Please write something first.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await aiService.generateHashtags({
-        content: mainContent,
-        platform: primaryPlatform,
-      });
-
-      setSuggestedHashtags(result.hashtags);
-      setSelectedHashtags(new Set());
-    } catch (error: any) {
-      setError(error.response?.data?.message || error.message || 'Failed to generate hashtags');
-    } finally {
-      setIsLoading(false);
-    }
+    // This function is now handled by EnhancedHashtagPanel
+    // Keeping for backward compatibility if needed
   };
 
   const handlePredictEngagement = async () => {
@@ -256,30 +234,28 @@ const AIAssistantPanel = memo(function AIAssistantPanel({ selectedPlatforms, mai
   };
 
   const handleToggleHashtag = (hashtag: string) => {
-    const newSelected = new Set(selectedHashtags);
-    if (newSelected.has(hashtag)) {
-      newSelected.delete(hashtag);
-    } else {
-      newSelected.add(hashtag);
-    }
-    setSelectedHashtags(newSelected);
+    // This function is now handled by EnhancedHashtagPanel
+    // Keeping for backward compatibility if needed
   };
 
-  const handleAddSelectedHashtags = () => {
-    if (selectedHashtags.size === 0) return;
-    
-    const hashtagsText = Array.from(selectedHashtags).join(' ');
+  const handleAddHashtags = (hashtags: string[]) => {
+    const hashtagsText = hashtags.join(' ');
     const newContent = mainContent.trim() + (mainContent.trim() ? '\n\n' : '') + hashtagsText;
     setContent('main', newContent);
-    setSelectedHashtags(new Set());
   };
 
-  const handleAddAllHashtags = () => {
-    if (suggestedHashtags.length === 0) return;
-    
-    const hashtagsText = suggestedHashtags.join(' ');
-    const newContent = mainContent.trim() + (mainContent.trim() ? '\n\n' : '') + hashtagsText;
+  const handleReplaceHashtags = (hashtags: string[]) => {
+    // Remove existing hashtags from content and add new ones
+    const contentWithoutHashtags = mainContent.replace(/#\w+/g, '').trim();
+    const hashtagsText = hashtags.join(' ');
+    const newContent = contentWithoutHashtags + (contentWithoutHashtags ? '\n\n' : '') + hashtagsText;
     setContent('main', newContent);
+  };
+
+  // Extract current hashtags from content
+  const getCurrentHashtags = (): string[] => {
+    const hashtagRegex = /#\w+/g;
+    return mainContent.match(hashtagRegex) || [];
   };
 
   const getScoreColor = (score: number) => {
@@ -571,71 +547,13 @@ const AIAssistantPanel = memo(function AIAssistantPanel({ selectedPlatforms, mai
 
         {/* Hashtags Tab */}
         {activeTab === 'hashtags' && (
-          <div className="space-y-4">
-            <button
-              onClick={handleGenerateHashtags}
-              disabled={isLoading || !mainContent.trim()}
-              className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Hash className="h-4 w-4" />
-                  Generate Hashtags
-                </>
-              )}
-            </button>
-
-            {!mainContent.trim() && (
-              <div className="p-4 bg-gray-50 rounded-lg text-center">
-                <p className="text-sm text-gray-600">Write some content first to generate relevant hashtags.</p>
-              </div>
-            )}
-
-            {/* Suggested Hashtags */}
-            {suggestedHashtags.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-gray-900">Suggested Hashtags</h3>
-                  <button
-                    onClick={handleAddAllHashtags}
-                    className="text-xs text-purple-600 hover:text-purple-700"
-                  >
-                    Add All
-                  </button>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  {suggestedHashtags.map((hashtag) => (
-                    <button
-                      key={hashtag}
-                      onClick={() => handleToggleHashtag(hashtag)}
-                      className={`px-2 py-1 text-xs rounded-full border transition-colors ${
-                        selectedHashtags.has(hashtag)
-                          ? 'bg-purple-100 border-purple-300 text-purple-700'
-                          : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {hashtag}
-                    </button>
-                  ))}
-                </div>
-
-                {selectedHashtags.size > 0 && (
-                  <button
-                    onClick={handleAddSelectedHashtags}
-                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
-                    Add Selected ({selectedHashtags.size})
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <EnhancedHashtagPanel
+            selectedPlatform={primaryPlatform}
+            currentHashtags={getCurrentHashtags()}
+            onHashtagsAdd={handleAddHashtags}
+            onHashtagsReplace={handleReplaceHashtags}
+            content={mainContent}
+          />
         )}
 
         {/* Insights Tab */}

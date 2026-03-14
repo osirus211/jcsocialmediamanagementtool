@@ -11,6 +11,8 @@ export * from './Subscription';
 export * from './Invoice';
 export * from './Payment';
 export * from './ApiKey';
+export * from './HashtagGroup';
+export * from './HashtagHistory';
 
 // Phase-5: Automation Engine models
 export * from './Workflow';

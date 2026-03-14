@@ -1165,3 +1165,4 @@ router.get('/:id/lock', [...validatePostId, ...validateWorkspaceId], (req, res, 
 });
 
 export default router;
+

@@ -39,3 +39,4 @@ router.get('/:platform', TrendController.getTrendsByPlatform);
 router.get('/', TrendController.getTopTrends);
 
 export default router;
+

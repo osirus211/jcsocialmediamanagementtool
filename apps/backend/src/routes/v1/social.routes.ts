@@ -40,3 +40,4 @@ router.post('/accounts/:id/sync', socialAccountController.syncAccount.bind(socia
 router.get('/accounts/health', socialAccountController.getHealth.bind(socialAccountController));
 
 export default router;
+

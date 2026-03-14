@@ -55,6 +55,13 @@ import connectionHealthRoutes from './connection-health.routes'; // Connection h
 import reconnectRoutes from './reconnect.routes'; // Account reconnection flows
 import notificationRoutes from './notifications.routes'; // In-app notifications
 import platformSettingsRoutes from '../platformSettings'; // Platform-specific settings
+import hashtagGroupsRoutes from './hashtag-groups.routes'; // Hashtag groups management
+import hashtagCheckerRoutes from './hashtag-checker.routes'; // Hashtag safety checker
+import hashtagDifficultyRoutes from './hashtag-difficulty.routes'; // Hashtag difficulty analysis
+import relatedHashtagsRoutes from './related-hashtags.routes'; // Related hashtags discovery
+import hashtagHistoryRoutes from './hashtag-history.routes'; // Hashtag usage history
+import trendingHashtagsRoutes from './trending-hashtags.routes'; // Trending hashtags
+import competitorHashtagAnalysisRoutes from './competitor-hashtag-analysis.routes'; // Competitor hashtag analysis
 
 const router = Router();
 
@@ -116,6 +123,13 @@ router.get('/', (_req, res) => {
       metrics: '/api/v1/metrics',
       googleBusiness: '/api/v1/google-business',
       apiKeys: '/api/v1/api-keys',
+      hashtagGroups: '/api/v1/hashtag-groups',
+      hashtagChecker: '/api/v1/hashtag-checker',
+      hashtagDifficulty: '/api/v1/hashtag-difficulty',
+      relatedHashtags: '/api/v1/related-hashtags',
+      hashtagHistory: '/api/v1/hashtag-history',
+      trendingHashtags: '/api/v1/trending-hashtags',
+      competitorHashtagAnalysis: '/api/v1/competitor-hashtag-analysis',
     },
   });
 });
@@ -178,5 +192,12 @@ router.use('/composer', composerRoutes);
 router.use('/metrics', metricsRoutes);
 router.use('/google-business', googleBusinessRoutes);
 router.use('/api-keys', apiKeysRoutes); // API key management
+router.use('/hashtag-groups', hashtagGroupsRoutes); // Hashtag groups management
+router.use('/hashtag-checker', hashtagCheckerRoutes); // Hashtag safety checker
+router.use('/hashtag-difficulty', hashtagDifficultyRoutes); // Hashtag difficulty analysis
+router.use('/related-hashtags', relatedHashtagsRoutes); // Related hashtags discovery
+router.use('/hashtag-history', hashtagHistoryRoutes); // Hashtag usage history
+router.use('/trending-hashtags', trendingHashtagsRoutes); // Trending hashtags
+router.use('/competitor-hashtag-analysis', competitorHashtagAnalysisRoutes); // Competitor hashtag analysis
 
 export default router;

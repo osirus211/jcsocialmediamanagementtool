@@ -47,3 +47,4 @@ router.delete('/:id', requirePostOwnershipOrAdmin, postController.deletePost.bin
 router.post('/:id/retry', requirePostOwnershipOrAdmin, postController.retryPost.bind(postController));
 
 export default router;
+

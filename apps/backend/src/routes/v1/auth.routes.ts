@@ -151,3 +151,4 @@ router.post('/deactivate-account', requireAuth, validateRequest(deactivateAccoun
 router.use('/magic-link', magicLinkRoutes);
 
 export default router;
+

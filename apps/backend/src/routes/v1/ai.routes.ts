@@ -96,3 +96,4 @@ router.post('/generate-calendar', checkAILimit, validateRequest(generateCalendar
 router.post('/moderate-content', AIController.moderateContent);
 
 export default router;
+

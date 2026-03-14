@@ -31,3 +31,4 @@ router.delete('/:id', queueSlotController.deleteSlot.bind(queueSlotController));
 router.post('/add-to-queue', validateRequest(addToQueueSchema), queueSlotController.addToQueue.bind(queueSlotController));
 
 export default router;
+

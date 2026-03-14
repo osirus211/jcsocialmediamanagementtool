@@ -62,3 +62,4 @@ router.get('/:id/growth', CompetitorController.getCompetitorGrowth);
 router.post('/compare', CompetitorController.compareCompetitors);
 
 export default router;
+

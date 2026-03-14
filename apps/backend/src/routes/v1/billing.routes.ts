@@ -29,3 +29,4 @@ router.post('/portal', requireAuth, requireWorkspace, validateRequest(createPort
 router.post('/cancel', requireAuth, requireWorkspace, billingController.cancelSubscription.bind(billingController));
 
 export default router;
+

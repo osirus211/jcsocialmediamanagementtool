@@ -87,3 +87,4 @@ router.get(
 
 export default router;
 export { ingestQueue }; // Export for worker initialization
+

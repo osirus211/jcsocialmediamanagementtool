@@ -47,3 +47,4 @@ router.get('/:accountId/growth', FollowerAnalyticsController.getFollowerGrowth);
 router.get('/:accountId/trends', FollowerAnalyticsController.getFollowerTrends);
 
 export default router;
+

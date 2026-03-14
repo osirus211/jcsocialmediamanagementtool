@@ -46,3 +46,4 @@ router.patch('/:id', ListeningRuleController.updateRule);
 router.delete('/:id', ListeningRuleController.deleteRule);
 
 export default router;
+
