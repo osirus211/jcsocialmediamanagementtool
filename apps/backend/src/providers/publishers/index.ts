@@ -14,3 +14,4 @@ export { LinkedInPublisher } from './LinkedInPublisher';
 export { TikTokPublisher } from './TikTokPublisher';
 export { GoogleBusinessPublisher } from './GoogleBusinessPublisher';
 export { MastodonPublisher } from './MastodonPublisher';
+export { RedditPublisher } from './RedditPublisher';

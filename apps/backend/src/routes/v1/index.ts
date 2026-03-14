@@ -49,6 +49,7 @@ import { facebookRoutes } from '../facebook.routes'; // Facebook-specific featur
 import { facebookAnalyticsRoutes } from '../analytics/facebook.analytics.routes'; // Facebook analytics
 import blueskyRoutes from './bluesky.routes'; // Bluesky OAuth and management
 import mastodonRoutes from './mastodon.routes'; // Mastodon OAuth and management
+import redditRoutes from './reddit.routes'; // Reddit OAuth and management
 
 const router = Router();
 
@@ -154,6 +155,7 @@ router.use('/onboarding', onboardingRoutes); // User onboarding
 router.use('/instagram', instagramRoutes); // Instagram-specific features
 router.use('/bluesky', blueskyRoutes); // Bluesky OAuth and management
 router.use('/mastodon', mastodonRoutes); // Mastodon OAuth and management
+router.use('/reddit', redditRoutes); // Reddit OAuth and management
 router.use('/dashboard', dashboardRoutes);
 router.use('/billing', billingRoutes);
 router.use('/admin', adminRoutes);

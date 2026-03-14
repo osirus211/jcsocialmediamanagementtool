@@ -18,6 +18,7 @@ import { LinkedInPublisher } from '../providers/publishers/LinkedInPublisher';
 import { TikTokPublisher } from '../providers/publishers/TikTokPublisher';
 import { GoogleBusinessPublisher } from '../providers/publishers/GoogleBusinessPublisher';
 import { MastodonPublisher } from '../providers/publishers/MastodonPublisher';
+import { RedditPublisher } from '../providers/publishers/RedditPublisher';
 import { publishingLockService } from '../services/PublishingLockService';
 import { classifyPublishingError, PublishingErrorCategory } from '../types/PublishingErrors';
 import { logger } from '../utils/logger';
@@ -46,6 +47,7 @@ export class PostPublishingWorker {
     this.publisherRegistry.register('tiktok', new TikTokPublisher());
     this.publisherRegistry.register('google-business', new GoogleBusinessPublisher());
     this.publisherRegistry.register('mastodon', new MastodonPublisher());
+    this.publisherRegistry.register('reddit', new RedditPublisher(process.env.REDDIT_USER_AGENT || 'web:jcsocialmedia:v1.0'));
   }
 
   /**

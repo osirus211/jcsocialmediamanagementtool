@@ -9,6 +9,7 @@ export enum SocialPlatform {
   THREADS = 'threads',
   BLUESKY = 'bluesky',
   MASTODON = 'mastodon',
+  REDDIT = 'reddit',
   GOOGLE_BUSINESS = 'google-business',
   PINTEREST = 'pinterest',
 }

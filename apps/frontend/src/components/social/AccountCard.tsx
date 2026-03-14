@@ -15,6 +15,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: '@',
   [SocialPlatform.BLUESKY]: '🦋',
   [SocialPlatform.MASTODON]: '🐘',
+  [SocialPlatform.REDDIT]: '🔴',
   [SocialPlatform.GOOGLE_BUSINESS]: 'G',
   [SocialPlatform.PINTEREST]: 'P',
 };
@@ -28,6 +29,7 @@ const platformColors: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: 'bg-black text-white',
   [SocialPlatform.BLUESKY]: 'bg-sky-500 text-white',
   [SocialPlatform.MASTODON]: 'bg-purple-600 text-white',
+  [SocialPlatform.REDDIT]: 'bg-orange-500 text-white',
   [SocialPlatform.GOOGLE_BUSINESS]: 'bg-blue-700 text-white',
   [SocialPlatform.PINTEREST]: 'bg-red-600 text-white',
 };

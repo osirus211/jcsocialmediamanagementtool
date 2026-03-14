@@ -4,6 +4,7 @@ import { apiClient } from '@/lib/api-client';
 import { InstagramConnectModal } from './InstagramConnectModal';
 import { BlueskyConnectModal } from './BlueskyConnectModal';
 import { MastodonConnectModal } from './MastodonConnectModal';
+import { RedditConnectModal } from './RedditConnectModal';
 
 interface ConnectButtonProps {
   platform: SocialPlatform;
@@ -19,6 +20,7 @@ const platformLabels: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: 'Threads',
   [SocialPlatform.BLUESKY]: 'Bluesky',
   [SocialPlatform.MASTODON]: 'Mastodon',
+  [SocialPlatform.REDDIT]: 'Reddit',
   [SocialPlatform.GOOGLE_BUSINESS]: 'Google Business Profile',
   [SocialPlatform.PINTEREST]: 'Pinterest',
 };
@@ -28,6 +30,7 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [showBlueskyModal, setShowBlueskyModal] = useState(false);
   const [showMastodonModal, setShowMastodonModal] = useState(false);
+  const [showRedditModal, setShowRedditModal] = useState(false);
 
   const handleConnect = async () => {
     // Special handling for Instagram - show options modal
@@ -45,6 +48,12 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
     // Special handling for Mastodon - show instance selection modal
     if (platform === SocialPlatform.MASTODON) {
       setShowMastodonModal(true);
+      return;
+    }
+
+    // Special handling for Reddit - show connect modal
+    if (platform === SocialPlatform.REDDIT) {
+      setShowRedditModal(true);
       return;
     }
 
@@ -92,6 +101,13 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
     }
   };
 
+  const handleRedditSuccess = () => {
+    setShowRedditModal(false);
+    if (onSuccess) {
+      onSuccess();
+    }
+  };
+
   return (
     <>
       <button
@@ -126,6 +142,15 @@ export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {
           isOpen={showMastodonModal}
           onClose={() => setShowMastodonModal(false)}
           onSuccess={handleMastodonSuccess}
+        />
+      )}
+
+      {/* Reddit Connect Modal */}
+      {platform === SocialPlatform.REDDIT && (
+        <RedditConnectModal
+          isOpen={showRedditModal}
+          onClose={() => setShowRedditModal(false)}
+          onSuccess={handleRedditSuccess}
         />
       )}
     </>

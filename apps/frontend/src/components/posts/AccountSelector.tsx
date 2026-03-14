@@ -19,6 +19,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.THREADS]: '@',
   [SocialPlatform.BLUESKY]: '🦋',
   [SocialPlatform.MASTODON]: '🐘',
+  [SocialPlatform.REDDIT]: '🔴',
   [SocialPlatform.GOOGLE_BUSINESS]: 'G',
   [SocialPlatform.PINTEREST]: 'P',
 };
