@@ -3,6 +3,7 @@ import { useComposerStore } from '@/store/composer.store';
 import { useSocialAccountStore } from '@/store/social.store';
 import { composerService } from '@/services/composer.service';
 import { SocialPlatform, PublishMode, PLATFORM_LIMITS } from '@/types/composer.types';
+import { getPlatformCharacterCount, getPlatformLimit } from '@/utils/characterCount';
 import { useDraftCollaboration } from '@/hooks/useDraftCollaboration';
 import { StatusBar } from './StatusBar';
 import { AccountSelector } from '../posts/AccountSelector';
@@ -248,13 +249,14 @@ export function ComposerContainer({
       errors.push('Please enter post content');
     }
 
-    // Check character limits
+    // Check character limits using enhanced character counting
     for (const platform of selectedPlatforms) {
       const content = platformContent[platform] || mainContent;
-      const limit = PLATFORM_LIMITS[platform];
+      const characterCount = getPlatformCharacterCount(content, platform);
+      const limit = getPlatformLimit(platform);
       
-      if (content.length > limit) {
-        errors.push(`${platform} content exceeds ${limit} character limit`);
+      if (characterCount > limit) {
+        errors.push(`${platform} content exceeds ${limit} character limit (${characterCount} characters)`);
       }
     }
 
@@ -385,13 +387,23 @@ export function ComposerContainer({
     removeTag(tag);
   }, [removeTag]);
 
-  const canPublish = useMemo(() => 
-    selectedAccounts.length > 0 &&
-    (mainContent.trim().length > 0 || Object.values(platformContent).some((c) => c?.trim())) &&
-    !hasUnsavedChanges &&
-    !isPublishing,
-    [selectedAccounts, mainContent, platformContent, hasUnsavedChanges, isPublishing]
-  );
+  const canPublish = useMemo(() => {
+    // Basic requirements
+    const hasAccounts = selectedAccounts.length > 0;
+    const hasContent = mainContent.trim().length > 0 || Object.values(platformContent).some((c) => c?.trim());
+    const noUnsavedChanges = !hasUnsavedChanges;
+    const notPublishing = !isPublishing;
+    
+    // Character limit validation
+    const withinLimits = selectedPlatforms.every(platform => {
+      const content = platformContent[platform] || mainContent;
+      const characterCount = getPlatformCharacterCount(content, platform);
+      const limit = getPlatformLimit(platform);
+      return characterCount <= limit;
+    });
+    
+    return hasAccounts && hasContent && noUnsavedChanges && notPublishing && withinLimits;
+  }, [selectedAccounts, mainContent, platformContent, hasUnsavedChanges, isPublishing, selectedPlatforms]);
 
   return (
     <>

@@ -4,10 +4,13 @@ import { EmojiPicker } from './EmojiPicker';
 import { MentionAutocomplete } from './MentionAutocomplete';
 import { LinkPreviewCard } from './LinkPreviewCard';
 import { PlatformSpecificSettings } from './PlatformSpecificSettings';
+import { EnhancedCharacterCounter } from './EnhancedCharacterCounter';
+import { TwitterCharacterOptimizer } from './TwitterCharacterOptimizer';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useLinkPreview } from '@/hooks/useLinkPreview';
 import { getSuggestedAdaptations } from '@/utils/contentAdaptation';
 import { useComposerStore } from '@/store/composer.store';
+import { getPlatformCharacterCount, getPlatformLimit, getCharacterStatus } from '@/utils/characterCount';
 import { useState, useRef, useCallback } from 'react';
 import { Smile, Wand2, Settings, Copy, RotateCcw } from 'lucide-react';
 
@@ -73,14 +76,18 @@ export function ContentSection({
 
   // Get character limit for active platform
   const getCharacterLimit = () => {
-    if (!enablePlatformCustomization || !activePlatform) return 280; // Default
-    return PLATFORM_LIMITS[activePlatform];
+    if (!enablePlatformCustomization || !activePlatform) return getPlatformLimit('twitter'); // Default
+    return getPlatformLimit(activePlatform);
   };
 
   const currentContent = getCurrentContent();
   const maxLength = getCharacterLimit();
-  const characterCount = currentContent.length;
+  const characterCount = getPlatformCharacterCount(
+    currentContent, 
+    enablePlatformCustomization && activePlatform ? activePlatform : 'twitter'
+  );
   const isOverLimit = characterCount > maxLength;
+  const characterStatus = getCharacterStatus(characterCount, maxLength);
 
   const handleContentChange = (content: string) => {
     if (enablePlatformCustomization && activePlatform) {
@@ -317,22 +324,27 @@ export function ContentSection({
                 <span className="text-blue-600">Using main content</span>
               )}
             </span>
-            <span
-              id="character-count"
-              role="status"
-              aria-live="polite"
-              className={`text-sm ${
-                isOverLimit ? 'text-red-600 font-semibold' : 'text-gray-500'
-              }`}
-            >
-              {characterCount} / {maxLength}
-              {isOverLimit && (
-                <span className="ml-2 text-xs">
-                  ({characterCount - maxLength} over limit)
-                </span>
-              )}
-            </span>
+            
+            {/* Enhanced Character Counter */}
+            <EnhancedCharacterCounter
+              content={currentContent}
+              platforms={enablePlatformCustomization && activePlatform ? [activePlatform] : platforms}
+              activePlatform={activePlatform}
+              showMultiPlatform={!enablePlatformCustomization && platforms.length > 1}
+              className="flex-shrink-0"
+            />
           </div>
+          
+          {/* Twitter Character Optimizer */}
+          {((enablePlatformCustomization && activePlatform === 'twitter') || 
+            (!enablePlatformCustomization && platforms.includes('twitter'))) && 
+           (characterStatus.severity === 'warning' || characterStatus.severity === 'error') && (
+            <TwitterCharacterOptimizer
+              content={currentContent}
+              onContentChange={handleContentChange}
+              characterLimit={maxLength}
+            />
+          )}
         </div>
 
         {/* Platform-Specific Settings */}
