@@ -232,6 +232,15 @@ export const Sidebar = () => {
                 <span>Automations</span>
               </a>
             </li>
+            <li>
+              <a
+                href="/settings/platforms"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <span>🎛️</span>
+                <span>Platform Settings</span>
+              </a>
+            </li>
           </ul>
         </nav>
       </div>

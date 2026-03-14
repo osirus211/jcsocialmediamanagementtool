@@ -23,6 +23,7 @@ const platformLabels: Record<SocialPlatform, string> = {
   [SocialPlatform.REDDIT]: 'Reddit',
   [SocialPlatform.GOOGLE_BUSINESS]: 'Google Business Profile',
   [SocialPlatform.PINTEREST]: 'Pinterest',
+  [SocialPlatform.TIKTOK]: 'TikTok',
 };
 
 export function ConnectButton({ platform, onSuccess }: ConnectButtonProps) {

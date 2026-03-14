@@ -4,12 +4,14 @@ interface BadgeProps {
   variant?: 'default' | 'secondary' | 'destructive' | 'outline';
   className?: string;
   children: React.ReactNode;
+  onClick?: () => void;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
   variant = 'default',
   className = '',
   children,
+  onClick,
 }) => {
   const baseClasses = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2';
   
@@ -20,9 +22,14 @@ export const Badge: React.FC<BadgeProps> = ({
     outline: 'text-foreground',
   };
 
+  const Component = onClick ? 'button' : 'div';
+
   return (
-    <div className={`${baseClasses} ${variantClasses[variant]} ${className}`}>
+    <Component 
+      className={`${baseClasses} ${variantClasses[variant]} ${className} ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       {children}
-    </div>
+    </Component>
   );
 };

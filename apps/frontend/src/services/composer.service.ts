@@ -10,6 +10,8 @@ import {
   QueueSlotsResponse,
   Media,
 } from '@/types/composer.types';
+import { platformSettingsService } from './platform-settings.service';
+import { SocialPlatform } from '@/types/social.types';
 
 /**
  * Composer Service
@@ -125,6 +127,44 @@ class ComposerService {
   async getQueueSlots(): Promise<QueueSlotsResponse> {
     const response = await apiClient.get<QueueSlotsResponse>('/composer/queue-slots');
     return response;
+  }
+
+  /**
+   * Apply platform defaults to post content
+   */
+  async applyPlatformDefaults(
+    platform: SocialPlatform,
+    post: {
+      content: string;
+      hashtags?: string[];
+      firstComment?: string;
+      visibility?: string;
+      location?: string;
+      media?: any[];
+    },
+    accountId?: string
+  ): Promise<any> {
+    try {
+      const response = await platformSettingsService.applyDefaults({
+        platform,
+        accountId,
+        post
+      });
+      return response.post;
+    } catch (error) {
+      console.error('Error applying platform defaults:', error);
+      // Return original post if defaults fail
+      return {
+        ...post,
+        hashtags: post.hashtags || [],
+        firstComment: post.firstComment || '',
+        visibility: post.visibility || 'public',
+        appliedDefaults: {
+          hashtagsAdded: [],
+          watermarkApplied: false
+        }
+      };
+    }
   }
 
   /**

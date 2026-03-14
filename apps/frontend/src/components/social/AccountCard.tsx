@@ -18,6 +18,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.REDDIT]: '🔴',
   [SocialPlatform.GOOGLE_BUSINESS]: 'G',
   [SocialPlatform.PINTEREST]: 'P',
+  [SocialPlatform.TIKTOK]: '🎵',
 };
 
 const platformColors: Record<SocialPlatform, string> = {
@@ -32,6 +33,7 @@ const platformColors: Record<SocialPlatform, string> = {
   [SocialPlatform.REDDIT]: 'bg-orange-500 text-white',
   [SocialPlatform.GOOGLE_BUSINESS]: 'bg-blue-700 text-white',
   [SocialPlatform.PINTEREST]: 'bg-red-600 text-white',
+  [SocialPlatform.TIKTOK]: 'bg-black text-white',
 };
 
 const statusColors: Record<AccountStatus, string> = {

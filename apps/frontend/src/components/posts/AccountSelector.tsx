@@ -22,6 +22,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   [SocialPlatform.REDDIT]: '🔴',
   [SocialPlatform.GOOGLE_BUSINESS]: 'G',
   [SocialPlatform.PINTEREST]: 'P',
+  [SocialPlatform.TIKTOK]: '🎵',
 };
 
 export function AccountSelector({ 
