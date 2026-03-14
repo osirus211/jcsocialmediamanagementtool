@@ -62,6 +62,10 @@ const PLATFORM_ASPECT_RATIOS: Record<SocialPlatform, AspectRatio[]> = {
     { label: 'Landscape (16:9)', ratio: 16/9, width: 1200, height: 675 },
     { label: 'Square (1:1)', ratio: 1, width: 1200, height: 1200 },
   ],
+  tiktok: [
+    { label: 'Vertical (9:16)', ratio: 0.5625, width: 1080, height: 1920 },
+    { label: 'Square (1:1)', ratio: 1, width: 1080, height: 1080 },
+  ],
 };
 
 const MediaCropModal = memo(function MediaCropModal({

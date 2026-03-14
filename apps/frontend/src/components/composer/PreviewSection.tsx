@@ -19,6 +19,7 @@ const platformNames: Record<SocialPlatform, string> = {
   bluesky: 'Bluesky',
   'google-business': 'Google Business',
   pinterest: 'Pinterest',
+  tiktok: 'TikTok',
 };
 
 export function PreviewSection({

@@ -60,6 +60,11 @@ const OPTIMAL_TIMES: Record<SocialPlatform, OptimalTime[]> = {
     { hour: 20, minute: 0, score: 93, engagement: 'Peak' },
     { hour: 11, minute: 0, score: 87, engagement: 'High' },
   ],
+  tiktok: [
+    { hour: 18, minute: 0, score: 94, engagement: 'Peak' },
+    { hour: 21, minute: 0, score: 89, engagement: 'High' },
+    { hour: 12, minute: 0, score: 83, engagement: 'High' },
+  ],
 };
 
 const OptimalTimeSuggestions = memo(function OptimalTimeSuggestions({

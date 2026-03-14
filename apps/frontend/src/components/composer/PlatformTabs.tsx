@@ -17,6 +17,7 @@ const platformIcons: Record<SocialPlatform, string> = {
   bluesky: '🦋',
   'google-business': 'G',
   pinterest: 'P',
+  tiktok: '🎵',
 };
 
 const platformNames: Record<SocialPlatform, string> = {
@@ -29,6 +30,7 @@ const platformNames: Record<SocialPlatform, string> = {
   bluesky: 'Bluesky',
   'google-business': 'Google Business',
   pinterest: 'Pinterest',
+  tiktok: 'TikTok',
 };
 
 export function PlatformTabs({

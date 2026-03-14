@@ -21,6 +21,7 @@ const ALT_TEXT_LIMITS: Record<SocialPlatform, number> = {
   youtube: 5000,
   'google-business': 1000,
   pinterest: 500,
+  tiktok: 150,
 };
 
 const AltTextModal = memo(function AltTextModal({

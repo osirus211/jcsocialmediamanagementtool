@@ -7,7 +7,7 @@
  * Supports: Facebook, Instagram, Twitter/X, LinkedIn, TikTok
  */
 
-export type SocialPlatform = 'facebook' | 'instagram' | 'twitter' | 'linkedin' | 'tiktok' | 'threads' | 'bluesky' | 'youtube' | 'pinterest';
+export type SocialPlatform = 'facebook' | 'instagram' | 'twitter' | 'linkedin' | 'tiktok' | 'threads' | 'bluesky' | 'youtube' | 'pinterest' | 'google-business';
 export type TokenType = 'bearer' | 'page' | 'user';
 export type AccountType = 'personal' | 'business' | 'creator' | 'page' | 'organization';
 export type PermissionStatus = 'sufficient' | 'insufficient_permissions';

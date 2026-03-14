@@ -17,6 +17,7 @@ const FIRST_COMMENT_LIMITS: Record<SocialPlatform, number> = {
   youtube: 10000,
   'google-business': 1500,
   pinterest: 500,
+  tiktok: 2200,
 };
 
 const FirstCommentSection = memo(function FirstCommentSection({ selectedPlatforms }: FirstCommentSectionProps) {

@@ -15,6 +15,8 @@ import { ThreadsPreview } from './ThreadsPreview';
 import { BlueskyPreview } from './BlueskyPreview';
 import { YouTubePreview } from './YouTubePreview';
 import { PinterestPreview } from './PinterestPreview';
+import { TikTokPreview } from './TikTokPreview';
+import { GoogleBusinessPreview } from './GoogleBusinessPreview';
 
 const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   twitter: '#1DA1F2',
@@ -26,6 +28,7 @@ const PLATFORM_COLORS: Record<SocialPlatform, string> = {
   youtube: '#FF0000',
   'google-business': '#4285F4',
   pinterest: '#E60023',
+  tiktok: '#000000',
 };
 
 const PLATFORM_NAMES: Record<SocialPlatform, string> = {
@@ -38,6 +41,7 @@ const PLATFORM_NAMES: Record<SocialPlatform, string> = {
   youtube: 'YouTube',
   'google-business': 'Google Business',
   pinterest: 'Pinterest',
+  tiktok: 'TikTok',
 };
 
 const PostPreviewPanel = memo(function PostPreviewPanel() {
@@ -191,6 +195,24 @@ const PostPreviewPanel = memo(function PostPreviewPanel() {
               media={media}
               accountName={getAccountInfo('pinterest')?.accountName}
               accountAvatar={getAccountInfo('pinterest')?.metadata?.avatarUrl}
+            />
+          )}
+          {activeTab === 'tiktok' && (
+            <TikTokPreview
+              content={getContent('tiktok')}
+              media={media}
+              accountUsername={getAccountInfo('tiktok')?.accountId}
+              accountAvatar={getAccountInfo('tiktok')?.metadata?.avatarUrl}
+            />
+          )}
+          {activeTab === 'google-business' && (
+            <GoogleBusinessPreview
+              content={getContent('google-business')}
+              media={media}
+              businessName={getAccountInfo('google-business')?.accountName}
+              businessAvatar={getAccountInfo('google-business')?.metadata?.avatarUrl}
+              businessAddress={getAccountInfo('google-business')?.metadata?.address}
+              businessRating={getAccountInfo('google-business')?.metadata?.rating}
             />
           )}
         </div>

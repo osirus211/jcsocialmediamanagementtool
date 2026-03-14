@@ -15,6 +15,7 @@ import { ThreadsAdapter } from './ThreadsAdapter';
 import { BlueskyAdapter } from './BlueskyAdapter';
 import { YouTubeAdapter } from './YouTubeAdapter';
 import { PinterestAdapter } from './PinterestAdapter';
+import { GoogleBusinessAdapter } from './GoogleBusinessAdapter';
 import { config } from '../../config';
 
 export class AdapterFactory {
@@ -57,6 +58,9 @@ export class AdapterFactory {
       case 'pinterest':
         return new PinterestAdapter(clientId, clientSecret, redirectUri) as any;
       
+      case 'google-business':
+        return new GoogleBusinessAdapter(clientId, clientSecret, redirectUri) as any;
+      
       default:
         throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -76,6 +80,7 @@ export class AdapterFactory {
       bluesky: undefined, // No OAuth config needed
       youtube: undefined, // No OAuth config needed
       pinterest: config.oauth.pinterest.appId,
+      'google-business': undefined, // No OAuth config needed
     };
 
     const value = configMap[platform];
@@ -101,6 +106,7 @@ export class AdapterFactory {
       bluesky: undefined, // No OAuth config needed
       youtube: undefined, // No OAuth config needed
       pinterest: config.oauth.pinterest.appSecret,
+      'google-business': undefined, // No OAuth config needed
     };
 
     const value = configMap[platform];
@@ -124,7 +130,7 @@ export class AdapterFactory {
    * Check if platform is supported
    */
   static isSupportedPlatform(platform: string): platform is SocialPlatform {
-    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky', 'youtube', 'pinterest'].includes(platform);
+    return ['facebook', 'instagram', 'twitter', 'linkedin', 'tiktok', 'threads', 'bluesky', 'youtube', 'pinterest', 'google-business'].includes(platform);
   }
 
   /**
@@ -140,7 +146,8 @@ export class AdapterFactory {
       'threads', 
       'bluesky', 
       'youtube', 
-      'pinterest'
+      'pinterest',
+      'google-business'
     ];
   }
 }

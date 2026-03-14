@@ -63,6 +63,9 @@ const MOCK_PLATFORM_HANDLES: Record<SocialPlatform, MentionSuggestion[]> = {
   pinterest: [
     { id: 'pt1', type: 'handle', name: 'Pinterest', handle: 'pinterest', platform: 'Pinterest' },
   ],
+  tiktok: [
+    { id: 'tt1', type: 'handle', name: 'TikTok', handle: 'tiktok', platform: 'TikTok' },
+  ],
 };
 
 export function useMentionAutocomplete({
