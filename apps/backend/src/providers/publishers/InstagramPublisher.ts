@@ -467,23 +467,32 @@ export class InstagramPublisher extends BasePublisher {
    * Process caption to separate main caption from first comment
    */
   private processCaption(content: string, post: any): { caption: string; firstComment?: string } {
-    if (!post || !('instagramOptions' in post) || !post.instagramOptions?.useFirstComment) {
-      return { caption: content };
+    // Check if first comment is enabled and has content
+    if (post?.firstComment?.enabled && post.firstComment?.content) {
+      return { 
+        caption: content, 
+        firstComment: post.firstComment.content 
+      };
     }
 
-    // Extract hashtags from content
-    const hashtagRegex = /#[\w\u0590-\u05ff]+/g;
-    const hashtags = content.match(hashtagRegex) || [];
-    
-    if (hashtags.length === 0) {
-      return { caption: content };
+    // Legacy support for instagramOptions.useFirstComment (hashtag extraction)
+    if (post?.instagramOptions?.useFirstComment) {
+      // Extract hashtags from content
+      const hashtagRegex = /#[\w\u0590-\u05ff]+/g;
+      const hashtags = content.match(hashtagRegex) || [];
+      
+      if (hashtags.length === 0) {
+        return { caption: content };
+      }
+
+      // Remove hashtags from main caption
+      const caption = content.replace(hashtagRegex, '').trim();
+      const firstComment = hashtags.join(' ');
+
+      return { caption, firstComment };
     }
 
-    // Remove hashtags from main caption
-    const caption = content.replace(hashtagRegex, '').trim();
-    const firstComment = hashtags.join(' ');
-
-    return { caption, firstComment };
+    return { caption: content };
   }
 
   /**

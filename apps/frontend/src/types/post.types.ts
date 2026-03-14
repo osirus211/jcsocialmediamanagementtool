@@ -41,6 +41,16 @@ export interface Post {
   rejectedBy?: string;
   rejectedAt?: string;
   rejectionReason?: string;
+  // First comment fields
+  firstComment?: {
+    enabled: boolean;
+    content: string;
+    platforms: string[]; // Which platforms to post first comment on
+    delay?: number; // Delay in seconds (0 = immediate)
+  };
+  firstCommentId?: string; // Platform post ID after posting first comment
+  firstCommentPostedAt?: string;
+  firstCommentStatus?: 'pending' | 'posted' | 'failed';
 }
 
 export interface CreatePostInput {

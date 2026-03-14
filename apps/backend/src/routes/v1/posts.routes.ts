@@ -1164,5 +1164,11 @@ router.get('/:id/lock', [...validatePostId, ...validateWorkspaceId], (req, res, 
   postController.getLockStatus(req, res, next);
 });
 
+// Import first comment routes
+import { firstCommentRoutes } from './firstComment.routes';
+
+// Mount first comment routes under /posts
+router.use('/', firstCommentRoutes);
+
 export default router;
 

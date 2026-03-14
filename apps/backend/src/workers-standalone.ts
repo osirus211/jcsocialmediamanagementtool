@@ -105,6 +105,20 @@ async function startWorkers() {
       logger.info('Media processing worker not available');
     }
     
+    // First Comment Worker
+    try {
+      const { FirstCommentWorker } = await import('./workers/FirstCommentWorker');
+      const firstCommentWorker = new FirstCommentWorker();
+      workerManager.registerWorker('first-comment-worker', firstCommentWorker as any, {
+        enabled: true,
+        maxRestarts: 3,
+        restartDelay: 5000,
+      });
+      logger.info('First comment worker registered');
+    } catch (error) {
+      logger.info('First comment worker not available');
+    }
+    
     // API Key Cleanup Worker
     try {
       const { apiKeyCleanupWorker } = await import('./workers/ApiKeyCleanupWorker');

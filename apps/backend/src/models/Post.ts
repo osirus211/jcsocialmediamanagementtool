@@ -135,6 +135,17 @@ export interface IPost extends Document {
     mentions?: string[];
     [key: string]: any;
   };
+
+  // First comment fields
+  firstComment?: {
+    enabled: boolean;
+    content: string;
+    platforms: string[]; // Which platforms to post first comment on
+    delay?: number; // Delay in seconds (0 = immediate)
+  };
+  firstCommentId?: string; // Platform post ID after posting first comment
+  firstCommentPostedAt?: Date;
+  firstCommentStatus?: 'pending' | 'posted' | 'failed';
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;

@@ -60,6 +60,17 @@ export interface IScheduledPost extends Document {
   campaignId?: mongoose.Types.ObjectId;
   tags: string[];
   
+  // First comment fields
+  firstComment?: {
+    enabled: boolean;
+    content: string;
+    platforms: string[];
+    delay?: number;
+  };
+  firstCommentId?: string;
+  firstCommentPostedAt?: Date;
+  firstCommentStatus?: 'pending' | 'posted' | 'failed';
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -175,6 +186,27 @@ const ScheduledPostSchema = new Schema<IScheduledPost>(
         },
         message: 'Maximum 10 tags allowed, each max 30 characters',
       },
+    },
+    
+    // First comment fields
+    firstComment: {
+      type: {
+        enabled: { type: Boolean, required: true },
+        content: { type: String, required: true },
+        platforms: { type: [String], required: true },
+        delay: { type: Number, default: 0 },
+      },
+      required: false,
+    },
+    firstCommentId: {
+      type: String,
+    },
+    firstCommentPostedAt: {
+      type: Date,
+    },
+    firstCommentStatus: {
+      type: String,
+      enum: ['pending', 'posted', 'failed'],
     },
   },
   {

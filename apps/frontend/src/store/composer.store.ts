@@ -70,9 +70,14 @@ interface ComposerState {
   campaignId?: string;
   tags: string[];
   
-  // First comment (Instagram/Facebook)
-  firstComment?: string;
-  enableFirstComment?: boolean;
+  // First comment (Instagram/Facebook/LinkedIn)
+  firstComment?: {
+    enabled: boolean;
+    content: string;
+    platforms: SocialPlatform[];
+    delay: number; // seconds
+  };
+  enableFirstComment?: boolean; // Legacy field for backward compatibility
   
   // Per-platform customization
   enablePlatformCustomization: boolean;
@@ -106,6 +111,7 @@ interface ComposerActions {
   // First comment
   setFirstComment: (comment: string) => void;
   setEnableFirstComment: (enabled: boolean) => void;
+  setFirstCommentConfig: (config: Partial<NonNullable<ComposerState['firstComment']>>) => void;
   
   // Per-platform customization
   setEnablePlatformCustomization: (enabled: boolean) => void;
@@ -180,7 +186,7 @@ const initialState: ComposerState = {
   categoryId: undefined,
   campaignId: undefined,
   tags: [],
-  firstComment: '',
+  firstComment: undefined,
   enableFirstComment: false,
   enablePlatformCustomization: false,
   platformSettings: {} as Record<SocialPlatform, any>,
@@ -310,11 +316,47 @@ export const useComposerStore = create<ComposerStore>((set, get) => ({
 
   // First comment methods
   setFirstComment: (comment) => {
-    set({ firstComment: comment, hasUnsavedChanges: true });
+    set((state) => ({
+      firstComment: {
+        ...state.firstComment,
+        enabled: true,
+        content: comment,
+        platforms: state.firstComment?.platforms || ['instagram', 'facebook'],
+        delay: state.firstComment?.delay || 0,
+      },
+      enableFirstComment: true, // Legacy field
+      hasUnsavedChanges: true,
+    }));
   },
 
   setEnableFirstComment: (enabled) => {
-    set({ enableFirstComment: enabled, hasUnsavedChanges: true });
+    set((state) => ({
+      firstComment: enabled ? {
+        enabled: true,
+        content: state.firstComment?.content || '',
+        platforms: state.firstComment?.platforms || ['instagram', 'facebook'],
+        delay: state.firstComment?.delay || 0,
+      } : undefined,
+      enableFirstComment: enabled, // Legacy field
+      hasUnsavedChanges: true,
+    }));
+  },
+
+  setFirstCommentConfig: (config) => {
+    set((state) => ({
+      firstComment: state.firstComment ? {
+        ...state.firstComment,
+        ...config,
+      } : {
+        enabled: true,
+        content: '',
+        platforms: ['instagram', 'facebook'],
+        delay: 0,
+        ...config,
+      },
+      enableFirstComment: config.enabled ?? state.enableFirstComment ?? true,
+      hasUnsavedChanges: true,
+    }));
   },
 
   // ============================================

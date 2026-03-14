@@ -21,6 +21,9 @@ import { MastodonPublisher } from '../providers/publishers/MastodonPublisher';
 import { RedditPublisher } from '../providers/publishers/RedditPublisher';
 import { publishingLockService } from '../services/PublishingLockService';
 import { classifyPublishingError, PublishingErrorCategory } from '../types/PublishingErrors';
+import { FirstCommentJob, FirstCommentJobData } from '../jobs/FirstCommentJob';
+import { Queue } from 'bullmq';
+import { getRedisClient } from '../config/redis';
 import { logger } from '../utils/logger';
 import { withSpan, recordSpanException } from '../config/telemetry';
 import {
@@ -35,6 +38,7 @@ import {
 
 export class PostPublishingWorker {
   private publisherRegistry: PublisherRegistry;
+  private firstCommentQueue: Queue<FirstCommentJobData>;
 
   constructor() {
     this.publisherRegistry = new PublisherRegistry();
@@ -48,6 +52,26 @@ export class PostPublishingWorker {
     this.publisherRegistry.register('google-business', new GoogleBusinessPublisher());
     this.publisherRegistry.register('mastodon', new MastodonPublisher());
     this.publisherRegistry.register('reddit', new RedditPublisher(process.env.REDDIT_USER_AGENT || 'web:jcsocialmedia:v1.0'));
+
+    // Initialize first comment queue
+    const redis = getRedisClient();
+    this.firstCommentQueue = new Queue<FirstCommentJobData>('first-comment-queue', {
+      connection: redis,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        removeOnComplete: {
+          age: 24 * 3600,
+          count: 100,
+        },
+        removeOnFail: {
+          age: 7 * 24 * 3600,
+        },
+      },
+    });
   }
 
   /**
@@ -136,6 +160,11 @@ export class PostPublishingWorker {
           publishResult: result,
         };
         await post.save();
+
+        // Queue first comment if enabled
+        if (post.firstComment?.enabled && post.firstComment?.content) {
+          await this.queueFirstComment(post, account, result.platformPostId);
+        }
 
         // Record successful attempt
         const duration = Date.now() - startTime;
@@ -232,5 +261,71 @@ export class PostPublishingWorker {
         }
       }
     });
+  }
+
+  /**
+   * Queue first comment job
+   */
+  private async queueFirstComment(
+    post: any,
+    account: any,
+    platformPostId: string
+  ): Promise<void> {
+    try {
+      // Check if platform supports first comments
+      const supportedPlatforms = ['instagram', 'facebook', 'linkedin'];
+      if (!supportedPlatforms.includes(account.platform)) {
+        logger.info('Platform does not support first comments', {
+          postId: post._id.toString(),
+          platform: account.platform,
+        });
+        return;
+      }
+
+      // Check if this platform is enabled for first comment
+      if (post.firstComment.platforms && !post.firstComment.platforms.includes(account.platform)) {
+        logger.info('First comment not enabled for this platform', {
+          postId: post._id.toString(),
+          platform: account.platform,
+          enabledPlatforms: post.firstComment.platforms,
+        });
+        return;
+      }
+
+      const delay = (post.firstComment.delay || 0) * 1000; // Convert seconds to milliseconds
+
+      const jobData: FirstCommentJobData = {
+        postId: post._id.toString(),
+        accountId: account._id.toString(),
+        platformPostId,
+        content: post.firstComment.content,
+        platform: account.platform,
+      };
+
+      await this.firstCommentQueue.add(
+        'post-first-comment',
+        jobData,
+        {
+          delay,
+        }
+      );
+
+      // Update post status
+      await ScheduledPost.findByIdAndUpdate(post._id, {
+        firstCommentStatus: 'pending',
+      });
+
+      logger.info('First comment job queued', {
+        postId: post._id.toString(),
+        platform: account.platform,
+        delay,
+      });
+    } catch (error: any) {
+      logger.error('Failed to queue first comment', {
+        postId: post._id.toString(),
+        platform: account.platform,
+        error: error.message,
+      });
+    }
   }
 }
