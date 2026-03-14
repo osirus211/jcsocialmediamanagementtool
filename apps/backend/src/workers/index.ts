@@ -59,6 +59,7 @@ import { InstagramPublisherWorker } from './InstagramPublisherWorker';
 import { TwitterPublisherWorker } from './TwitterPublisherWorker';
 import { LinkedInPublisherWorker } from './LinkedInPublisherWorker';
 import { TikTokPublisherWorker } from './TikTokPublisherWorker';
+// import { GoogleBusinessPublisherWorker } from './GoogleBusinessPublisherWorker';
 import { TokenRefreshWorker } from './TokenRefreshWorker';
 import { DistributedTokenRefreshWorker } from './DistributedTokenRefreshWorker';
 
@@ -128,6 +129,13 @@ export function initializeWorkers(): WorkerManager {
     new WorkerAdapter(new TikTokPublisherWorker(), 'tiktok-publisher-worker'),
     workerConfigs['tiktok-publisher-worker']
   );
+
+  // TODO: Add Google Business Publisher Worker when module import is fixed
+  // manager.registerWorker(
+  //   'google-business-publisher-worker',
+  //   new WorkerAdapter(new GoogleBusinessPublisherWorker(), 'google-business-publisher-worker'),
+  //   workerConfigs['google-business-publisher-worker'] || { enabled: true, maxRestarts: 3, restartDelay: 5000 }
+  // );
 
   manager.registerWorker(
     'token-refresh-worker',

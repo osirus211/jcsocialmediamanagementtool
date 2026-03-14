@@ -12,3 +12,4 @@ export { FacebookPublisher } from './FacebookPublisher';
 export { InstagramPublisher } from './InstagramPublisher';
 export { LinkedInPublisher } from './LinkedInPublisher';
 export { TikTokPublisher } from './TikTokPublisher';
+export { GoogleBusinessPublisher } from './GoogleBusinessPublisher';

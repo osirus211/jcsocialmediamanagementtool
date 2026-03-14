@@ -18,10 +18,12 @@ import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
 import rateLimit from 'express-rate-limit';
 import { GoogleBusinessOAuthService } from '../../services/oauth/GoogleBusinessOAuthService';
+import { GoogleBusinessPublisher } from '../../providers/publishers/GoogleBusinessPublisher';
+import { SocialAccount } from '../../models/SocialAccount';
 import { oauthStateService } from '../../services/OAuthStateService';
 import { getClientIp, getHashedClientIp } from '../../utils/ipHash';
 import { logger } from '../../utils/logger';
-import { BadRequestError, UnauthorizedError } from '../../utils/errors';
+import { BadRequestError, UnauthorizedError, NotFoundError } from '../../utils/errors';
 import { config } from '../../config';
 import mongoose from 'mongoose';
 
@@ -52,6 +54,24 @@ const disconnectRateLimit = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
   message: 'Too many disconnect attempts. Please try again later.',
+});
+
+const reviewsRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per user
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
+  message: 'Too many review requests. Please try again later.',
+});
+
+const insightsRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // 20 requests per minute per user
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
+  message: 'Too many insights requests. Please try again later.',
 });
 
 // Initialize Google Business OAuth Service
@@ -292,6 +312,310 @@ router.delete(
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
       logger.error('Failed to disconnect Google Business Profile account', {
+        error: errorMessage,
+        stack: errorStack,
+      });
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/v1/google-business/reviews/:accountId
+ * 
+ * Fetches reviews for a Google Business Profile location
+ */
+router.get(
+  '/reviews/:accountId',
+  requireAuth,
+  requireWorkspace,
+  reviewsRateLimit,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { accountId } = req.params;
+      const { pageSize = '50' } = req.query;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      // Validate authentication
+      if (!workspaceId || !userId) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      // Validate accountId
+      if (!mongoose.Types.ObjectId.isValid(accountId)) {
+        throw new BadRequestError('Invalid account ID');
+      }
+
+      // Find the social account
+      const account = await SocialAccount.findOne({
+        _id: accountId,
+        workspaceId,
+        provider: 'google-business',
+      });
+
+      if (!account) {
+        throw new NotFoundError('Google Business Profile account not found');
+      }
+
+      logger.info('Fetching Google Business Profile reviews', {
+        workspaceId,
+        userId,
+        accountId,
+        pageSize,
+      });
+
+      // Get publisher and fetch reviews
+      const publisher = new GoogleBusinessPublisher();
+      const reviews = await publisher.getReviews(account, parseInt(pageSize.toString()));
+
+      logger.info('Google Business Profile reviews fetched', {
+        workspaceId,
+        userId,
+        accountId,
+        reviewCount: reviews.length,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          reviews,
+          count: reviews.length,
+        },
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('Failed to fetch Google Business Profile reviews', {
+        error: errorMessage,
+        stack: errorStack,
+      });
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/v1/google-business/reviews/:accountId/:reviewId/reply
+ * 
+ * Replies to a Google Business Profile review
+ */
+router.post(
+  '/reviews/:accountId/:reviewId/reply',
+  requireAuth,
+  requireWorkspace,
+  reviewsRateLimit,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { accountId, reviewId } = req.params;
+      const { reply } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      // Validate authentication
+      if (!workspaceId || !userId) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      // Validate parameters
+      if (!mongoose.Types.ObjectId.isValid(accountId)) {
+        throw new BadRequestError('Invalid account ID');
+      }
+
+      if (!reply || typeof reply !== 'string' || reply.trim().length === 0) {
+        throw new BadRequestError('Reply text is required');
+      }
+
+      // Find the social account
+      const account = await SocialAccount.findOne({
+        _id: accountId,
+        workspaceId,
+        provider: 'google-business',
+      });
+
+      if (!account) {
+        throw new NotFoundError('Google Business Profile account not found');
+      }
+
+      logger.info('Replying to Google Business Profile review', {
+        workspaceId,
+        userId,
+        accountId,
+        reviewId,
+      });
+
+      // Get publisher and reply to review
+      const publisher = new GoogleBusinessPublisher();
+      await publisher.replyToReview(account, reviewId, reply.trim());
+
+      logger.info('Google Business Profile review reply posted', {
+        workspaceId,
+        userId,
+        accountId,
+        reviewId,
+      });
+
+      res.json({
+        success: true,
+        message: 'Review reply posted successfully',
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('Failed to reply to Google Business Profile review', {
+        error: errorMessage,
+        stack: errorStack,
+      });
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /api/v1/google-business/reviews/:accountId/:reviewId/reply
+ * 
+ * Deletes a reply to a Google Business Profile review
+ */
+router.delete(
+  '/reviews/:accountId/:reviewId/reply',
+  requireAuth,
+  requireWorkspace,
+  reviewsRateLimit,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { accountId, reviewId } = req.params;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      // Validate authentication
+      if (!workspaceId || !userId) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      // Validate accountId
+      if (!mongoose.Types.ObjectId.isValid(accountId)) {
+        throw new BadRequestError('Invalid account ID');
+      }
+
+      // Find the social account
+      const account = await SocialAccount.findOne({
+        _id: accountId,
+        workspaceId,
+        provider: 'google-business',
+      });
+
+      if (!account) {
+        throw new NotFoundError('Google Business Profile account not found');
+      }
+
+      logger.info('Deleting Google Business Profile review reply', {
+        workspaceId,
+        userId,
+        accountId,
+        reviewId,
+      });
+
+      // Get publisher and delete review reply
+      const publisher = new GoogleBusinessPublisher();
+      await publisher.deleteReviewReply(account, reviewId);
+
+      logger.info('Google Business Profile review reply deleted', {
+        workspaceId,
+        userId,
+        accountId,
+        reviewId,
+      });
+
+      res.json({
+        success: true,
+        message: 'Review reply deleted successfully',
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('Failed to delete Google Business Profile review reply', {
+        error: errorMessage,
+        stack: errorStack,
+      });
+      next(error);
+    }
+  }
+);
+
+/**
+ * GET /api/v1/google-business/insights/:accountId
+ * 
+ * Fetches location insights for a Google Business Profile
+ */
+router.get(
+  '/insights/:accountId',
+  requireAuth,
+  requireWorkspace,
+  insightsRateLimit,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { accountId } = req.params;
+      const { startDate, endDate } = req.query;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      // Validate authentication
+      if (!workspaceId || !userId) {
+        throw new UnauthorizedError('Authentication required');
+      }
+
+      // Validate accountId
+      if (!mongoose.Types.ObjectId.isValid(accountId)) {
+        throw new BadRequestError('Invalid account ID');
+      }
+
+      // Validate date parameters
+      if (!startDate || !endDate) {
+        throw new BadRequestError('Start date and end date are required');
+      }
+
+      // Find the social account
+      const account = await SocialAccount.findOne({
+        _id: accountId,
+        workspaceId,
+        provider: 'google-business',
+      });
+
+      if (!account) {
+        throw new NotFoundError('Google Business Profile account not found');
+      }
+
+      logger.info('Fetching Google Business Profile insights', {
+        workspaceId,
+        userId,
+        accountId,
+        startDate,
+        endDate,
+      });
+
+      // Get publisher and fetch insights
+      const publisher = new GoogleBusinessPublisher();
+      const insights = await publisher.getLocationInsights(
+        account,
+        startDate.toString(),
+        endDate.toString()
+      );
+
+      logger.info('Google Business Profile insights fetched', {
+        workspaceId,
+        userId,
+        accountId,
+        totalImpressions: insights.metrics.impressions,
+      });
+
+      res.json({
+        success: true,
+        data: insights,
+      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error('Failed to fetch Google Business Profile insights', {
         error: errorMessage,
         stack: errorStack,
       });
