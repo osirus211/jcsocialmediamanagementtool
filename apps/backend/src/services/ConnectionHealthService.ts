@@ -30,6 +30,7 @@ interface HealthMetrics {
   webhookActivityScore: number; // 0-100
   errorFrequencyScore: number; // 0-100
   lastInteractionScore: number; // 0-100
+  responseTimeScore: number; // 0-100
 }
 
 interface HealthScoreResult {
@@ -45,10 +46,11 @@ export class ConnectionHealthService {
 
   // Weights for health score calculation
   private readonly weights = {
-    tokenRefresh: 0.4, // 40%
-    webhookActivity: 0.3, // 30%
+    tokenRefresh: 0.3, // 30%
+    webhookActivity: 0.25, // 25%
     errorFrequency: 0.2, // 20%
     lastInteraction: 0.1, // 10%
+    responseTime: 0.15, // 15%
   };
 
   constructor(private redis: Redis) {}
@@ -70,12 +72,14 @@ export class ConnectionHealthService {
       const webhookActivityScore = await this.getWebhookActivityScore(provider, accountId);
       const errorFrequencyScore = await this.getErrorFrequencyScore(provider, accountId);
       const lastInteractionScore = await this.getLastInteractionScore(provider, accountId);
+      const responseTimeScore = await this.getResponseTimeScore(provider, accountId);
 
       const metrics: HealthMetrics = {
         tokenRefreshSuccessRate,
         webhookActivityScore,
         errorFrequencyScore,
         lastInteractionScore,
+        responseTimeScore,
       };
 
       // Calculate weighted score
@@ -83,7 +87,8 @@ export class ConnectionHealthService {
         tokenRefreshSuccessRate * this.weights.tokenRefresh +
           webhookActivityScore * this.weights.webhookActivity +
           errorFrequencyScore * this.weights.errorFrequency +
-          lastInteractionScore * this.weights.lastInteraction
+          lastInteractionScore * this.weights.lastInteraction +
+          responseTimeScore * this.weights.responseTime
       );
 
       // Determine grade
@@ -130,6 +135,7 @@ export class ConnectionHealthService {
           webhookActivityScore: 0,
           errorFrequencyScore: 0,
           lastInteractionScore: 0,
+          responseTimeScore: 0,
         },
         timestamp: new Date(),
       };
@@ -341,6 +347,59 @@ export class ConnectionHealthService {
    */
   private getMetricKey(provider: string, accountId: string, metric: string): string {
     return `${this.keyPrefix}:${provider}:${accountId}:${metric}`;
+  }
+
+  /**
+   * Record API response time for health scoring
+   */
+  async recordApiResponseTime(
+    provider: string,
+    accountId: string,
+    responseTimeMs: number
+  ): Promise<void> {
+    const key = this.getMetricKey(provider, accountId, 'response_times');
+    
+    // Store response time in a sorted set with timestamp as score
+    await this.redis.zadd(key, Date.now(), responseTimeMs);
+    await this.redis.expire(key, this.metricsWindow);
+
+    // Keep only last 100 response times to prevent memory bloat
+    await this.redis.zremrangebyrank(key, 0, -101);
+
+    // Recalculate health score
+    await this.calculateHealthScore(provider, accountId);
+  }
+
+  /**
+   * Get average response time score (0-100)
+   * 
+   * Based on average API response time in last 7 days
+   */
+  private async getResponseTimeScore(provider: string, accountId: string): Promise<number> {
+    const key = this.getMetricKey(provider, accountId, 'response_times');
+    
+    // Get all response times from last 7 days
+    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const responseTimes = await this.redis.zrangebyscore(key, sevenDaysAgo, '+inf');
+
+    if (responseTimes.length === 0) return 100; // No data = assume healthy
+
+    // Calculate average response time
+    const avgResponseTime = responseTimes
+      .map(time => parseFloat(time))
+      .reduce((sum, time) => sum + time, 0) / responseTimes.length;
+
+    // Score based on response time
+    // < 200ms = 100 score
+    // < 500ms = 80 score
+    // < 1000ms = 60 score
+    // < 2000ms = 40 score
+    // 2000ms+ = 20 score
+    if (avgResponseTime < 200) return 100;
+    if (avgResponseTime < 500) return 80;
+    if (avgResponseTime < 1000) return 60;
+    if (avgResponseTime < 2000) return 40;
+    return 20;
   }
 
   /**
