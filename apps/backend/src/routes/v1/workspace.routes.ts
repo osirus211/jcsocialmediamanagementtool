@@ -29,6 +29,7 @@ import {
   memberDeactivateRateLimiter,
   memberReactivateRateLimiter,
 } from '../../middleware/rateLimiter';
+import blackoutDatesRoutes from '../blackoutDates';
 
 const router = Router();
 
@@ -241,6 +242,9 @@ router.get(
   requireAdmin,
   InvitationController.getInvitationStats
 );
+
+// Mount blackout dates routes
+router.use('/', blackoutDatesRoutes);
 
 export default router;
 

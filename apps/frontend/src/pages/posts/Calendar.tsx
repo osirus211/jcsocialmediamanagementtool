@@ -5,6 +5,7 @@ import { useCalendarData } from '@/hooks/useCalendarData';
 import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { WeekView } from '@/components/calendar/WeekView';
+import { DragDropProvider } from '@/components/calendar/DragDropProvider';
 import { Post } from '@/types/post.types';
 import { AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { logger } from '@/lib/logger';
@@ -163,13 +164,15 @@ export const CalendarPage = () => {
   /**
    * Reschedule handler
    */
-  const handleReschedule = useCallback(async (postId: string, newDate: string) => {
+  const handleReschedule = useCallback(async (postId: string, newDate: string): Promise<boolean> => {
     const success = await reschedulePost(postId, newDate);
     
     if (success) {
       // Show success feedback (optional)
       logger.info('Post rescheduled successfully');
     }
+    
+    return success;
   }, [reschedulePost]);
 
   /**
@@ -295,9 +298,9 @@ export const CalendarPage = () => {
             </div>
           )}
 
-          {/* Calendar views */}
+          {/* Calendar views with drag & drop */}
           {!isLoading && !isEmpty && (
-            <>
+            <DragDropProvider onReschedule={handleReschedule}>
               {viewMode === 'month' ? (
                 <MonthGrid
                   currentMonth={currentMonth}
@@ -313,7 +316,7 @@ export const CalendarPage = () => {
                   onReschedule={handleReschedule}
                 />
               )}
-            </>
+            </DragDropProvider>
           )}
         </div>
       </div>

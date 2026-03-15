@@ -1,6 +1,7 @@
 import { PublishMode, QueueSlot } from '@/types/composer.types';
 import { QueueSlotSelector } from './QueueSlotSelector';
 import { OptimalTimeSuggestions } from './OptimalTimeSuggestions';
+import { TimezoneAwareDateTimePicker } from '@/components/ui/TimezoneAwareDateTimePicker';
 import { Clock, Send, List, TrendingUp } from 'lucide-react';
 
 interface PublishModeSelectorProps {
@@ -38,30 +39,6 @@ export function PublishModeSelector({
     if (newMode !== PublishMode.QUEUE) {
       onSlotChange(undefined);
     }
-  };
-
-  const handleDateChange = (dateString: string) => {
-    if (!dateString) {
-      onScheduledDateChange(undefined);
-      return;
-    }
-
-    const date = new Date(dateString);
-    
-    // Validate future date
-    if (date <= new Date()) {
-      alert('Scheduled date must be in the future');
-      return;
-    }
-
-    onScheduledDateChange(date);
-  };
-
-  const formatDateForInput = (date?: Date) => {
-    if (!date) return '';
-    return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
   };
 
   return (
@@ -182,26 +159,12 @@ export function PublishModeSelector({
       {/* Schedule Date Picker */}
       {mode === PublishMode.SCHEDULE && (
         <div className="pl-4 sm:pl-8 space-y-4">
-          <div>
-            <label htmlFor="schedule-datetime" className="block text-sm font-medium text-gray-700 mb-2">
-              Schedule Date & Time
-            </label>
-            <input
-              id="schedule-datetime"
-              type="datetime-local"
-              value={formatDateForInput(scheduledDate)}
-              onChange={(e) => handleDateChange(e.target.value)}
-              min={new Date().toISOString().slice(0, 16)}
-              aria-label="Select date and time for scheduled post"
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          
-          {/* Optimal Time Suggestions */}
-          <OptimalTimeSuggestions
-            selectedPlatforms={selectedPlatforms as any[]}
-            onTimeSelect={onScheduledDateChange}
-            currentScheduledDate={scheduledDate}
+          <TimezoneAwareDateTimePicker
+            value={scheduledDate}
+            onChange={onScheduledDateChange}
+            label="Schedule Date & Time"
+            showOptimalTimes={true}
+            className="w-full"
           />
         </div>
       )}

@@ -9,7 +9,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { getRedisClient } from '../config/redis';
+import { getRedisClientSafe } from '../config/redis';
 import { RateLimiterService } from '../services/RateLimiterService';
 import { OAuthStateBindingService } from '../services/OAuthStateBindingService';
 import { SuspiciousActivityDetectionService } from '../services/SuspiciousActivityDetectionService';
@@ -17,11 +17,22 @@ import { OAuthFailureLog, OAuthErrorTypes } from '../models/OAuthFailureLog';
 import { AuditLog } from '../models/AuditLog';
 import { logger } from '../utils/logger';
 
-// Initialize services
-const redis = getRedisClient();
-const rateLimiter = new RateLimiterService(redis);
-const stateBinding = new OAuthStateBindingService(redis);
-const suspiciousActivity = new SuspiciousActivityDetectionService(redis);
+// Lazy initialization - only create services when Redis is available
+let rateLimiter: RateLimiterService | null = null;
+let stateBinding: OAuthStateBindingService | null = null;
+let suspiciousActivity: SuspiciousActivityDetectionService | null = null;
+
+const getServices = () => {
+  if (!rateLimiter || !stateBinding || !suspiciousActivity) {
+    const redis = getRedisClientSafe();
+    if (redis) {
+      rateLimiter = new RateLimiterService(redis);
+      stateBinding = new OAuthStateBindingService(redis);
+      suspiciousActivity = new SuspiciousActivityDetectionService(redis);
+    }
+  }
+  return { rateLimiter, stateBinding, suspiciousActivity };
+};
 
 /**
  * Rate limit OAuth endpoints
@@ -36,10 +47,19 @@ export async function oauthRateLimit(
   const ip = req.ip || 'unknown';
 
   try {
-    const isAllowed = await rateLimiter.isAllowed('oauth', ip);
+    const { rateLimiter: rateLimiterSvc, suspiciousActivity: suspiciousActivitySvc } = getServices();
+    
+    if (!rateLimiterSvc || !suspiciousActivitySvc) {
+      // If Redis not available, fail open (allow request)
+      logger.warn('OAuth rate limiter unavailable - allowing request', { ip });
+      next();
+      return;
+    }
+
+    const isAllowed = await rateLimiterSvc.isAllowed('oauth', ip);
 
     if (!isAllowed) {
-      const resetTime = await rateLimiter.getResetTime('oauth', ip);
+      const resetTime = await rateLimiterSvc.getResetTime('oauth', ip);
 
       logger.warn('OAuth rate limit exceeded', {
         ip,
@@ -48,7 +68,7 @@ export async function oauthRateLimit(
       });
 
       // Track as failure
-      await suspiciousActivity.trackFailure(
+      await suspiciousActivitySvc.trackFailure(
         ip,
         'oauth',
         OAuthErrorTypes.RATE_LIMIT_EXCEEDED,
@@ -86,7 +106,10 @@ export async function bindOAuthState(
   provider: string,
   workspaceId?: string
 ): Promise<void> {
-  await stateBinding.bindState(state, ip, userAgent, provider, workspaceId);
+  const { stateBinding: stateBindingSvc } = getServices();
+  if (stateBindingSvc) {
+    await stateBindingSvc.bindState(state, ip, userAgent, provider, workspaceId);
+  }
 }
 
 /**
@@ -112,7 +135,16 @@ export async function verifyOAuthState(
   }
 
   try {
-    const verification = await stateBinding.verifyState(state, ip, userAgent);
+    const { stateBinding: stateBindingSvc, suspiciousActivity: suspiciousActivitySvc } = getServices();
+    
+    if (!stateBindingSvc || !suspiciousActivitySvc) {
+      // If Redis not available, skip state verification (fail open)
+      logger.warn('OAuth state verification unavailable - allowing request', { ip, state });
+      next();
+      return;
+    }
+
+    const verification = await stateBindingSvc.verifyState(state, ip, userAgent);
 
     if (!verification.valid) {
       const provider = verification.data?.provider || 'unknown';
@@ -135,7 +167,7 @@ export async function verifyOAuthState(
           ? OAuthErrorTypes.EXPIRED_STATE
           : OAuthErrorTypes.INVALID_STATE;
 
-      const isSuspicious = await suspiciousActivity.trackFailure(
+      const isSuspicious = await suspiciousActivitySvc.trackFailure(
         ip,
         provider,
         errorType,
@@ -171,7 +203,7 @@ export async function verifyOAuthState(
     (req as any).oauthVerification = verification.data;
 
     // Consume state (one-time use)
-    await stateBinding.consumeState(state);
+    await stateBindingSvc.consumeState(state);
 
     next();
   } catch (error: any) {
@@ -220,15 +252,20 @@ export async function logOAuthFailure(
   state?: string,
   metadata?: Record<string, any>
 ): Promise<void> {
-  const isSuspicious = await suspiciousActivity.trackFailure(
-    ip,
-    provider,
-    errorType as any,
-    userAgent,
-    workspaceId,
-    state,
-    metadata
-  );
+  const { suspiciousActivity: suspiciousActivitySvc } = getServices();
+  
+  let isSuspicious = false;
+  if (suspiciousActivitySvc) {
+    isSuspicious = await suspiciousActivitySvc.trackFailure(
+      ip,
+      provider,
+      errorType as any,
+      userAgent,
+      workspaceId,
+      state,
+      metadata
+    );
+  }
 
   await AuditLog.log({
     userId: '000000000000000000000000',
@@ -250,4 +287,4 @@ export async function logOAuthFailure(
 /**
  * Export services for use in controllers
  */
-export { stateBinding, suspiciousActivity, rateLimiter };
+export { getServices };

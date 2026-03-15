@@ -10,8 +10,11 @@ import { draftsService, DraftPost } from '../../services/drafts.service';
 
 export const DraftsList: React.FC = () => {
   const [drafts, setDrafts] = useState<DraftPost[]>([]);
+  const [filteredDrafts, setFilteredDrafts] = useState<DraftPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'locked' | 'unlocked'>('all');
   const navigate = useNavigate();
 
   const fetchDrafts = async () => {
@@ -27,6 +30,30 @@ export const DraftsList: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Filter drafts based on search and status
+  useEffect(() => {
+    let filtered = drafts;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(draft => 
+        draft.content.toLowerCase().includes(query) ||
+        draft.createdBy.name.toLowerCase().includes(query) ||
+        draft.lastEditedBy?.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter === 'locked') {
+      filtered = filtered.filter(draft => isLocked(draft));
+    } else if (statusFilter === 'unlocked') {
+      filtered = filtered.filter(draft => !isLocked(draft));
+    }
+
+    setFilteredDrafts(filtered);
+  }, [drafts, searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchDrafts();
@@ -46,11 +73,24 @@ export const DraftsList: React.FC = () => {
     }
 
     try {
-      // Note: This would need a delete endpoint in the drafts service
-      // For now, we'll just refresh the list
+      await draftsService.deleteDraft(draftId);
       await fetchDrafts();
+      // Show success message
     } catch (err) {
       console.error('Failed to delete draft:', err);
+      alert('Failed to delete draft. Please try again.');
+    }
+  };
+
+  const handleDuplicate = async (draftId: string) => {
+    try {
+      const duplicatedDraft = await draftsService.duplicateDraft(draftId);
+      await fetchDrafts();
+      // Navigate to edit the duplicated draft
+      navigate(`/posts/create?draftId=${duplicatedDraft._id}`);
+    } catch (err) {
+      console.error('Failed to duplicate draft:', err);
+      alert('Failed to duplicate draft. Please try again.');
     }
   };
 
@@ -161,7 +201,43 @@ export const DraftsList: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {drafts.map((draft) => (
+      {/* Search and Filter Controls */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search Input */}
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search drafts by content or author..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          
+          {/* Status Filter */}
+          <div className="sm:w-48">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'locked' | 'unlocked')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Drafts</option>
+              <option value="unlocked">Available</option>
+              <option value="locked">Being Edited</option>
+            </select>
+          </div>
+        </div>
+        
+        {/* Results Count */}
+        <div className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+          {filteredDrafts.length} of {drafts.length} drafts
+          {searchQuery && ` matching "${searchQuery}"`}
+        </div>
+      </div>
+
+      {/* Drafts List */}
+      {filteredDrafts.map((draft) => (
         <div
           key={draft._id}
           className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow"
@@ -221,6 +297,12 @@ export const DraftsList: React.FC = () => {
                 Edit
               </button>
               <button
+                onClick={() => handleDuplicate(draft._id)}
+                className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Duplicate
+              </button>
+              <button
                 onClick={() => handleDelete(draft._id)}
                 className="inline-flex items-center px-3 py-1.5 border border-red-300 dark:border-red-600 text-sm font-medium rounded-md text-red-700 dark:text-red-300 bg-white dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
@@ -230,6 +312,28 @@ export const DraftsList: React.FC = () => {
           </div>
         </div>
       ))}
+      
+      {/* No Results Message */}
+      {filteredDrafts.length === 0 && drafts.length > 0 && (
+        <div className="text-center py-12">
+          <div className="text-4xl mb-4">🔍</div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No drafts found
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            Try adjusting your search or filter criteria.
+          </p>
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setStatusFilter('all');
+            }}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            Clear Filters
+          </button>
+        </div>
+      )}
     </div>
   );
 };

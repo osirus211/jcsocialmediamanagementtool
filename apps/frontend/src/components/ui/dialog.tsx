@@ -22,6 +22,16 @@ interface DialogTitleProps {
   children: React.ReactNode;
 }
 
+interface DialogDescriptionProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+interface DialogFooterProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
@@ -62,5 +72,21 @@ export function DialogTitle({ className = '', children }: DialogTitleProps) {
     <h2 className={`text-lg font-semibold ${className}`}>
       {children}
     </h2>
+  );
+}
+
+export function DialogDescription({ className = '', children }: DialogDescriptionProps) {
+  return (
+    <p className={`text-sm text-gray-600 ${className}`}>
+      {children}
+    </p>
+  );
+}
+
+export function DialogFooter({ className = '', children }: DialogFooterProps) {
+  return (
+    <div className={`flex justify-end gap-2 mt-6 ${className}`}>
+      {children}
+    </div>
   );
 }

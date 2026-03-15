@@ -17,6 +17,7 @@
 import { getRedisClient } from '../config/redis';
 import { logger } from '../utils/logger';
 import { EventEmitter } from 'events';
+import { Redis } from 'ioredis';
 
 export interface PlatformStatus {
   status: 'operational' | 'degraded';
@@ -33,7 +34,7 @@ interface DegradedStatusData {
 }
 
 export class PlatformHealthService {
-  private redis = getRedisClient();
+  private redis: Redis | null = null;
   private eventEmitter = new EventEmitter();
 
   // Configuration constants
@@ -43,10 +44,21 @@ export class PlatformHealthService {
   private readonly MIN_SAMPLE_SIZE = 10; // Minimum API calls before marking degraded
 
   /**
+   * Get Redis client safely
+   */
+  private getRedis(): Redis {
+    if (!this.redis) {
+      this.redis = getRedisClient();
+    }
+    return this.redis;
+  }
+
+  /**
    * Record an API call result (success or failure)
    * Adds timestamp to Redis sorted set and checks platform health
    */
   async recordApiCall(platform: string, success: boolean): Promise<void> {
+    const redis = this.getRedis();
     const timestamp = Date.now();
     const key = success
       ? `platform:${platform}:success`
@@ -55,11 +67,11 @@ export class PlatformHealthService {
     // Add to sorted set with timestamp as score
     // Use timestamp + random to ensure uniqueness
     const member = `${timestamp}:${Math.random()}`;
-    await this.redis.zadd(key, timestamp, member);
+    await redis.zadd(key, timestamp, member);
 
     // Remove entries older than window
     const cutoff = timestamp - this.WINDOW_SIZE * 1000;
-    await this.redis.zremrangebyscore(key, '-inf', cutoff);
+    await redis.zremrangebyscore(key, '-inf', cutoff);
 
     logger.debug('API call recorded', {
       platform,
@@ -77,8 +89,9 @@ export class PlatformHealthService {
    * Marks platform as recovered if failure rate <= 30% for 2 minutes
    */
   private async checkPlatformHealth(platform: string): Promise<void> {
-    const successCount = await this.redis.zcard(`platform:${platform}:success`);
-    const failureCount = await this.redis.zcard(`platform:${platform}:failure`);
+    const redis = this.getRedis();
+    const successCount = await redis.zcard(`platform:${platform}:success`);
+    const failureCount = await redis.zcard(`platform:${platform}:failure`);
     const total = successCount + failureCount;
 
     // Require minimum sample size to avoid false positives
@@ -126,16 +139,17 @@ export class PlatformHealthService {
    * Check if platform has stable recovery (low failure rate for 2 minutes)
    */
   private async checkStableRecovery(platform: string): Promise<boolean> {
+    const redis = this.getRedis();
     // Check failure rate for last 2 minutes
     const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
 
-    const recentSuccesses = await this.redis.zcount(
+    const recentSuccesses = await redis.zcount(
       `platform:${platform}:success`,
       twoMinutesAgo,
       '+inf'
     );
 
-    const recentFailures = await this.redis.zcount(
+    const recentFailures = await redis.zcount(
       `platform:${platform}:failure`,
       twoMinutesAgo,
       '+inf'
@@ -171,6 +185,7 @@ export class PlatformHealthService {
    * Stores degraded status in Redis, emits event, pauses publishing
    */
   private async markPlatformDegraded(platform: string, failureRate: number): Promise<void> {
+    const redis = this.getRedis();
     const statusKey = `platform_status:${platform}`;
     const statusData: DegradedStatusData = {
       status: 'degraded',
@@ -179,7 +194,7 @@ export class PlatformHealthService {
       consecutiveMinutes: 1,
     };
 
-    await this.redis.setex(statusKey, this.WINDOW_SIZE, JSON.stringify(statusData));
+    await redis.setex(statusKey, this.WINDOW_SIZE, JSON.stringify(statusData));
 
     logger.warn('Platform marked as degraded', {
       platform,
@@ -206,8 +221,9 @@ export class PlatformHealthService {
    * Deletes degraded status, emits event, resumes publishing
    */
   private async markPlatformRecovered(platform: string): Promise<void> {
+    const redis = this.getRedis();
     const statusKey = `platform_status:${platform}`;
-    await this.redis.del(statusKey);
+    await redis.del(statusKey);
 
     logger.info('Platform recovered', { platform });
 
@@ -230,9 +246,10 @@ export class PlatformHealthService {
    * TODO: Integrate with publishing worker to delay queued jobs
    */
   private async pausePlatformPublishing(platform: string): Promise<void> {
+    const redis = this.getRedis();
     // Set pause flag in Redis
     const pauseKey = `platform_publishing_paused:${platform}`;
-    await this.redis.set(pauseKey, '1', 'EX', this.WINDOW_SIZE);
+    await redis.set(pauseKey, '1', 'EX', this.WINDOW_SIZE);
 
     logger.info('Publishing paused for platform', { platform });
 
@@ -248,9 +265,10 @@ export class PlatformHealthService {
    * TODO: Integrate with publishing worker to promote delayed jobs
    */
   private async resumePlatformPublishing(platform: string): Promise<void> {
+    const redis = this.getRedis();
     // Remove pause flag
     const pauseKey = `platform_publishing_paused:${platform}`;
-    await this.redis.del(pauseKey);
+    await redis.del(pauseKey);
 
     logger.info('Publishing resumed for platform', { platform });
 
@@ -264,8 +282,9 @@ export class PlatformHealthService {
    * Check if platform publishing is paused
    */
   async isPlatformPublishingPaused(platform: string): Promise<boolean> {
+    const redis = this.getRedis();
     const pauseKey = `platform_publishing_paused:${platform}`;
-    const exists = await this.redis.exists(pauseKey);
+    const exists = await redis.exists(pauseKey);
     return exists === 1;
   }
 
@@ -273,8 +292,9 @@ export class PlatformHealthService {
    * Get platform status (operational or degraded)
    */
   async getPlatformStatus(platform: string): Promise<'operational' | 'degraded'> {
+    const redis = this.getRedis();
     const statusKey = `platform_status:${platform}`;
-    const data = await this.redis.get(statusKey);
+    const data = await redis.get(statusKey);
 
     if (!data) {
       return 'operational';
@@ -316,11 +336,12 @@ export class PlatformHealthService {
    * Calculate current failure rate for platform
    */
   private async calculateFailureRate(platform: string): Promise<number> {
+    const redis = this.getRedis();
     const successKey = `platform:${platform}:success`;
     const failureKey = `platform:${platform}:failure`;
 
-    const successCount = await this.redis.zcard(successKey);
-    const failureCount = await this.redis.zcard(failureKey);
+    const successCount = await redis.zcard(successKey);
+    const failureCount = await redis.zcard(failureKey);
 
     const total = successCount + failureCount;
     if (total === 0) {

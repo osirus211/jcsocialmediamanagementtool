@@ -5,10 +5,11 @@ import { bulkUploadService } from '@/services/bulkUpload.service';
 import { logger } from '@/lib/logger';
 
 interface CSVRow {
-  content: string;
-  platforms: string;
-  scheduledAt: string;
-  socialAccountIds?: string;
+  text: string;
+  platform: string;
+  scheduled_time: string;
+  media_url?: string;
+  timezone?: string;
 }
 
 interface CSVUploaderProps {
@@ -21,9 +22,10 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
   const validateColumns = (headers: string[]): string | null => {
-    const required = ['content', 'platforms', 'scheduledAt'];
+    const required = ['text', 'platform', 'scheduled_time'];
     const missing = required.filter(col => !headers.includes(col));
     
     if (missing.length > 0) {
@@ -36,6 +38,7 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
   const handleFileSelect = useCallback((selectedFile: File) => {
     setError(null);
     setPreview([]);
+    setValidationWarnings([]);
 
     if (!selectedFile.name.endsWith('.csv')) {
       setError('Please select a CSV file');
@@ -68,6 +71,27 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
           return;
         }
 
+        // Check for potential issues and show warnings
+        const warnings: string[] = [];
+        const data = results.data;
+        
+        if (data.length > 100) {
+          warnings.push(`Large file detected: ${data.length} rows. Processing may take a few minutes.`);
+        }
+
+        // Check for common timezone issues
+        const hasTimezones = data.some(row => row.timezone);
+        if (!hasTimezones) {
+          warnings.push('No timezone specified. All posts will be scheduled in UTC.');
+        }
+
+        // Check for media URLs
+        const hasMedia = data.some(row => row.media_url);
+        if (hasMedia) {
+          warnings.push('Media URLs detected. Ensure all URLs are publicly accessible.');
+        }
+
+        setValidationWarnings(warnings);
         setPreview(results.data);
       },
       error: (err) => {
@@ -117,6 +141,7 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
       // Reset form
       setFile(null);
       setPreview([]);
+      setValidationWarnings([]);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload CSV';
       logger.error('CSV upload failed', { error: errorMessage });
@@ -170,6 +195,7 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
                 setFile(null);
                 setPreview([]);
                 setError(null);
+                setValidationWarnings([]);
               }}
               className="ml-4 text-sm text-red-600 hover:text-red-700"
             >
@@ -178,6 +204,23 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
           </div>
         )}
       </div>
+
+      {/* Validation Warnings */}
+      {validationWarnings.length > 0 && (
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Validation Warnings</p>
+              <ul className="text-sm text-yellow-700 mt-1 space-y-1">
+                {validationWarnings.map((warning, idx) => (
+                  <li key={idx}>• {warning}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -203,17 +246,19 @@ export function CSVUploader({ onUploadSuccess }: CSVUploaderProps) {
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Content</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Platforms</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Scheduled At</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Accounts</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Scheduled Time</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Media URLs</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Timezone</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {preview.map((row, idx) => (
                   <tr key={idx}>
-                    <td className="px-4 py-2 text-sm text-gray-900 max-w-xs truncate">{row.content}</td>
-                    <td className="px-4 py-2 text-sm text-gray-600">{row.platforms}</td>
-                    <td className="px-4 py-2 text-sm text-gray-600">{row.scheduledAt}</td>
-                    <td className="px-4 py-2 text-sm text-gray-600">{row.socialAccountIds || '-'}</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 max-w-xs truncate">{row.text}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600">{row.platform}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600">{row.scheduled_time}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600 max-w-xs truncate">{row.media_url || '-'}</td>
+                    <td className="px-4 py-2 text-sm text-gray-600">{row.timezone || 'UTC'}</td>
                   </tr>
                 ))}
               </tbody>

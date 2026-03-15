@@ -10,6 +10,7 @@ import { logger } from '../utils/logger';
 import { authMetricsTracker } from './metrics/AuthMetricsTracker';
 import { config } from '../config';
 import * as crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 export interface RegisterInput {
   email: string;
@@ -25,12 +26,13 @@ export interface LoginInput {
 
 interface TwoFactorChallengeResponse {
   requiresTwoFactor: true;
+  tempToken: string;
   userId: string;
   message: string;
 }
 
 export interface AuthResponse {
-  user: IUser;
+  user: Partial<IUser>;
   tokens: TokenPair;
 }
 
@@ -113,26 +115,61 @@ export class AuthService {
   static async login(input: LoginInput): Promise<LoginResponse> {
     try {
       logger.info('RUNTIME_TRACE LOGIN_START', { timestamp: new Date().toISOString() });
+      
+      // Sanitize and validate input
+      const email = input.email.toLowerCase().trim();
+      const password = input.password;
+
+      // Input validation
+      if (!email || !password) {
+        throw new BadRequestError('Email and password are required');
+      }
+
+      if (email.length > 255) {
+        throw new BadRequestError('Email too long');
+      }
+
+      if (password.length < 8) {
+        throw new BadRequestError('Password must be at least 8 characters');
+      }
+
+      if (password.length > 128) {
+        throw new BadRequestError('Password too long');
+      }
+
       // Find user with password field and 2FA fields
       const user = await User.findOne({
-        email: input.email.toLowerCase(),
+        email: email.toLowerCase().trim(),
         softDeletedAt: null,
       }).select('+password +refreshTokens +twoFactorSecret');
 
+      // TIMING ATTACK PREVENTION: Always perform password comparison even if user not found
+      const dummyHash = '$2b$12$LCKapIvNQLMCQfCLLkBave5JKE0EDvxSFcLSAO5OVKGmVEKSbzUwS'; // Dummy bcrypt hash
+      
       if (!user) {
-        // Use generic message to prevent email enumeration
+        // Perform dummy comparison to prevent timing attacks
+        await bcrypt.compare(password, dummyHash);
         throw new UnauthorizedError('Invalid email or password');
       }
 
       // Check if user is using OAuth
       if (user.provider !== OAuthProvider.LOCAL) {
+        // Still perform dummy comparison for timing consistency
+        await bcrypt.compare(password, dummyHash);
         throw new BadRequestError(
-          `Please sign in with ${user.provider.charAt(0).toUpperCase() + user.provider.slice(1)}`
+          `This account uses ${user.provider.charAt(0).toUpperCase() + user.provider.slice(1)} Sign-In. Please use ${user.provider.charAt(0).toUpperCase() + user.provider.slice(1)} to log in.`
         );
       }
 
+      // Check if email is verified
+      if (!user.isEmailVerified) {
+        // Still perform password comparison for timing consistency
+        await user.comparePassword(password);
+        throw new UnauthorizedError('Please verify your email first');
+      }
+
       // Verify password (timing-attack safe)
-      const isPasswordValid = await user.comparePassword(input.password);
+      const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
         throw new UnauthorizedError('Invalid email or password');
       }
@@ -141,9 +178,18 @@ export class AuthService {
       if (user.twoFactorEnabled && user.twoFactorSecret) {
         logger.info('2FA challenge required', { userId: user._id, email: user.email });
         
+        // Generate short-lived temp token (5 minutes) for 2FA verification
+        const tempToken = TokenService.generateTempToken({
+          userId: user._id.toString(),
+          email: user.email,
+          role: user.role,
+          purpose: '2fa_verification'
+        }, '5m');
+        
         // Return 2FA challenge response instead of tokens
         return {
           requiresTwoFactor: true,
+          tempToken,
           userId: user._id.toString(),
           message: 'Two-factor authentication required'
         };
@@ -169,7 +215,11 @@ export class AuthService {
       authMetricsTracker.incrementLoginSuccess();
 
       logger.info('RUNTIME_TRACE LOGIN_SUCCESS', { timestamp: new Date().toISOString() });
-      return { user, tokens };
+      
+      // Remove sensitive fields from user object
+      const { password: _, refreshTokens: __, twoFactorSecret: ___, ...safeUser } = user.toObject();
+      
+      return { user: safeUser, tokens };
     } catch (error) {
       logger.error('RUNTIME_TRACE LOGIN_FAILED', { timestamp: new Date().toISOString() });
       logger.error('Login error:', error);
@@ -776,8 +826,11 @@ export class AuthService {
         email: user.email,
       });
 
+      // Remove sensitive fields from user object
+      const { password: _, refreshTokens: __, twoFactorSecret: ___, twoFactorBackupCodes: ____, ...safeUser } = user.toObject();
+
       return {
-        user,
+        user: safeUser,
         tokens,
       };
     } catch (error: any) {

@@ -266,7 +266,6 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
 );
 
 // Indexes for performance and uniqueness
-UserSchema.index({ email: 1 });
 UserSchema.index({ provider: 1, oauthId: 1 });
 UserSchema.index({ softDeletedAt: 1 });
 UserSchema.index({ createdAt: -1 });

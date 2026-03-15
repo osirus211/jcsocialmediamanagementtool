@@ -30,6 +30,26 @@ export interface IWorkspace extends Document {
     industry?: string;
   };
   
+  // Queue Pause Settings (beats Buffer & Hootsuite)
+  queuePause: {
+    // Global workspace pause
+    isPaused: boolean;
+    pausedAt?: Date;
+    pausedBy?: mongoose.Types.ObjectId;
+    resumeAt?: Date; // Auto-resume time
+    reason?: string; // Why paused (crisis, maintenance, etc.)
+    
+    // Per-account pause (superior to competitors)
+    accountPauses: Array<{
+      socialAccountId: mongoose.Types.ObjectId;
+      isPaused: boolean;
+      pausedAt: Date;
+      pausedBy: mongoose.Types.ObjectId;
+      resumeAt?: Date;
+      reason?: string;
+    }>;
+  };
+  
   // Client Portal (white-label)
   clientPortal: {
     enabled: boolean;
@@ -146,6 +166,57 @@ const WorkspaceSchema = new Schema<IWorkspace>(
         type: String,
         enum: ['marketing-agency', 'e-commerce', 'saas', 'media', 'non-profit', 'education', 'healthcare', 'real-estate', 'other'],
       },
+    },
+    
+    // Queue Pause Settings
+    queuePause: {
+      isPaused: {
+        type: Boolean,
+        default: false,
+        index: true,
+      },
+      pausedAt: {
+        type: Date,
+      },
+      pausedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      resumeAt: {
+        type: Date,
+        index: true, // For auto-resume queries
+      },
+      reason: {
+        type: String,
+        maxlength: 200,
+      },
+      accountPauses: [{
+        socialAccountId: {
+          type: Schema.Types.ObjectId,
+          ref: 'SocialAccount',
+          required: true,
+        },
+        isPaused: {
+          type: Boolean,
+          default: false,
+        },
+        pausedAt: {
+          type: Date,
+          required: true,
+        },
+        pausedBy: {
+          type: Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        resumeAt: {
+          type: Date,
+        },
+        reason: {
+          type: String,
+          maxlength: 200,
+        },
+      }],
     },
     
     // Client Portal

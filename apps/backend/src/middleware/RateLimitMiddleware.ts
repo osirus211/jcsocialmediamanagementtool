@@ -129,7 +129,19 @@ async function checkRateLimit(
   total: number;
 }> {
   try {
-    const redis = getRedisClient();
+    const { getRedisClientSafe } = await import('../config/redis');
+    const redis = getRedisClientSafe();
+    
+    if (!redis) {
+      // If Redis not available, fail open (allow request)
+      return {
+        allowed: true,
+        remaining: config.maxRequests - 1,
+        resetTime: Date.now() + config.windowMs,
+        total: 1,
+      };
+    }
+    
     const now = Date.now();
     const windowStart = now - config.windowMs;
     

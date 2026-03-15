@@ -12,6 +12,7 @@ import { WorkspaceInvitation, IWorkspaceInvitation, InvitationStatus } from '../
 import { workspacePermissionService, Permission } from './WorkspacePermissionService';
 import { emailService } from './EmailService';
 import { logger } from '../utils/logger';
+import { isValidTimezone, validateTimezoneWithFallback } from '../utils/timezone.utils';
 
 export class WorkspaceService {
   /**
@@ -141,6 +142,11 @@ export class WorkspaceService {
         throw new Error('Workspace slug is already taken');
       }
       updates.slug = updates.slug.toLowerCase();
+    }
+
+    // Validate timezone if provided
+    if (updates.settings?.timezone) {
+      updates.settings.timezone = validateTimezoneWithFallback(updates.settings.timezone, 'UTC');
     }
 
     const workspace = await Workspace.findByIdAndUpdate(

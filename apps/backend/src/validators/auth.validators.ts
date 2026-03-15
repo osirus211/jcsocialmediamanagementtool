@@ -26,8 +26,11 @@ export const registerSchema = z.object({
  */
 export const loginSchema = z.object({
   body: z.object({
-    email: emailSchema,
-    password: z.string().min(1, 'Password is required'),
+    email: emailSchema.max(255, 'Email too long'),
+    password: z.string()
+      .min(1, 'Password is required')
+      .min(8, 'Password must be at least 8 characters')
+      .max(128, 'Password too long'),
   }),
 });
 

@@ -6,11 +6,21 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { ConnectionHealthService } from '../services/ConnectionHealthService';
-import { getRedisClient } from '../config/redis';
+import { getRedisClientSafe } from '../config/redis';
 import { logger } from '../utils/logger';
 
-const redis = getRedisClient();
-const healthService = new ConnectionHealthService(redis);
+// Lazy initialization - only create health service when Redis is available
+let healthService: ConnectionHealthService | null = null;
+
+const getHealthService = () => {
+  if (!healthService) {
+    const redis = getRedisClientSafe();
+    if (redis) {
+      healthService = new ConnectionHealthService(redis);
+    }
+  }
+  return healthService;
+};
 
 /**
  * Middleware to track response times for social media API calls
@@ -32,16 +42,19 @@ export const responseTimeTracker = (req: any, res: Response, next: NextFunction)
       // Record response time asynchronously (don't block response)
       setImmediate(async () => {
         try {
-          await healthService.recordApiResponseTime(provider, accountId, responseTime);
-          
-          logger.debug('API response time recorded', {
-            provider,
-            accountId,
-            responseTime,
-            path: req.path,
-            method: req.method,
-            statusCode: res.statusCode
-          });
+          const healthSvc = getHealthService();
+          if (healthSvc) {
+            await healthSvc.recordApiResponseTime(provider, accountId, responseTime);
+            
+            logger.debug('API response time recorded', {
+              provider,
+              accountId,
+              responseTime,
+              path: req.path,
+              method: req.method,
+              statusCode: res.statusCode
+            });
+          }
         } catch (error: any) {
           logger.error('Failed to record API response time', {
             provider,

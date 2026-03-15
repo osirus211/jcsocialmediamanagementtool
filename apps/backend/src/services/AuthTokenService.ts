@@ -52,6 +52,15 @@ export class AuthTokenService {
   }
 
   /**
+   * Generate temporary token (for 2FA, password reset, etc.)
+   */
+  static generateTempToken(payload: TokenPayload & { purpose: string }, expiresIn: string = '5m'): string {
+    return jwt.sign(payload, config.jwt.secret, {
+      expiresIn,
+    } as jwt.SignOptions);
+  }
+
+  /**
    * Verify access token
    */
   static verifyAccessToken(token: string): TokenPayload {

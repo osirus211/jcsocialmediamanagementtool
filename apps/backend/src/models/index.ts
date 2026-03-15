@@ -20,3 +20,6 @@ export * from './WorkflowRun';
 export * from './RSSFeed';
 export * from './RSSFeedItem';
 export * from './EvergreenRule';
+
+// Blackout Dates
+export * from './BlackoutDate';

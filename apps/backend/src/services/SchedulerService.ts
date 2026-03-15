@@ -3,6 +3,7 @@ import { PostingQueue } from '../queue/PostingQueue';
 import { Post, PostStatus } from '../models/Post';
 import { logger } from '../utils/logger';
 import { getRedisClient } from '../config/redis';
+import { blackoutDateService } from './BlackoutDateService';
 
 /**
  * Scheduler Service
@@ -163,6 +164,70 @@ export class SchedulerService {
   private async enqueuePost(post: any): Promise<void> {
     const postId = post._id.toString();
     console.log('🔍 SCHEDULER: Enqueuing post', postId);
+    
+    // Check if the post is scheduled during a blackout period
+    const blackoutCheck = await blackoutDateService.isDateBlackedOut(
+      post.workspaceId.toString(),
+      post.scheduledAt
+    );
+
+    if (blackoutCheck.isBlackedOut && blackoutCheck.blackoutDate) {
+      console.log('🚫 SCHEDULER: Post scheduled during blackout period', postId);
+      
+      const action = blackoutCheck.blackoutDate.action;
+      
+      switch (action) {
+        case 'hold':
+          // Keep post as scheduled, don't enqueue yet
+          logger.info('Post held due to blackout period', {
+            postId,
+            scheduledAt: post.scheduledAt,
+            blackoutReason: blackoutCheck.blackoutDate.reason,
+            action: 'hold'
+          });
+          return;
+          
+        case 'reschedule':
+          // Find next available slot and reschedule
+          const nextSlot = await blackoutDateService.getNextAvailableSlot(
+            post.workspaceId.toString(),
+            post.scheduledAt,
+            30 // Look up to 30 days ahead
+          );
+          
+          if (nextSlot) {
+            await postService.updateScheduledAt(postId, nextSlot);
+            logger.info('Post rescheduled due to blackout period', {
+              postId,
+              originalScheduledAt: post.scheduledAt,
+              newScheduledAt: nextSlot,
+              blackoutReason: blackoutCheck.blackoutDate.reason,
+              action: 'reschedule'
+            });
+            return;
+          } else {
+            // No available slot found, fall back to hold
+            logger.warn('No available slot found for rescheduling, holding post', {
+              postId,
+              scheduledAt: post.scheduledAt,
+              blackoutReason: blackoutCheck.blackoutDate.reason,
+            });
+            return;
+          }
+          
+        case 'cancel':
+          // Cancel the post
+          await postService.updatePostStatus(postId, PostStatus.CANCELLED as any);
+          logger.info('Post cancelled due to blackout period', {
+            postId,
+            scheduledAt: post.scheduledAt,
+            blackoutReason: blackoutCheck.blackoutDate.reason,
+            action: 'cancel'
+          });
+          return;
+      }
+    }
+
     const redis = getRedisClient();
     const lockKey = `post:queued:${postId}`;
 

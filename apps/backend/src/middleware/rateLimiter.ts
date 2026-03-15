@@ -9,7 +9,14 @@ import RedisStore from 'rate-limit-redis';
  */
 const createRedisStore = () => {
   try {
-    const redisClient = getRedisClient();
+    // Skip Redis store in test environment to avoid connection issues
+    if (process.env.NODE_ENV === 'test') {
+      return undefined;
+    }
+
+    // Lazy initialization - only get Redis client when needed
+    const { getRedisClientSafe } = require('../config/redis');
+    const redisClient = getRedisClientSafe();
 
     if (!redisClient) {
       console.warn('Redis unavailable, using memory store');
@@ -17,8 +24,7 @@ const createRedisStore = () => {
     }
 
     return new RedisStore({
-      // @ts-ignore - rate-limit-redis types don't match ioredis perfectly
-      sendCommand: async (...args: string[]) => redisClient.call(args[0], ...args.slice(1)),
+      sendCommand: (...args: any[]) => redisClient.call(...args),
       prefix: 'rl:',
     });
   } catch (error) {
@@ -42,22 +48,37 @@ export const globalRateLimiter = rateLimit({
 });
 
 /**
- * Auth limiter
+ * Auth limiter - Enhanced for production security
  */
 export const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window per IP (increased from 5 to match requirements)
   standardHeaders: true,
   legacyHeaders: false,
-  // Don't create store on import - let it use memory store
-  store: undefined,
-  handler: (_req: Request, res: Response) => {
+  store: process.env.NODE_ENV === 'test' ? undefined : (() => {
+    // Lazy initialization - create store only when middleware is actually used
+    try {
+      return createRedisStore();
+    } catch (error) {
+      console.warn('Failed to create Redis store for auth rate limiter, using memory store');
+      return undefined;
+    }
+  })(),
+  keyGenerator: (req: Request) => {
+    // Rate limit by both IP and email for comprehensive protection
+    const email = req.body?.email?.toLowerCase()?.trim();
+    return email ? `${req.ip}:${email}` : req.ip || 'unknown';
+  },
+  handler: (req: Request, res: Response) => {
+    const retryAfter = Math.ceil(15 * 60); // 15 minutes in seconds
     res.status(429).json({
       error: 'Too Many Requests',
-      message: 'Too many authentication attempts. Please try again later.',
-      retryAfter: 900,
+      message: 'Too many login attempts. Please try again in 15 minutes.',
+      retryAfter,
     });
   },
+  // Skip rate limiting for successful requests (only count failures)
+  skipSuccessfulRequests: true,
 });
 
 /**

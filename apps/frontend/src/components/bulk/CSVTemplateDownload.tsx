@@ -2,11 +2,12 @@ import { Download } from 'lucide-react';
 
 export function CSVTemplateDownload() {
   const handleDownload = () => {
-    // CSV template with headers and example rows
+    // CSV template with headers and example rows - matching backend expectations
     const csvContent = [
-      'content,platforms,scheduledAt,socialAccountIds',
-      '"Check out our new product launch! 🚀","twitter,linkedin","2024-12-25 10:00","account-id-1,account-id-2"',
-      '"Happy holidays from our team! 🎄","facebook,instagram","2024-12-25 14:30","account-id-3"',
+      'text,platform,scheduled_time,media_url,timezone',
+      '"Check out our new product launch! 🚀","twitter,linkedin","2024-12-25 10:00","https://example.com/image1.jpg","America/New_York"',
+      '"Happy holidays from our team! 🎄","facebook,instagram","2024-12-25 14:30","https://example.com/image2.jpg,https://example.com/image3.jpg","Europe/London"',
+      '"Simple text post without media","twitter","2024-12-26 09:00","","UTC"',
     ].join('\n');
 
     // Create blob and download
@@ -35,10 +36,11 @@ export function CSVTemplateDownload() {
           <div className="bg-white rounded border border-blue-200 p-3 mb-4">
             <p className="text-xs font-mono text-gray-700 mb-2">Required columns:</p>
             <ul className="text-xs text-gray-600 space-y-1">
-              <li><span className="font-semibold">content</span> - Post text content</li>
-              <li><span className="font-semibold">platforms</span> - Comma-separated (twitter, facebook, linkedin, instagram)</li>
-              <li><span className="font-semibold">scheduledAt</span> - ISO format or YYYY-MM-DD HH:mm</li>
-              <li><span className="font-semibold">socialAccountIds</span> - Comma-separated account IDs (optional)</li>
+              <li><span className="font-semibold">text</span> - Post content (required)</li>
+              <li><span className="font-semibold">platform</span> - Comma-separated (twitter, facebook, linkedin, instagram)</li>
+              <li><span className="font-semibold">scheduled_time</span> - YYYY-MM-DD HH:mm format (required)</li>
+              <li><span className="font-semibold">media_url</span> - Comma-separated image/video URLs (optional)</li>
+              <li><span className="font-semibold">timezone</span> - Timezone (e.g., America/New_York, UTC) (optional, defaults to UTC)</li>
             </ul>
           </div>
           <button

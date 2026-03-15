@@ -3,6 +3,7 @@ import { Upload, Loader2, AlertCircle } from 'lucide-react';
 import { CSVTemplateDownload } from '@/components/bulk/CSVTemplateDownload';
 import { CSVUploader } from '@/components/bulk/CSVUploader';
 import { BulkJobStatus } from '@/components/bulk/BulkJobStatus';
+import { BulkImportFeatures } from '@/components/bulk/BulkImportFeatures';
 import { bulkUploadService, BulkUploadJob } from '@/services/bulkUpload.service';
 import { logger } from '@/lib/logger';
 
@@ -61,9 +62,12 @@ export function BulkImportPage() {
             <h1 className="text-3xl font-bold text-gray-900">Bulk Import Posts</h1>
           </div>
           <p className="text-gray-600">
-            Upload a CSV file to schedule multiple posts at once
+            Upload a CSV file to schedule up to 500 posts at once. Supports timezone-aware scheduling, media attachments, and duplicate detection.
           </p>
         </div>
+
+        {/* Features Overview */}
+        <BulkImportFeatures />
 
         {/* Section 1: Download Template */}
         <div className="mb-8">

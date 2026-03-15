@@ -1,10 +1,14 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { QueueAutoResumeNotification } from '@/components/queue/QueueAutoResumeNotification';
 
 export const MainLayout = () => {
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Global Auto-Resume Notifications */}
+      <QueueAutoResumeNotification />
+      
       {/* Sidebar */}
       <Sidebar />
 

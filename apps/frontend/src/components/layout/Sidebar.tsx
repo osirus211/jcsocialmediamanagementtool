@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher';
 import { approvalsService } from '@/services/approvals.service';
+import { draftsService } from '@/services/drafts.service';
+import { queueService, QueuePauseStatus } from '@/services/queue.service';
 
 export const Sidebar = () => {
   const [approvalCount, setApprovalCount] = useState(0);
+  const [draftCount, setDraftCount] = useState(0);
+  const [queueStatus, setQueueStatus] = useState<QueuePauseStatus | null>(null);
 
   const fetchApprovalCount = async () => {
     try {
@@ -14,11 +18,35 @@ export const Sidebar = () => {
     }
   };
 
+  const fetchDraftCount = async () => {
+    try {
+      const response = await draftsService.listDrafts({ limit: 1 });
+      setDraftCount(response.pagination.total);
+    } catch (error) {
+      // Silently fail - don't show errors for background polling
+    }
+  };
+
+  const fetchQueueStatus = async () => {
+    try {
+      const status = await queueService.getQueueStatus();
+      setQueueStatus(status);
+    } catch (error) {
+      // Silently fail - don't show errors for background polling
+    }
+  };
+
   useEffect(() => {
     fetchApprovalCount();
+    fetchDraftCount();
+    fetchQueueStatus();
     
     // Poll every 60 seconds
-    const interval = setInterval(fetchApprovalCount, 60000);
+    const interval = setInterval(() => {
+      fetchApprovalCount();
+      fetchDraftCount();
+      fetchQueueStatus();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
   return (
@@ -69,10 +97,17 @@ export const Sidebar = () => {
             <li>
               <a
                 href="/drafts"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
               >
-                <span>📄</span>
-                <span>Drafts</span>
+                <div className="flex items-center gap-3">
+                  <span>📄</span>
+                  <span>Drafts</span>
+                </div>
+                {draftCount > 0 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {draftCount}
+                  </span>
+                )}
               </a>
             </li>
             <li>
@@ -158,6 +193,22 @@ export const Sidebar = () => {
               >
                 <span>📅</span>
                 <span>Calendar</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href="/queue"
+                className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <div className="flex items-center gap-3">
+                  <span>📋</span>
+                  <span>Queue</span>
+                </div>
+                {(queueStatus?.isPaused || queueStatus?.accountPauses.length > 0) && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                    ⏸️ PAUSED
+                  </span>
+                )}
               </a>
             </li>
             <li>

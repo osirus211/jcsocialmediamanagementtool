@@ -333,4 +333,108 @@ router.post('/:id/autosave', validateRequest(autoSaveSchema), async (req, res, n
   }
 });
 
+/**
+ * POST /drafts/:id/duplicate
+ * Duplicate a draft
+ */
+router.post('/:id/duplicate', async (req, res, next): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { workspaceId } = req.workspace!;
+    const userId = req.user!.userId;
+
+    // Get original draft
+    const originalDraft = await Post.findOne({
+      _id: id,
+      workspaceId,
+      status: PostStatus.DRAFT,
+    });
+
+    if (!originalDraft) {
+      res.status(404).json({
+        success: false,
+        error: 'Draft not found',
+      });
+      return;
+    }
+
+    // Create duplicate
+    const duplicatedDraft = new Post({
+      workspaceId,
+      createdBy: userId,
+      status: PostStatus.DRAFT,
+      content: originalDraft.content,
+      platformContent: originalDraft.platformContent,
+      socialAccountIds: originalDraft.socialAccountIds,
+      mediaIds: originalDraft.mediaIds,
+      version: 1,
+    });
+
+    await duplicatedDraft.save();
+
+    // Populate for response
+    await duplicatedDraft.populate('createdBy', 'name email');
+    await duplicatedDraft.populate('socialAccountIds', 'platform accountName');
+
+    res.json({
+      success: true,
+      data: duplicatedDraft,
+    });
+  } catch (error) {
+    logger.error('Error duplicating draft', { draftId: req.params.id, error });
+    next(error);
+  }
+});
+
+/**
+ * DELETE /drafts/:id
+ * Delete a draft
+ */
+router.delete('/:id', async (req, res, next): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { workspaceId } = req.workspace!;
+    const userId = req.user!.userId;
+
+    // Find and verify ownership/permissions
+    const draft = await Post.findOne({
+      _id: id,
+      workspaceId,
+      status: PostStatus.DRAFT,
+    });
+
+    if (!draft) {
+      res.status(404).json({
+        success: false,
+        error: 'Draft not found',
+      });
+      return;
+    }
+
+    // Check if user can delete (owner or admin)
+    if (draft.createdBy?.toString() !== userId) {
+      // TODO: Add proper permission check for workspace admins
+      res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions to delete this draft',
+      });
+      return;
+    }
+
+    // Release any locks before deletion
+    await DraftCollaborationService.releaseLock(id, userId);
+
+    // Delete the draft
+    await Post.deleteOne({ _id: id });
+
+    res.json({
+      success: true,
+      message: 'Draft deleted successfully',
+    });
+  } catch (error) {
+    logger.error('Error deleting draft', { draftId: req.params.id, error });
+    next(error);
+  }
+});
+
 export default router;

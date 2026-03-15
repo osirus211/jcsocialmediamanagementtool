@@ -13,10 +13,22 @@ import { getRedisClient } from '../../config/redis';
 import { logger } from '../../utils/logger';
 import { BadRequestError } from '../../utils/errors';
 import mongoose from 'mongoose';
+import { Redis } from 'ioredis';
 
 const router = Router();
-const redis = getRedisClient();
-const healthService = new ConnectionHealthService(redis);
+let redis: Redis | null = null;
+let healthService: ConnectionHealthService | null = null;
+
+// Lazy initialization
+const getHealthService = (): ConnectionHealthService => {
+  if (!healthService) {
+    if (!redis) {
+      redis = getRedisClient();
+    }
+    healthService = new ConnectionHealthService(redis);
+  }
+  return healthService;
+};
 
 /**
  * GET /api/v1/connection-health/scores
@@ -35,7 +47,7 @@ router.get('/scores', requireAuth, requireWorkspace, async (req, res, next) => {
     // Get health scores for each account
     const healthScores = await Promise.all(
       accounts.map(async (account) => {
-        const score = await healthService.getHealthScore(
+        const score = await getHealthService().getHealthScore(
           account.provider,
           account.providerUserId
         );
@@ -99,13 +111,13 @@ router.get('/account/:accountId', requireAuth, requireWorkspace, async (req, res
     }
 
     // Get current health score
-    const healthScore = await healthService.getHealthScore(
+    const healthScore = await getHealthService().getHealthScore(
       account.provider,
       account.providerUserId
     );
 
     // Recalculate to get fresh metrics
-    const freshScore = await healthService.calculateHealthScore(
+    const freshScore = await getHealthService().calculateHealthScore(
       account.provider,
       account.providerUserId
     );
@@ -147,7 +159,7 @@ router.post('/recalculate/:accountId', requireAuth, requireWorkspace, async (req
     }
 
     // Recalculate health score
-    const healthScore = await healthService.calculateHealthScore(
+    const healthScore = await getHealthService().calculateHealthScore(
       account.provider,
       account.providerUserId
     );
@@ -191,7 +203,7 @@ router.get('/trends/:accountId', requireAuth, requireWorkspace, async (req, res,
     }
 
     // Get historical health scores (simplified - in production would store daily snapshots)
-    const currentScore = await healthService.getHealthScore(
+    const currentScore = await getHealthService().getHealthScore(
       account.provider,
       account.providerUserId
     );

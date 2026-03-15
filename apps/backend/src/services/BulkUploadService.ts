@@ -10,14 +10,17 @@ import { BulkUploadJob, IBulkUploadJob, BulkUploadStatus, BulkUploadError } from
 import { postService } from './PostService';
 import { Media } from '../models/Media';
 import { SocialPlatform } from '../models/ScheduledPost';
+import { SocialAccount } from '../models/SocialAccount';
 import { logger } from '../utils/logger';
 import { BadRequestError } from '../utils/errors';
+import moment from 'moment-timezone';
 
 interface CSVRow {
   platform: string;
   text: string;
   scheduled_time: string;
   media_url?: string;
+  timezone?: string;
 }
 
 const MAX_ROWS = 500;
@@ -120,6 +123,7 @@ export class BulkUploadService {
       const errors: BulkUploadError[] = [];
       let successCount = 0;
       let failureCount = 0;
+      const processedPosts = new Set<string>(); // For duplicate detection
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -150,12 +154,21 @@ export class BulkUploadService {
             continue;
           }
 
-          // Parse scheduled time
-          const scheduledAt = new Date(row.scheduled_time);
-          if (isNaN(scheduledAt.getTime())) {
+          // Parse scheduled time with timezone support
+          const timezone = row.timezone || 'UTC';
+          let scheduledAt: Date;
+          
+          try {
+            // Use moment-timezone for proper timezone handling
+            const momentDate = moment.tz(row.scheduled_time, 'YYYY-MM-DD HH:mm', timezone);
+            if (!momentDate.isValid()) {
+              throw new Error('Invalid date format');
+            }
+            scheduledAt = momentDate.utc().toDate();
+          } catch (err) {
             errors.push({
               row: rowNumber,
-              error: 'Invalid scheduled_time format',
+              error: `Invalid scheduled_time format or timezone. Use YYYY-MM-DD HH:mm format and valid timezone (e.g., America/New_York, UTC)`,
               data: row,
             });
             failureCount++;
@@ -172,18 +185,55 @@ export class BulkUploadService {
             continue;
           }
 
+          // Duplicate detection - create unique key for content + platforms + time
+          const duplicateKey = `${row.text.trim()}-${platforms.sort().join(',')}-${scheduledAt.getTime()}`;
+          if (processedPosts.has(duplicateKey)) {
+            errors.push({
+              row: rowNumber,
+              error: 'Duplicate post detected (same content, platforms, and time)',
+              data: row,
+            });
+            failureCount++;
+            continue;
+          }
+          processedPosts.add(duplicateKey);
+
           // Resolve media IDs from URLs if provided
           let mediaIds: string[] = [];
           if (row.media_url) {
-            const mediaUrls = row.media_url.split(',').map(url => url.trim());
-            mediaIds = await this.resolveMediaUrls(mediaUrls, workspaceId);
+            try {
+              const mediaUrls = row.media_url.split(',').map(url => url.trim()).filter(url => url);
+              mediaIds = await this.resolveMediaUrls(mediaUrls, workspaceId);
+            } catch (err: any) {
+              errors.push({
+                row: rowNumber,
+                error: `Media processing error: ${err.message}`,
+                data: row,
+              });
+              failureCount++;
+              continue;
+            }
           }
+
+          // Get appropriate social accounts for each platform
+          const socialAccounts = await this.getSocialAccountsForPlatforms(platforms, workspaceId);
 
           // Create post for each platform
           for (const platform of platforms) {
+            const socialAccount = socialAccounts.find(acc => acc.platform === platform);
+            if (!socialAccount) {
+              errors.push({
+                row: rowNumber,
+                error: `No connected ${platform} account found`,
+                data: row,
+              });
+              failureCount++;
+              continue;
+            }
+
             await postService.createPost({
               workspaceId,
-              socialAccountId: '', // TODO: Get appropriate social account ID
+              socialAccountId: socialAccount._id.toString(),
               platform,
               content: row.text,
               mediaIds,
@@ -284,6 +334,41 @@ export class BulkUploadService {
       };
     }
 
+    // Validate timezone if provided
+    if (row.timezone) {
+      try {
+        if (!moment.tz.zone(row.timezone)) {
+          return {
+            row: rowNumber,
+            error: `Invalid timezone: ${row.timezone}. Use valid timezone names like America/New_York, Europe/London, UTC`,
+            data: row,
+          };
+        }
+      } catch (err) {
+        return {
+          row: rowNumber,
+          error: `Invalid timezone: ${row.timezone}`,
+          data: row,
+        };
+      }
+    }
+
+    // Validate media URLs format if provided
+    if (row.media_url) {
+      const mediaUrls = row.media_url.split(',').map(url => url.trim()).filter(url => url);
+      for (const url of mediaUrls) {
+        try {
+          new URL(url);
+        } catch (err) {
+          return {
+            row: rowNumber,
+            error: `Invalid media URL format: ${url}`,
+            data: row,
+          };
+        }
+      }
+    }
+
     return null;
   }
 
@@ -294,24 +379,62 @@ export class BulkUploadService {
     const mediaIds: string[] = [];
 
     for (const url of mediaUrls) {
-      // Try to find media by filename or storage URL
-      const media = await Media.findOne({
-        workspaceId: new mongoose.Types.ObjectId(workspaceId),
-        $or: [
-          { originalFilename: url },
-          { filename: url },
-          { storageUrl: url },
-        ],
-      });
+      if (!url) continue;
 
-      if (media) {
-        mediaIds.push(media._id.toString());
-      } else {
-        logger.warn('Media not found for URL', { url, workspaceId });
+      try {
+        // Try to find media by filename, original filename, or storage URL
+        const media = await Media.findOne({
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          $or: [
+            { originalFilename: { $regex: url.split('/').pop(), $options: 'i' } },
+            { filename: { $regex: url.split('/').pop(), $options: 'i' } },
+            { storageUrl: url },
+            { publicUrl: url },
+          ],
+        });
+
+        if (media) {
+          mediaIds.push(media._id.toString());
+        } else {
+          // If media not found, log warning but don't fail the entire upload
+          logger.warn('Media not found for URL', { url, workspaceId });
+          // Could potentially download and create media here in the future
+        }
+      } catch (err: any) {
+        logger.error('Error resolving media URL', { url, workspaceId, error: err.message });
+        throw new Error(`Failed to resolve media URL: ${url}`);
       }
     }
 
     return mediaIds;
+  }
+
+  /**
+   * Get social accounts for platforms
+   */
+  private async getSocialAccountsForPlatforms(
+    platforms: SocialPlatform[],
+    workspaceId: string
+  ): Promise<Array<{ _id: mongoose.Types.ObjectId; platform: SocialPlatform }>> {
+    try {
+      const socialAccounts = await SocialAccount.find({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        provider: { $in: platforms },
+        status: 'active',
+      }).select('_id provider').lean();
+
+      return socialAccounts.map(acc => ({
+        _id: acc._id,
+        platform: acc.provider as SocialPlatform,
+      }));
+    } catch (error: any) {
+      logger.error('Failed to get social accounts', {
+        workspaceId,
+        platforms,
+        error: error.message,
+      });
+      return [];
+    }
   }
 
   /**

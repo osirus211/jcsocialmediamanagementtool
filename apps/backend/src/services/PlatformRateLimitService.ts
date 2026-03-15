@@ -13,6 +13,7 @@
  */
 
 import { getRedisClient } from '../config/redis';
+import { Redis } from 'ioredis';
 import { logger } from '../utils/logger';
 import { AxiosError } from 'axios';
 import { EventEmitter } from 'events';
@@ -38,7 +39,7 @@ interface QuotaInfo {
 }
 
 export class PlatformRateLimitService {
-  private redis = getRedisClient();
+  private redis: Redis | null = null;
   private eventEmitter = new EventEmitter();
 
   // App-level rate limits (per platform app, not per account)
@@ -51,11 +52,22 @@ export class PlatformRateLimitService {
   };
 
   /**
+   * Get Redis client safely
+   */
+  private getRedis(): Redis {
+    if (!this.redis) {
+      this.redis = getRedisClient();
+    }
+    return this.redis;
+  }
+
+  /**
    * Check if app-level quota allows the request
    * Increments counter if allowed
    * Emits warning at 80% threshold
    */
   async checkAppLevelQuota(platform: string): Promise<QuotaCheckResult> {
+    const redis = this.getRedis();
     const limit = this.APP_LEVEL_LIMITS[platform as keyof typeof this.APP_LEVEL_LIMITS];
     
     if (!limit) {
@@ -64,12 +76,12 @@ export class PlatformRateLimitService {
     }
 
     const key = `app_quota:${platform}`;
-    const currentStr = await this.redis.get(key);
+    const currentStr = await redis.get(key);
     const currentCount = currentStr ? parseInt(currentStr) : 0;
 
     // Check if limit reached
     if (currentCount >= limit.requests) {
-      const ttl = await this.redis.ttl(key);
+      const ttl = await redis.ttl(key);
       const resetAt = new Date(Date.now() + ttl * 1000);
 
       logger.warn('App-level rate limit reached', {
@@ -89,11 +101,11 @@ export class PlatformRateLimitService {
     }
 
     // Increment counter
-    const newCount = await this.redis.incr(key);
+    const newCount = await redis.incr(key);
 
     // Set expiry on first increment
     if (newCount === 1) {
-      await this.redis.expire(key, limit.window);
+      await redis.expire(key, limit.window);
     }
 
     const remaining = limit.requests - newCount;
@@ -128,6 +140,7 @@ export class PlatformRateLimitService {
     accountId: string,
     error: AxiosError
   ): Promise<RateLimitInfo> {
+    const redis = this.getRedis();
     const resetTime = this.extractResetTime(platform, error);
     const quotaInfo = this.extractQuotaInfo(platform, error);
 
@@ -135,7 +148,7 @@ export class PlatformRateLimitService {
     const key = `rate_limit:${platform}:${accountId}`;
     const ttl = Math.ceil((resetTime.getTime() - Date.now()) / 1000);
 
-    await this.redis.setex(
+    await redis.setex(
       key,
       Math.max(ttl, 1), // Ensure TTL is at least 1 second
       JSON.stringify({
@@ -313,8 +326,9 @@ export class PlatformRateLimitService {
    * Check if account is currently rate limited
    */
   async isRateLimited(platform: string, accountId: string): Promise<boolean> {
+    const redis = this.getRedis();
     const key = `rate_limit:${platform}:${accountId}`;
-    const exists = await this.redis.exists(key);
+    const exists = await redis.exists(key);
     return exists === 1;
   }
 
@@ -322,8 +336,9 @@ export class PlatformRateLimitService {
    * Get rate limit info for account
    */
   async getRateLimitInfo(platform: string, accountId: string): Promise<RateLimitInfo | null> {
+    const redis = this.getRedis();
     const key = `rate_limit:${platform}:${accountId}`;
-    const data = await this.redis.get(key);
+    const data = await redis.get(key);
 
     if (!data) {
       return null;

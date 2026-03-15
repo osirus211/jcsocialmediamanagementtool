@@ -181,6 +181,21 @@ class DraftsService {
   ): Promise<AutoSaveResult> {
     return this.autoSave(id, data.content, data.platformContent, data.version);
   }
+
+  /**
+   * Duplicate a draft
+   */
+  async duplicateDraft(id: string): Promise<DraftPost> {
+    const response = await apiClient.post(`/drafts/${id}/duplicate`);
+    return response.data;
+  }
+
+  /**
+   * Delete a draft
+   */
+  async deleteDraft(id: string): Promise<void> {
+    await apiClient.delete(`/drafts/${id}`);
+  }
 }
 
 export const draftsService = new DraftsService();

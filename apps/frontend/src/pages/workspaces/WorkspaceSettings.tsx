@@ -11,6 +11,9 @@ import { BulkImportModal } from '@/components/workspace/BulkImportModal';
 import { TransferOwnershipModal } from '@/components/workspace/TransferOwnershipModal';
 import { InviteMemberModal } from '@/components/workspace/InviteMemberModal';
 import { MemberRow } from '@/components/workspace/MemberRow';
+import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
+import { TimezoneSettings } from '@/components/settings/TimezoneSettings';
+import { formatTimeWithTimezone, getUserTimezone } from '@/utils/timezones';
 
 /**
  * Workspace Settings Page
@@ -411,23 +414,11 @@ export const WorkspaceSettingsPage = () => {
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Timezone
-                  </label>
-                  <select
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    disabled={!isAdmin || isLoading}
-                  >
-                    {timezoneOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <TimezoneSettings
+                  showImpactPreview={true}
+                  showTeamCoordination={true}
+                  onSave={() => setSuccess('Workspace timezone updated successfully')}
+                />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

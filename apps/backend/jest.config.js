@@ -20,6 +20,14 @@ module.exports = {
   modulePathIgnorePatterns: [
     '<rootDir>/src/services/oauth/',
   ],
+  // Handle ES modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(nanoid|@bull-board|other-es-modules)/)'
+  ],
+  // Mock problematic modules
+  moduleNameMapper: {
+    '^yamljs$': '<rootDir>/src/__tests__/__mocks__/yamljs.js',
+  },
   coverageThreshold: {
     global: {
       branches: 60,
@@ -27,5 +35,10 @@ module.exports = {
       lines: 65,
       statements: 65
     }
-  }
+  },
+  // Add debugging options
+  detectOpenHandles: true,
+  forceExit: true,
+  // Ensure tests run in band to avoid port conflicts
+  maxWorkers: 1
 };

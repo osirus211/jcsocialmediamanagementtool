@@ -37,6 +37,7 @@ const ConnectChannelV2Page = lazy(() => import('@/pages/connect-v2/ConnectChanne
 const PostListPage = lazy(() => import('@/pages/posts/PostList').then(module => ({ default: module.PostListPage })));
 const CreatePostPage = lazy(() => import('@/pages/posts/CreatePost').then(module => ({ default: module.CreatePostPage })));
 const CalendarPage = lazy(() => import('@/pages/posts/Calendar').then(module => ({ default: module.CalendarPage })));
+const QueuePage = lazy(() => import('@/pages/QueuePage').then(module => ({ default: module.default })));
 const FailedPostsPage = lazy(() => import('@/pages/posts/FailedPosts').then(module => ({ default: module.FailedPostsPage })));
 
 // Analytics
@@ -137,6 +138,10 @@ const router = createBrowserRouter([
       {
         path: 'posts/calendar',
         element: <SuspenseWrapper><CalendarPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'queue',
+        element: <SuspenseWrapper><QueuePage /></SuspenseWrapper>,
       },
       {
         path: 'posts/failed',

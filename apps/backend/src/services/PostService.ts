@@ -1096,6 +1096,23 @@ export class PostService {
       return post;
     }
 
+    async updateScheduledAt(postId: string, scheduledAt: Date): Promise<IScheduledPost> {
+      const post = await ScheduledPost.findByIdAndUpdate(
+        postId,
+        {
+          scheduledAt,
+          updatedAt: new Date(),
+        },
+        { new: true }
+      );
+
+      if (!post) {
+        throw new Error('Post not found');
+      }
+
+      return post;
+    }
+
 }
 
 // Export singleton instance

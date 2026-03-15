@@ -21,6 +21,7 @@ import apiKeysRoutes from './apiKeys.routes';
 import taskRoutes from './tasks.routes'; // Task management
 import templatesRoutes from './templates.routes'; // Phase-2: Post templates
 import queueSlotsRoutes from './queue-slots.routes'; // Phase-2: Queue slots
+import queueRoutes from './queue.routes'; // Phase-2: Queue management
 import linksRoutes from './links.routes'; // Phase-2: Link shortening
 import linkPreviewRoutes from './link-preview.routes'; // Link preview API
 import followersRoutes from './followers.routes'; // Phase-3: Follower analytics
@@ -85,6 +86,7 @@ router.get('/', (_req, res) => {
       tasks: '/api/v1/tasks',
       templates: '/api/v1/templates',
       queueSlots: '/api/v1/queue-slots',
+      queue: '/api/v1/queue',
       links: '/api/v1/links',
       linkPreview: '/api/v1/link-preview',
       media: '/api/v1/media',
@@ -156,6 +158,7 @@ router.use('/post', postRoutes); // Legacy post API
 router.use('/tasks', taskRoutes); // Task management
 router.use('/templates', templatesRoutes); // Phase-2: Post templates
 router.use('/queue-slots', queueSlotsRoutes); // Phase-2: Queue slots
+router.use('/queue', queueRoutes); // Phase-2: Queue management
 router.use('/links', linksRoutes); // Phase-2: Link shortening
 router.use('/link-preview', linkPreviewRoutes); // Link preview API
 router.use('/alttext', alttextRoutes); // Alt text generation and validation

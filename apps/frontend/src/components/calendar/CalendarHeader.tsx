@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { Calendar, List, Plus, Sparkles } from 'lucide-react';
 import { CalendarAutoFillModal } from './CalendarAutoFillModal';
+import { TimezoneIndicator } from './TimezoneIndicator';
 
 type ViewMode = 'month' | 'week';
 
@@ -70,7 +71,11 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   const isAllSelected = selectedMemberIds.length === 0;
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-4">
+    <>
+      {/* Timezone Indicator */}
+      <TimezoneIndicator />
+      
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
       {/* Top row: View mode switcher and New Post button */}
       <div className="flex items-center justify-between mb-4">
         {/* View mode switcher */}
@@ -198,5 +203,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         connectedAccounts={[]} // TODO: Pass actual connected accounts
       />
     </div>
+    </>
   );
 };

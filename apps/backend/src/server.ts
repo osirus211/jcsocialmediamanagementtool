@@ -254,6 +254,19 @@ const startServer = async () => {
       // Don't throw - but log as error since GDPR compliance is important
     }
 
+    console.log('🔧 Initializing queue scheduler...');
+    // Start queue scheduler - critical for auto-resume functionality
+    try {
+      const { QueueScheduler } = await import('./jobs/schedulers/queueScheduler');
+      QueueScheduler.start();
+      console.log('⏰ Queue Scheduler STARTED');
+      logger.info('⏰ Queue scheduler started');
+    } catch (error) {
+      console.log('❌ Queue scheduler failed to start:', error);
+      logger.error('❌ Queue scheduler failed to start:', error);
+      // Don't throw - but log as error since auto-resume is important
+    }
+
     console.log('🔧 Initializing magic link cleanup job...');
     // Start magic link cleanup job - independent of Redis
     try {
@@ -842,8 +855,11 @@ const startServer = async () => {
   }
 };
 
-// Start the server
-console.log('🚀 server.ts: Calling startServer()...');
-startServer();
+// Start the server only if this file is run directly (not imported)
+if (require.main === module) {
+  console.log('🚀 server.ts: Calling startServer()...');
+  startServer();
+}
 
+export { startServer };
 export default app;
