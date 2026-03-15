@@ -214,6 +214,15 @@ export class MediaStorageService {
   }
 
   /**
+   * Delete file from storage (alias for deleteMedia)
+   * 
+   * @param storageKey - Storage key of the file to delete
+   */
+  async deleteFile(storageKey: string): Promise<void> {
+    return this.deleteMedia(storageKey);
+  }
+
+  /**
    * Build CDN URL for media
    * 
    * @param storageKey - Storage key of the media
@@ -316,6 +325,47 @@ export class MediaStorageService {
    */
   getPublicUrl(storageKey: string): string {
     return this.buildCdnUrl(storageKey);
+  }
+
+  /**
+   * Download file from storage as buffer
+   * 
+   * @param storageKey - Storage key of the file
+   * @returns File buffer
+   */
+  async downloadFile(storageKey: string): Promise<Buffer> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized. AWS credentials are required.');
+    }
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.storageConfig.bucket,
+        Key: storageKey,
+      });
+
+      const response = await this.s3Client.send(command);
+      
+      if (!response.Body) {
+        throw new Error('No file content received');
+      }
+
+      // Convert stream to buffer
+      const buffer = Buffer.from(await response.Body.transformToByteArray());
+
+      logger.debug('File downloaded from storage', {
+        storageKey,
+        size: buffer.length,
+      });
+
+      return buffer;
+    } catch (error: any) {
+      logger.error('Failed to download file from storage', {
+        storageKey,
+        error: error.message,
+      });
+      throw new Error(`Failed to download file: ${error.message}`);
+    }
   }
 }
 

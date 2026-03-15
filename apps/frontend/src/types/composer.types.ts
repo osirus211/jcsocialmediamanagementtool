@@ -40,6 +40,12 @@ export interface MediaFile {
   errorMessage?: string;
   thumbnailUrl?: string;
   duration?: number; // Video duration in seconds
+  width?: number; // Video/image width
+  height?: number; // Video/image height
+  fps?: number; // Video frame rate
+  resolution?: string; // e.g., "1080p", "720p", "4K"
+  bitrate?: number; // Video bitrate
+  canCancel?: boolean; // Whether upload can be cancelled
   metadata?: {
     altText?: string;
     isThread?: boolean;
@@ -47,12 +53,45 @@ export interface MediaFile {
     isPoll?: boolean;
     options?: string[];
     duration?: string;
+    // Video-specific metadata
+    videoMetadata?: {
+      codec?: string;
+      profile?: string;
+      level?: string;
+      colorSpace?: string;
+      hasAudio?: boolean;
+      audioCodec?: string;
+      audioBitrate?: number;
+      audioChannels?: number;
+    };
+    // Thumbnail metadata
+    thumbnails?: {
+      auto?: string[]; // Auto-generated thumbnails at different times
+      custom?: string; // Custom uploaded thumbnail
+      selected?: string; // Currently selected thumbnail
+      frames?: Array<{
+        time: number;
+        url: string;
+        label: string; // e.g., "0s", "25%", "50%"
+      }>;
+    };
+    // Platform validation
+    platformCompatibility?: Record<SocialPlatform, {
+      compatible: boolean;
+      issues?: string[];
+      warnings?: string[];
+    }>;
+    // Processing status
+    processing?: {
+      transcoding?: boolean;
+      thumbnailGeneration?: boolean;
+      compression?: boolean;
+      validation?: boolean;
+    };
     // GIF-specific metadata
     giphyId?: string;
     giphyTitle?: string;
     giphyUrl?: string;
-    width?: number;
-    height?: number;
     // YouTube-specific metadata
     youtubeTitle?: string;
     youtubeDescription?: string;
@@ -240,9 +279,9 @@ export const FILE_VALIDATION = {
     extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
   },
   video: {
-    types: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'],
+    types: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska'],
     maxSize: 512 * 1024 * 1024 * 1024, // 512GB for YouTube (but warn at 2GB)
-    extensions: ['.mp4', '.mov', '.avi', '.webm'],
+    extensions: ['.mp4', '.mov', '.avi', '.webm', '.mkv'],
   },
   youtube: {
     video: {
@@ -257,5 +296,85 @@ export const FILE_VALIDATION = {
       extensions: ['.jpg', '.jpeg', '.png'],
       recommendedSize: '1280x720',
     },
+  },
+};
+
+// Platform-Specific Video Requirements
+export const PLATFORM_VIDEO_LIMITS: Record<SocialPlatform, {
+  maxSize: number;
+  maxDuration: number; // seconds
+  supportedFormats: string[];
+  aspectRatios: string[];
+  maxResolution?: string;
+}> = {
+  instagram: {
+    maxSize: 1 * 1024 * 1024 * 1024, // 1GB
+    maxDuration: 90, // 90 seconds for Reels
+    supportedFormats: ['video/mp4', 'video/quicktime'],
+    aspectRatios: ['9:16', '1:1', '4:5'],
+    maxResolution: '1080x1920',
+  },
+  tiktok: {
+    maxSize: 4 * 1024 * 1024 * 1024, // 4GB
+    maxDuration: 10 * 60, // 10 minutes
+    supportedFormats: ['video/mp4', 'video/quicktime', 'video/webm'],
+    aspectRatios: ['9:16'],
+    maxResolution: '1080x1920',
+  },
+  youtube: {
+    maxSize: 256 * 1024 * 1024 * 1024, // 256GB
+    maxDuration: 12 * 60 * 60, // 12 hours
+    supportedFormats: ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'],
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    maxResolution: '3840x2160', // 4K
+  },
+  twitter: {
+    maxSize: 512 * 1024 * 1024, // 512MB
+    maxDuration: 2 * 60 + 20, // 2:20
+    supportedFormats: ['video/mp4', 'video/quicktime'],
+    aspectRatios: ['16:9', '1:1'],
+    maxResolution: '1920x1080',
+  },
+  linkedin: {
+    maxSize: 5 * 1024 * 1024 * 1024, // 5GB
+    maxDuration: 10 * 60, // 10 minutes
+    supportedFormats: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    maxResolution: '1920x1080',
+  },
+  facebook: {
+    maxSize: 10 * 1024 * 1024 * 1024, // 10GB
+    maxDuration: 240 * 60, // 240 minutes
+    supportedFormats: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    maxResolution: '1920x1080',
+  },
+  threads: {
+    maxSize: 1 * 1024 * 1024 * 1024, // 1GB
+    maxDuration: 5 * 60, // 5 minutes
+    supportedFormats: ['video/mp4', 'video/quicktime'],
+    aspectRatios: ['9:16', '1:1', '4:5'],
+    maxResolution: '1080x1920',
+  },
+  bluesky: {
+    maxSize: 100 * 1024 * 1024, // 100MB
+    maxDuration: 3 * 60, // 3 minutes
+    supportedFormats: ['video/mp4', 'video/quicktime'],
+    aspectRatios: ['16:9', '1:1', '9:16'],
+    maxResolution: '1920x1080',
+  },
+  'google-business': {
+    maxSize: 100 * 1024 * 1024, // 100MB
+    maxDuration: 30, // 30 seconds
+    supportedFormats: ['video/mp4', 'video/quicktime'],
+    aspectRatios: ['16:9', '1:1'],
+    maxResolution: '1920x1080',
+  },
+  pinterest: {
+    maxSize: 2 * 1024 * 1024 * 1024, // 2GB
+    maxDuration: 15 * 60, // 15 minutes
+    supportedFormats: ['video/mp4', 'video/quicktime'],
+    aspectRatios: ['1:1', '2:3', '4:5', '9:16'],
+    maxResolution: '1080x1920',
   },
 };

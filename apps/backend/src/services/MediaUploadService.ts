@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Media, MediaType, MediaStatus, IMedia } from '../models/Media';
 import { logger } from '../utils/logger';
 import { mediaStorageService } from '../services/MediaStorageService';
+import { videoTranscodingService } from '../services/VideoTranscodingService';
 import { BadRequestError } from '../utils/errors';
 import { withSpan } from '../config/telemetry';
 import {
@@ -36,6 +37,8 @@ export const SUPPORTED_VIDEO_TYPES = [
   'video/mpeg',
   'video/quicktime',
   'video/webm',
+  'video/x-msvideo', // AVI
+  'video/x-matroska', // MKV
 ];
 
 // Size limits (in bytes)
@@ -63,6 +66,10 @@ export interface ConfirmUploadInput {
   width?: number;
   height?: number;
   duration?: number;
+  uploadedSize?: number;
+  isChunkedUpload?: boolean;
+  chunkIndex?: number;
+  totalChunks?: number;
 }
 
 export class MediaUploadService {
@@ -283,7 +290,7 @@ export class MediaUploadService {
         // Update workspace storage usage
         await this.updateWorkspaceStorageUsage(input.workspaceId);
 
-        // Enqueue processing jobs for images
+        // Enqueue processing jobs for images and videos
         if (media.mediaType === MediaType.IMAGE || (media.mediaType as string) === 'gif') {
           try {
             const { MediaProcessingQueue } = await import('../queue/MediaProcessingQueue');
@@ -323,6 +330,32 @@ export class MediaUploadService {
             logger.warn('Failed to enqueue processing jobs', {
               mediaId: media._id.toString(),
               error: queueError.message,
+            });
+          }
+        } else if (media.mediaType === MediaType.VIDEO) {
+          // Check if video needs transcoding
+          try {
+            if (!videoTranscodingService.isFormatSupported(media.mimeType)) {
+              logger.info('Video needs transcoding', {
+                mediaId: media._id.toString(),
+                mimeType: media.mimeType,
+              });
+              
+              // Process transcoding asynchronously
+              videoTranscodingService.processUploadedVideo(
+                media._id.toString(),
+                input.workspaceId
+              ).catch(error => {
+                logger.error('Video transcoding failed', {
+                  mediaId: media._id.toString(),
+                  error: error.message,
+                });
+              });
+            }
+          } catch (transcodingError: any) {
+            logger.warn('Failed to check video transcoding requirements', {
+              mediaId: media._id.toString(),
+              error: transcodingError.message,
             });
           }
         }
@@ -757,6 +790,296 @@ export class MediaUploadService {
         totalPages: Math.ceil(total / limit),
       };
     }
+
+  /**
+   * Generate upload URL for chunked upload
+   */
+  async generateChunkedUploadUrl(input: {
+    workspaceId: string;
+    filename: string;
+    mimeType: string;
+    totalSize: number;
+    chunkSize: number;
+    chunkIndex: number;
+    totalChunks: number;
+  }): Promise<{
+    uploadUrl: string;
+    mediaId: string;
+    chunkKey: string;
+  }> {
+    try {
+      // Validate file
+      const validation = this.validateFile(input.mimeType, input.totalSize);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
+      // Generate storage key for this chunk
+      const baseKey = this.generateStorageKey(input.workspaceId, input.filename);
+      const chunkKey = `${baseKey}.chunk.${input.chunkIndex}`;
+
+      // Generate presigned URL for chunk upload
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: chunkKey,
+        ContentType: input.mimeType,
+        ContentLength: input.chunkSize,
+      });
+
+      const uploadUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn: 900, // 15 minutes
+      });
+
+      // Create or get media record
+      let mediaId: string;
+      const existingMedia = await Media.findOne({
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+        filename: input.filename,
+        status: MediaStatus.PENDING
+      });
+
+      if (existingMedia) {
+        mediaId = existingMedia._id.toString();
+      } else {
+        const media = new Media({
+          workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+          mediaType: input.mimeType.startsWith('image/') ? MediaType.IMAGE : MediaType.VIDEO,
+          filename: input.filename,
+          originalFilename: input.filename,
+          size: input.totalSize,
+          mimeType: input.mimeType,
+          storageKey: baseKey,
+          status: MediaStatus.PENDING,
+          metadata: {
+            chunkedUpload: true,
+            totalChunks: input.totalChunks,
+            chunkSize: input.chunkSize,
+            uploadedChunks: []
+          },
+        });
+
+        const savedMedia = await media.save();
+        mediaId = savedMedia._id.toString();
+      }
+
+      return {
+        uploadUrl,
+        mediaId,
+        chunkKey,
+      };
+    } catch (error) {
+      logger.error('Failed to generate chunked upload URL', { error, input });
+      throw error;
+    }
+  }
+
+  /**
+   * Confirm chunk upload
+   */
+  async confirmChunkUpload(input: {
+    mediaId: string;
+    workspaceId: string;
+    chunkIndex: number;
+    chunkKey: string;
+    chunkSize: number;
+  }): Promise<{
+    success: boolean;
+    uploadedChunks: number;
+    totalChunks: number;
+    isComplete: boolean;
+  }> {
+    try {
+      const media = await Media.findOne({
+        _id: input.mediaId,
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId)
+      });
+
+      if (!media) {
+        throw new Error('Media not found');
+      }
+
+      // Update uploaded chunks
+      const uploadedChunks = media.metadata?.uploadedChunks || [];
+      if (!uploadedChunks.includes(input.chunkIndex)) {
+        uploadedChunks.push(input.chunkIndex);
+      }
+
+      await Media.updateOne(
+        { _id: input.mediaId },
+        {
+          $set: {
+            'metadata.uploadedChunks': uploadedChunks,
+            updatedAt: new Date(),
+          }
+        }
+      );
+
+      const totalChunks = media.metadata?.totalChunks || 0;
+      const isComplete = uploadedChunks.length === totalChunks;
+
+      // If all chunks uploaded, combine them
+      if (isComplete) {
+        await this.combineChunks(input.mediaId, input.workspaceId);
+      }
+
+      return {
+        success: true,
+        uploadedChunks: uploadedChunks.length,
+        totalChunks,
+        isComplete,
+      };
+    } catch (error) {
+      logger.error('Failed to confirm chunk upload', { error, input });
+      throw error;
+    }
+  }
+
+  /**
+   * Combine uploaded chunks into final file
+   */
+  private async combineChunks(mediaId: string, workspaceId: string): Promise<void> {
+    try {
+      const media = await Media.findOne({
+        _id: mediaId,
+        workspaceId: new mongoose.Types.ObjectId(workspaceId)
+      });
+
+      if (!media) {
+        throw new Error('Media not found');
+      }
+
+      const totalChunks = media.metadata?.totalChunks || 0;
+
+      // Download all chunks and combine
+      const chunks: Buffer[] = [];
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkKey = `${media.storageKey}.chunk.${i}`;
+        
+        try {
+          const command = new GetObjectCommand({
+            Bucket: this.bucketName,
+            Key: chunkKey,
+          });
+          
+          const response = await this.s3Client.send(command);
+          const chunkBuffer = Buffer.from(await response.Body.transformToByteArray());
+          chunks.push(chunkBuffer);
+        } catch (error) {
+          logger.error('Failed to download chunk', { chunkKey, error });
+          throw new Error(`Failed to download chunk ${i}`);
+        }
+      }
+
+      // Combine chunks
+      const combinedBuffer = Buffer.concat(chunks);
+
+      // Upload combined file
+      const uploadCommand = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: media.storageKey,
+        Body: combinedBuffer,
+        ContentType: media.mimeType,
+      });
+
+      await this.s3Client.send(uploadCommand);
+
+      // Clean up chunk files
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkKey = `${media.storageKey}.chunk.${i}`;
+        try {
+          const deleteCommand = new (require('@aws-sdk/client-s3').DeleteObjectCommand)({
+            Bucket: this.bucketName,
+            Key: chunkKey,
+          });
+          await this.s3Client.send(deleteCommand);
+        } catch (error) {
+          logger.warn('Failed to delete chunk file', { chunkKey, error });
+        }
+      }
+
+      // Update media record
+      await Media.updateOne(
+        { _id: mediaId },
+        {
+          $set: {
+            status: MediaStatus.UPLOADED,
+            storageUrl: this.getStorageUrl(media.storageKey),
+            uploadedAt: new Date(),
+          },
+          $unset: {
+            'metadata.totalChunks': '',
+            'metadata.chunkSize': '',
+            'metadata.uploadedChunks': '',
+            'metadata.chunkedUpload': '',
+          }
+        }
+      );
+
+      logger.info('Chunked upload completed and combined', {
+        mediaId,
+        totalChunks,
+        finalSize: combinedBuffer.length,
+      });
+    } catch (error) {
+      logger.error('Failed to combine chunks', { error, mediaId });
+      
+      // Mark upload as failed
+      await Media.updateOne(
+        { _id: mediaId },
+        {
+          $set: {
+            status: MediaStatus.FAILED,
+            metadata: {
+              error: error instanceof Error ? error.message : 'Failed to combine chunks',
+              failedAt: new Date(),
+            }
+          }
+        }
+      );
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel chunked upload and clean up
+   */
+  async cancelChunkedUpload(mediaId: string, workspaceId: string): Promise<void> {
+    try {
+      const media = await Media.findOne({
+        _id: mediaId,
+        workspaceId: new mongoose.Types.ObjectId(workspaceId)
+      });
+
+      if (!media) {
+        return; // Already deleted or doesn't exist
+      }
+
+      const totalChunks = media.metadata?.totalChunks || 0;
+
+      // Clean up any uploaded chunks
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkKey = `${media.storageKey}.chunk.${i}`;
+        try {
+          const deleteCommand = new (require('@aws-sdk/client-s3').DeleteObjectCommand)({
+            Bucket: this.bucketName,
+            Key: chunkKey,
+          });
+          await this.s3Client.send(deleteCommand);
+        } catch (error) {
+          // Ignore errors - chunk might not exist
+        }
+      }
+
+      // Delete media record
+      await Media.deleteOne({ _id: mediaId });
+
+      logger.info('Chunked upload cancelled and cleaned up', { mediaId });
+    } catch (error) {
+      logger.error('Failed to cancel chunked upload', { error, mediaId });
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

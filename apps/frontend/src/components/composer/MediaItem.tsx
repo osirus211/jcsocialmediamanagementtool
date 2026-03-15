@@ -1,8 +1,9 @@
 import { MediaFile } from '@/types/composer.types';
-import { X, RefreshCw, AlertCircle, Scissors, Image, Crop, Eye } from 'lucide-react';
+import { X, RefreshCw, AlertCircle, Scissors, Image, Crop, Eye, Info, StopCircle } from 'lucide-react';
 import { useState } from 'react';
 import { VideoTrimmer } from '../media/VideoTrimmer';
 import { VideoThumbnailSelector } from '../media/VideoThumbnailSelector';
+import { VideoMetadataDisplay } from '../media/VideoMetadataDisplay';
 import { MediaCropModal } from './MediaCropModal';
 import { AltTextModal } from './AltTextModal';
 
@@ -11,6 +12,7 @@ interface MediaItemProps {
   selectedPlatforms?: string[];
   onRemove: (mediaId: string) => void;
   onRetry?: (mediaId: string) => void;
+  onCancel?: (mediaId: string) => void;
   onMediaUpdate?: (updatedMedia: MediaFile) => void;
   onMediaReplace?: (oldMediaId: string, newMedia: MediaFile) => void;
 }
@@ -20,6 +22,7 @@ export function MediaItem({
   selectedPlatforms = [],
   onRemove, 
   onRetry,
+  onCancel,
   onMediaUpdate,
   onMediaReplace
 }: MediaItemProps) {
@@ -27,6 +30,7 @@ export function MediaItem({
   const [showThumbnailSelector, setShowThumbnailSelector] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
   const [showAltTextModal, setShowAltTextModal] = useState(false);
+  const [showMetadata, setShowMetadata] = useState(false);
   
   const isUploading = media.uploadStatus === 'uploading';
   const isError = media.uploadStatus === 'error';
@@ -111,9 +115,18 @@ export function MediaItem({
               style={{ width: `${media.uploadProgress || 0}%` }}
             />
           </div>
-          <span className="text-white text-sm">
+          <span className="text-white text-sm mb-2">
             {media.uploadProgress || 0}%
           </span>
+          {media.canCancel && onCancel && (
+            <button
+              onClick={() => onCancel(media.id)}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              <StopCircle className="h-3 w-3" />
+              Cancel
+            </button>
+          )}
         </div>
       )}
 
@@ -209,6 +222,13 @@ export function MediaItem({
           >
             <Image className="h-3 w-3" />
           </button>
+          <button
+            onClick={() => setShowMetadata(true)}
+            className="p-1.5 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition-colors"
+            title="Video details"
+          >
+            <Info className="h-3 w-3" />
+          </button>
         </div>
       )}
 
@@ -251,6 +271,27 @@ export function MediaItem({
           onSave={handleAltTextSaved}
           onClose={() => setShowAltTextModal(false)}
         />
+      )}
+
+      {/* Video Metadata Modal */}
+      {showMetadata && media.type === 'video' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Video Information</h3>
+              <button
+                onClick={() => setShowMetadata(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <VideoMetadataDisplay
+              media={media}
+              selectedPlatforms={selectedPlatforms as any[]}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

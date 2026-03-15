@@ -1,8 +1,9 @@
 import { useState, useRef, memo, useCallback, useMemo } from 'react';
-import { MediaFile, FILE_VALIDATION } from '@/types/composer.types';
+import { MediaFile, FILE_VALIDATION, PLATFORM_VIDEO_LIMITS } from '@/types/composer.types';
 import { MediaItem } from './MediaItem';
 import { DesignImportPanel } from '../media/DesignImportPanel';
 import { StockPhotoPanel } from '../media/StockPhotoPanel';
+import { VideoCompressionWidget } from '../media/VideoCompressionWidget';
 import { Upload, Image, Video, Palette, Search, Eye, AlertCircle, Wand2, Sparkles } from 'lucide-react';
 import { compressImageFile, isImageFile } from '@/utils/imageCompression';
 import { GiphyPicker } from './GiphyPicker';
@@ -31,6 +32,8 @@ const MediaUploadSection = memo(function MediaUploadSection({
   const [showStockPhotos, setShowStockPhotos] = useState(false);
   const [showGiphyPicker, setShowGiphyPicker] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [showCompressionWidget, setShowCompressionWidget] = useState(false);
+  const [videoNeedsCompression, setVideoNeedsCompression] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const acceptedTypes = useMemo(() => [
@@ -70,6 +73,23 @@ const MediaUploadSection = memo(function MediaUploadSection({
             console.warn('Failed to compress image, using original:', error);
             processedFiles.push(file);
           }
+        } else if (file.type.startsWith('video/')) {
+          // Check if video needs compression for selected platforms
+          const needsCompression = selectedPlatforms.some(platform => {
+            const limits = PLATFORM_VIDEO_LIMITS[platform as keyof typeof PLATFORM_VIDEO_LIMITS];
+            return limits && file.size > limits.maxSize;
+          });
+
+          if (needsCompression) {
+            // Show compression widget for this video
+            setVideoNeedsCompression(file);
+            setShowCompressionWidget(true);
+            setIsCompressing(false);
+            return; // Don't process other files yet
+          } else {
+            // Video is within limits, process normally
+            processedFiles.push(file);
+          }
         } else {
           // Keep non-image files as-is
           processedFiles.push(file);
@@ -84,7 +104,7 @@ const MediaUploadSection = memo(function MediaUploadSection({
     } finally {
       setIsCompressing(false);
     }
-  }, [media.length, maxFiles, onUpload]);
+  }, [media.length, maxFiles, onUpload, selectedPlatforms]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -159,6 +179,19 @@ const MediaUploadSection = memo(function MediaUploadSection({
     }
   }, [media.length, maxFiles, onUpload]);
 
+  const handleVideoCompressed = useCallback((compressedFile: File) => {
+    setShowCompressionWidget(false);
+    setVideoNeedsCompression(null);
+    onUpload([compressedFile]);
+  }, [onUpload]);
+
+  const handleCompressionSkipped = useCallback(() => {
+    setShowCompressionWidget(false);
+    if (videoNeedsCompression) {
+      onUpload([videoNeedsCompression]);
+    }
+    setVideoNeedsCompression(null);
+  }, [videoNeedsCompression, onUpload]);
   const handleMediaUpdate = useCallback((updatedMedia: MediaFile) => {
     if (onMediaUpdate) {
       onMediaUpdate(updatedMedia.id, updatedMedia);
@@ -259,10 +292,51 @@ const MediaUploadSection = memo(function MediaUploadSection({
           </div>
           <div className="flex items-center gap-1">
             <Video className="h-4 w-4" />
-            <span>Videos: MP4, MOV, AVI (max 100MB)</span>
+            <span>Videos: MP4, MOV, AVI, WebM, MKV (max 100MB)</span>
           </div>
         </div>
+
+        {/* Platform-specific requirements */}
+        {selectedPlatforms.length > 0 && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs font-medium text-blue-800 mb-2">
+              Platform Requirements for Selected Networks:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-blue-700">
+              {selectedPlatforms.slice(0, 4).map(platform => (
+                <div key={platform} className="flex items-center gap-1">
+                  <span className="font-medium capitalize">{platform}:</span>
+                  <span>
+                    {platform === 'instagram' && 'Max 1GB, 90s for Reels'}
+                    {platform === 'tiktok' && 'Max 4GB, 10min, 9:16 ratio'}
+                    {platform === 'youtube' && 'Max 256GB, 12hrs, 4K support'}
+                    {platform === 'twitter' && 'Max 512MB, 2:20 duration'}
+                    {platform === 'linkedin' && 'Max 5GB, 10min duration'}
+                    {platform === 'facebook' && 'Max 10GB, 240min duration'}
+                    {!['instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'facebook'].includes(platform) && 'Standard limits apply'}
+                  </span>
+                </div>
+              ))}
+              {selectedPlatforms.length > 4 && (
+                <div className="text-blue-600">
+                  +{selectedPlatforms.length - 4} more platforms
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Video Compression Widget */}
+      {showCompressionWidget && videoNeedsCompression && (
+        <VideoCompressionWidget
+          videoFile={videoNeedsCompression}
+          videoSize={videoNeedsCompression.size}
+          platform={selectedPlatforms as any[]}
+          onCompressed={handleVideoCompressed}
+          onClose={handleCompressionSkipped}
+        />
+      )}
 
       {/* Design Import Button */}
       <div className="flex justify-center gap-3">

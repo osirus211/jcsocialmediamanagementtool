@@ -151,3 +151,139 @@ export async function trimVideo(
       .run();
   });
 }
+
+/**
+ * Generate multiple thumbnails from video at different time offsets
+ */
+export async function generateMultipleThumbnails(
+  filePath: string,
+  outputDir: string,
+  timeOffsets: number[]
+): Promise<Array<{ time: number; path: string; label: string }>> {
+  const results: Array<{ time: number; path: string; label: string }> = [];
+  
+  // Ensure output directory exists
+  await fs.mkdir(outputDir, { recursive: true });
+
+  for (const timeOffset of timeOffsets) {
+    const outputPath = path.join(outputDir, `thumb_${timeOffset}s.jpg`);
+    
+    try {
+      await generateThumbnail(filePath, outputPath, timeOffset);
+      
+      // Generate label
+      let label: string;
+      if (timeOffset === 0) {
+        label = '0s';
+      } else if (timeOffset < 60) {
+        label = `${timeOffset}s`;
+      } else {
+        const minutes = Math.floor(timeOffset / 60);
+        const seconds = timeOffset % 60;
+        label = seconds > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${minutes}m`;
+      }
+      
+      results.push({
+        time: timeOffset,
+        path: outputPath,
+        label,
+      });
+    } catch (error) {
+      logger.warn('Failed to generate thumbnail at time offset', {
+        filePath,
+        timeOffset,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Generate thumbnails at percentage points of video duration
+ */
+export async function generatePercentageThumbnails(
+  filePath: string,
+  outputDir: string,
+  percentages: number[] = [0, 25, 50, 75, 100]
+): Promise<Array<{ time: number; path: string; label: string }>> {
+  try {
+    // Get video metadata first
+    const metadata = await extractVideoMetadata(filePath);
+    const duration = metadata.duration;
+    
+    // Calculate time offsets from percentages
+    const timeOffsets = percentages.map(percentage => {
+      const time = Math.floor((duration * percentage) / 100);
+      // Ensure we don't exceed video duration
+      return Math.min(time, Math.max(0, duration - 1));
+    });
+    
+    // Generate thumbnails
+    const results = await generateMultipleThumbnails(filePath, outputDir, timeOffsets);
+    
+    // Update labels to show percentages
+    return results.map((result, index) => ({
+      ...result,
+      label: percentages[index] === 0 ? '0s' : `${percentages[index]}%`,
+    }));
+  } catch (error) {
+    logger.error('Failed to generate percentage thumbnails', {
+      filePath,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
+  }
+}
+
+/**
+ * Generate comprehensive thumbnail set (fixed times + percentages)
+ */
+export async function generateComprehensiveThumbnails(
+  filePath: string,
+  outputDir: string
+): Promise<Array<{ time: number; path: string; label: string }>> {
+  try {
+    const metadata = await extractVideoMetadata(filePath);
+    const duration = metadata.duration;
+    
+    const thumbnails: Array<{ time: number; label: string }> = [];
+    
+    // Add fixed time points (if within duration)
+    const fixedTimes = [0, 1, 5, 10];
+    for (const time of fixedTimes) {
+      if (time < duration) {
+        thumbnails.push({ time, label: `${time}s` });
+      }
+    }
+    
+    // Add percentage points
+    const percentages = [25, 50, 75];
+    for (const percentage of percentages) {
+      const time = Math.floor((duration * percentage) / 100);
+      if (time > 0 && time < duration && !thumbnails.some(t => Math.abs(t.time - time) < 2)) {
+        thumbnails.push({ time, label: `${percentage}%` });
+      }
+    }
+    
+    // Sort by time
+    thumbnails.sort((a, b) => a.time - b.time);
+    
+    // Generate thumbnails
+    const timeOffsets = thumbnails.map(t => t.time);
+    const results = await generateMultipleThumbnails(filePath, outputDir, timeOffsets);
+    
+    // Apply correct labels
+    return results.map((result, index) => ({
+      ...result,
+      label: thumbnails[index]?.label || `${result.time}s`,
+    }));
+  } catch (error) {
+    logger.error('Failed to generate comprehensive thumbnails', {
+      filePath,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    throw error;
+  }
+}
