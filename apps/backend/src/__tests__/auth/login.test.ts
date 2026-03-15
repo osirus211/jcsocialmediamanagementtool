@@ -4,11 +4,33 @@ import { User } from '../../models/User';
 import { connectDatabase, disconnectDatabase } from '../../config/database';
 import bcrypt from 'bcrypt';
 
+// Mock Redis to prevent connection errors during tests
+jest.mock('../../config/redis', () => ({
+  getRedisClient: jest.fn(() => null),
+  isRedisHealthy: jest.fn(() => false),
+  getCircuitBreakerStatus: jest.fn(() => ({ state: 'closed', failures: 0 })),
+  getRecoveryService: jest.fn(() => ({ isRecovering: false, lastAttempt: null })),
+}));
+
 // Mock EmailService to avoid react-email dependency issues
 jest.mock('../../services/EmailService', () => ({
   EmailService: {
     sendEmail: jest.fn(),
     sendWelcomeEmail: jest.fn(),
+    sendPasswordResetEmail: jest.fn(),
+  },
+}));
+
+// Mock EmailSequenceService to avoid dependency issues
+jest.mock('../../services/EmailSequenceService', () => ({
+  emailSequenceService: {
+    startSequence: jest.fn(),
+  },
+}));
+
+// Mock EmailNotificationService to avoid dependency issues
+jest.mock('../../services/EmailNotificationService', () => ({
+  emailNotificationService: {
     sendPasswordResetEmail: jest.fn(),
   },
 }));
@@ -21,6 +43,69 @@ jest.mock('../../services/WorkspaceService', () => ({
     updateWorkspace: jest.fn(),
     deleteWorkspace: jest.fn(),
   })),
+}));
+
+// Mock Prometheus metrics to prevent duplicate registration errors
+jest.mock('../../config/connectionHealthMetrics', () => ({
+  connectionHealthMetrics: {
+    register: jest.fn(),
+    recordConnectionAttempt: jest.fn(),
+    recordConnectionSuccess: jest.fn(),
+    recordConnectionFailure: jest.fn(),
+    recordQueryExecution: jest.fn(),
+  },
+}));
+
+// Mock health check services
+jest.mock('../../services/HealthCheckService', () => ({
+  healthCheckService: {
+    isHealthy: jest.fn(() => Promise.resolve(true)),
+    getHealthStatus: jest.fn(() => Promise.resolve({ status: 'healthy' })),
+  },
+}));
+
+jest.mock('../../services/WorkerManager', () => ({
+  WorkerManager: {
+    getInstance: jest.fn(() => ({
+      getStatus: jest.fn(() => []),
+      isHealthy: jest.fn(() => true),
+      getRedisHealth: jest.fn(() => ({ status: 'healthy' })),
+    })),
+  },
+}));
+
+jest.mock('../../services/QueueMonitoringService', () => ({
+  queueMonitoringService: {
+    getAllQueueStats: jest.fn(() => Promise.resolve({})),
+  },
+}));
+
+jest.mock('../../services/PublishingHealthService', () => ({
+  publishingHealthService: {
+    getPublishingHealth: jest.fn(() => Promise.resolve({ status: 'healthy' })),
+  },
+}));
+
+// Mock CSRF middleware to prevent token validation errors during tests
+jest.mock('../../middleware/csrf', () => ({
+  csrfProtection: (req: any, res: any, next: any) => next(),
+  generateToken: jest.fn(() => 'mock-csrf-token'),
+  getCsrfToken: (req: any, res: any) => res.json({ csrfToken: 'mock-csrf-token' }),
+}));
+
+// Mock auth metrics tracker
+jest.mock('../../services/metrics/AuthMetricsTracker', () => ({
+  authMetricsTracker: {
+    incrementRegisterSuccess: jest.fn(),
+    incrementLoginSuccess: jest.fn(),
+  },
+}));
+
+// Mock Sentry to prevent initialization errors
+jest.mock('../../monitoring/sentry', () => ({
+  sentryRequestHandler: () => (req: any, res: any, next: any) => next(),
+  sentryTracingHandler: () => (req: any, res: any, next: any) => next(),
+  sentryErrorHandler: () => (err: any, req: any, res: any, next: any) => next(err),
 }));
 
 describe('POST /api/v1/auth/login', () => {
@@ -107,9 +192,13 @@ describe('POST /api/v1/auth/login', () => {
         .send({
           email: testEmail,
           password: testPassword,
-        })
-        .expect(200);
+        });
 
+      console.log('Response status:', response.status);
+      console.log('Response body:', response.body);
+      console.log('Response text:', response.text);
+
+      expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('accessToken');
       expect(response.body).toHaveProperty('user');
       expect(response.body.user.email).toBe(testEmail);
