@@ -66,7 +66,8 @@ export const authRateLimiter = rateLimit({
   })(),
   keyGenerator: (req: Request) => {
     // Rate limit by both IP and email for comprehensive protection
-    const email = req.body?.email?.toLowerCase()?.trim();
+    // Safely handle cases where email might not be a string (e.g., after sanitization)
+    const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : null;
     return email ? `${req.ip}:${email}` : req.ip || 'unknown';
   },
   handler: (req: Request, res: Response) => {

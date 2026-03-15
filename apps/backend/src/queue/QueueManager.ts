@@ -1,7 +1,8 @@
 import { Queue, QueueOptions, Worker, Job } from 'bullmq';
-import { getRedisClient } from '../config/redis';
+import { getRedisClientSafe } from '../config/redis';
 import { logger } from '../utils/logger';
 import Redlock from 'redlock';
+import { Redis } from 'ioredis';
 
 /**
  * Queue Manager
@@ -28,7 +29,8 @@ export class QueueManager {
   private static instance: QueueManager;
   private queues: Map<string, Queue> = new Map();
   private workers: Map<string, Worker> = new Map();
-  private redlock: Redlock;
+  private redlock: Redlock | null;
+  private redisConnection: Redis | null = null;
   private isShuttingDown: boolean = false;
   
   // Queue lag metrics
@@ -41,18 +43,25 @@ export class QueueManager {
 
   private constructor() {
     // Initialize Redlock for distributed locking
-    const redis = getRedisClient();
-    this.redlock = new Redlock([redis], {
-      driftFactor: 0.01,
-      retryCount: 3,
-      retryDelay: 200,
-      retryJitter: 200,
-      automaticExtensionThreshold: 500,
-    });
+    const redis = getRedisClientSafe();
+    this.redisConnection = redis;
+    
+    if (redis) {
+      this.redlock = new Redlock([redis], {
+        driftFactor: 0.01,
+        retryCount: 3,
+        retryDelay: 200,
+        retryJitter: 200,
+        automaticExtensionThreshold: 500,
+      });
 
-    this.redlock.on('error', (error) => {
-      logger.error('Redlock error:', error);
-    });
+      this.redlock.on('error', (error) => {
+        logger.error('Redlock error:', error);
+      });
+    } else {
+      logger.warn('Redis unavailable - distributed locking disabled');
+      this.redlock = null;
+    }
 
     // Setup graceful shutdown
     this.setupGracefulShutdown();
@@ -73,6 +82,10 @@ export class QueueManager {
    */
   async acquireLock(resource: string, ttl: number = 10000): Promise<any> {
     try {
+      if (!this.redlock) {
+        logger.warn('Distributed locking unavailable - Redis not connected');
+        return null;
+      }
       return await this.redlock.acquire([`lock:${resource}`], ttl);
     } catch (error) {
       logger.error('Failed to acquire lock', { resource, error });
@@ -123,7 +136,11 @@ export class QueueManager {
       return this.queues.get(name)!;
     }
 
-    const redis = getRedisClient();
+    const redis = getRedisClientSafe();
+    if (!redis) {
+      throw new Error('Redis client unavailable - cannot create queue');
+    }
+    
     const defaultOptions: QueueOptions = {
       connection: redis,
       defaultJobOptions: {
@@ -188,7 +205,11 @@ export class QueueManager {
       return this.workers.get(queueName)!;
     }
 
-    const redis = getRedisClient();
+    const redis = getRedisClientSafe();
+    if (!redis) {
+      throw new Error('Redis client unavailable - cannot create worker');
+    }
+    
     const worker = new Worker(queueName, processor, {
       connection: redis,
       concurrency: options?.concurrency || 5,
@@ -568,7 +589,7 @@ export class QueueManager {
    * Get Redis connection (for compatibility)
    */
   getConnection() {
-    return (this as any).redisConnection;
+    return this.redisConnection;
   }
 }
 

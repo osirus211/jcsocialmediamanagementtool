@@ -29,7 +29,7 @@ services:
     container_name: sms-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '6380:6379'
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -57,7 +57,7 @@ services:
       PORT: 5000
       MONGODB_URI: mongodb://admin:password123@mongodb:27017/social-media-scheduler?authSource=admin
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: 6380
       JWT_SECRET: dev-jwt-secret-change-in-production-min-32-chars
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production-min-32-chars
       FRONTEND_URL: http://localhost:5173

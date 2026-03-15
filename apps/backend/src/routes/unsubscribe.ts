@@ -37,7 +37,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     // Stop email sequence
-    await emailSequenceService.stopSequence(user._id.toString());
+    await emailSequenceService.instance.stopSequence(user._id.toString());
 
     // Update user notification preferences
     user.notificationPreferences.email.weeklyReport = false;

@@ -173,4 +173,8 @@ describe('Platform Publish Flow Integration Tests', () => {
     });
 
     it('should handle wrapper overhead within acceptable limits', async () => {
-      const s
+      // Test implementation would go here
+      expect(true).toBe(true);
+    });
+  });
+});

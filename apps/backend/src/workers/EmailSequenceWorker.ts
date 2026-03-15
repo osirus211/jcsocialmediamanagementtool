@@ -127,7 +127,7 @@ export class EmailSequenceWorker {
     );
 
     try {
-      await emailSequenceService.processSequenceEmail({
+      await emailSequenceService.instance.processSequenceEmail({
         userId,
         step,
         templateType,

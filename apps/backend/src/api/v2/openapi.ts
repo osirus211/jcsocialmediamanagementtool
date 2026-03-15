@@ -6,7 +6,18 @@
 
 import { z } from 'zod';
 import { extendZodWithOpenApi, OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
-import { SocialPlatform, PostStatus } from '../../models/ScheduledPost';
+
+// Define platform and status enums as const arrays for better compatibility
+const SOCIAL_PLATFORMS = [
+  'twitter', 'linkedin', 'facebook', 'instagram', 'youtube', 'threads',
+  'tiktok', 'bluesky', 'mastodon', 'reddit', 'google-business', 'pinterest',
+  'github', 'apple'
+] as const;
+
+const POST_STATUSES = [
+  'draft', 'pending_approval', 'approved', 'scheduled', 'queued',
+  'publishing', 'published', 'failed', 'rejected'
+] as const;
 
 // Extend Zod with OpenAPI
 extendZodWithOpenApi(z);
@@ -25,18 +36,18 @@ registry.registerComponent('securitySchemes', 'ApiKeyAuth', {
 const ErrorSchema = registry.register(
   'Error',
   z.object({
-    error: z.string().openapi({ description: 'Error message' }),
-    code: z.string().openapi({ description: 'Error code' }),
-    details: z.record(z.any()).optional().openapi({ description: 'Additional error details' }),
+    error: z.string().describe('Error message'),
+    code: z.string().describe('Error code'),
+    details: z.record(z.any()).optional().describe('Additional error details'),
   }).openapi({ description: 'Error response' })
 );
 
 const MetaSchema = registry.register(
   'Meta',
   z.object({
-    cursor: z.string().nullable().openapi({ description: 'Cursor for next page (null if no more pages)' }),
-    hasMore: z.boolean().openapi({ description: 'Whether there are more items' }),
-    total: z.number().optional().openapi({ description: 'Total count of items' }),
+    cursor: z.string().nullable().describe('Cursor for next page (null if no more pages)'),
+    hasMore: z.boolean().describe('Whether there are more items'),
+    total: z.number().optional().describe('Total count of items'),
   }).openapi({ description: 'Pagination metadata' })
 );
 
@@ -44,30 +55,30 @@ const MetaSchema = registry.register(
 const PostSchema = registry.register(
   'Post',
   z.object({
-    _id: z.string().openapi({ description: 'Post ID' }),
-    workspaceId: z.string().openapi({ description: 'Workspace ID' }),
-    socialAccountId: z.string().openapi({ description: 'Social account ID' }),
-    platform: z.nativeEnum(SocialPlatform).openapi({ description: 'Social platform' }),
-    content: z.string().openapi({ description: 'Post content' }),
-    mediaIds: z.array(z.string()).optional().openapi({ description: 'Media file IDs' }),
-    status: z.nativeEnum(PostStatus).openapi({ description: 'Post status' }),
-    scheduledAt: z.string().datetime().openapi({ description: 'Scheduled publish time' }),
-    publishedAt: z.string().datetime().nullable().openapi({ description: 'Actual publish time' }),
-    contentType: z.enum(['post', 'story', 'reel']).openapi({ description: 'Content type' }),
-    createdAt: z.string().datetime().openapi({ description: 'Creation time' }),
-    updatedAt: z.string().datetime().openapi({ description: 'Last update time' }),
+    _id: z.string().describe('Post ID'),
+    workspaceId: z.string().describe('Workspace ID'),
+    socialAccountId: z.string().describe('Social account ID'),
+    platform: z.enum(SOCIAL_PLATFORMS).describe('Social platform'),
+    content: z.string().describe('Post content'),
+    mediaIds: z.array(z.string()).optional().describe('Media file IDs'),
+    status: z.enum(POST_STATUSES).describe('Post status'),
+    scheduledAt: z.string().datetime().describe('Scheduled publish time'),
+    publishedAt: z.string().datetime().nullable().describe('Actual publish time'),
+    contentType: z.enum(['post', 'story', 'reel']).describe('Content type'),
+    createdAt: z.string().datetime().describe('Creation time'),
+    updatedAt: z.string().datetime().describe('Last update time'),
   }).openapi({ description: 'Social media post' })
 );
 
 const CreatePostSchema = registry.register(
   'CreatePost',
   z.object({
-    socialAccountId: z.string().openapi({ description: 'Social account ID to post to' }),
-    platform: z.nativeEnum(SocialPlatform).openapi({ description: 'Social platform' }),
-    content: z.string().min(1).max(5000).openapi({ description: 'Post content (1-5000 characters)' }),
-    mediaIds: z.array(z.string()).optional().openapi({ description: 'Media file IDs to attach' }),
-    scheduledAt: z.string().datetime().optional().openapi({ description: 'Schedule time (defaults to now)' }),
-    contentType: z.enum(['post', 'story', 'reel']).optional().default('post').openapi({ description: 'Content type' }),
+    socialAccountId: z.string().describe('Social account ID to post to'),
+    platform: z.enum(SOCIAL_PLATFORMS).describe('Social platform'),
+    content: z.string().min(1).max(5000).describe('Post content (1-5000 characters)'),
+    mediaIds: z.array(z.string()).optional().describe('Media file IDs to attach'),
+    scheduledAt: z.string().datetime().optional().describe('Schedule time (defaults to now)'),
+    contentType: z.enum(['post', 'story', 'reel']).optional().default('post').describe('Content type'),
   }).openapi({ description: 'Create post request' })
 );
 
@@ -75,27 +86,27 @@ const CreatePostSchema = registry.register(
 const PostAnalyticsSchema = registry.register(
   'PostAnalytics',
   z.object({
-    postId: z.string().openapi({ description: 'Post ID' }),
-    platform: z.nativeEnum(SocialPlatform).openapi({ description: 'Social platform' }),
-    impressions: z.number().openapi({ description: 'Number of impressions' }),
-    engagements: z.number().openapi({ description: 'Total engagements' }),
-    likes: z.number().openapi({ description: 'Number of likes' }),
-    comments: z.number().openapi({ description: 'Number of comments' }),
-    shares: z.number().openapi({ description: 'Number of shares' }),
-    clicks: z.number().openapi({ description: 'Number of clicks' }),
-    engagementRate: z.number().openapi({ description: 'Engagement rate percentage' }),
-    collectedAt: z.string().datetime().openapi({ description: 'Data collection time' }),
+    postId: z.string().describe('Post ID'),
+    platform: z.enum(SOCIAL_PLATFORMS).describe('Social platform'),
+    impressions: z.number().describe('Number of impressions'),
+    engagements: z.number().describe('Total engagements'),
+    likes: z.number().describe('Number of likes'),
+    comments: z.number().describe('Number of comments'),
+    shares: z.number().describe('Number of shares'),
+    clicks: z.number().describe('Number of clicks'),
+    engagementRate: z.number().describe('Engagement rate percentage'),
+    collectedAt: z.string().datetime().describe('Data collection time'),
   }).openapi({ description: 'Post analytics data' })
 );
 
 const FollowerDataSchema = registry.register(
   'FollowerData',
   z.object({
-    platform: z.nativeEnum(SocialPlatform).openapi({ description: 'Social platform' }),
-    date: z.string().date().openapi({ description: 'Date of record' }),
-    followerCount: z.number().openapi({ description: 'Total followers' }),
-    change: z.number().openapi({ description: 'Change from previous day' }),
-    changePercent: z.number().openapi({ description: 'Percentage change' }),
+    platform: z.enum(SOCIAL_PLATFORMS).describe('Social platform'),
+    date: z.string().date().describe('Date of record'),
+    followerCount: z.number().describe('Total followers'),
+    change: z.number().describe('Change from previous day'),
+    changePercent: z.number().describe('Percentage change'),
   }).openapi({ description: 'Follower growth data' })
 );
 
@@ -103,15 +114,15 @@ const FollowerDataSchema = registry.register(
 const MediaSchema = registry.register(
   'Media',
   z.object({
-    _id: z.string().openapi({ description: 'Media ID' }),
-    workspaceId: z.string().openapi({ description: 'Workspace ID' }),
-    filename: z.string().openapi({ description: 'Original filename' }),
-    mimeType: z.string().openapi({ description: 'MIME type' }),
-    size: z.number().openapi({ description: 'File size in bytes' }),
-    url: z.string().url().openapi({ description: 'Public URL' }),
-    thumbnails: z.record(z.string()).optional().openapi({ description: 'Thumbnail URLs by size' }),
-    uploadedBy: z.string().openapi({ description: 'Uploader ID' }),
-    createdAt: z.string().datetime().openapi({ description: 'Upload time' }),
+    _id: z.string().describe('Media ID'),
+    workspaceId: z.string().describe('Workspace ID'),
+    filename: z.string().describe('Original filename'),
+    mimeType: z.string().describe('MIME type'),
+    size: z.number().describe('File size in bytes'),
+    url: z.string().url().describe('Public URL'),
+    thumbnails: z.record(z.string()).optional().describe('Thumbnail URLs by size'),
+    uploadedBy: z.string().describe('Uploader ID'),
+    createdAt: z.string().datetime().describe('Upload time'),
   }).openapi({ description: 'Media file' })
 );
 
@@ -119,15 +130,15 @@ const MediaSchema = registry.register(
 const WebhookSchema = registry.register(
   'Webhook',
   z.object({
-    _id: z.string().openapi({ description: 'Webhook ID' }),
-    workspaceId: z.string().openapi({ description: 'Workspace ID' }),
-    url: z.string().url().openapi({ description: 'Webhook endpoint URL' }),
-    events: z.array(z.string()).openapi({ description: 'Subscribed event types' }),
-    enabled: z.boolean().openapi({ description: 'Whether webhook is enabled' }),
-    successCount: z.number().openapi({ description: 'Successful deliveries' }),
-    failureCount: z.number().openapi({ description: 'Failed deliveries' }),
-    lastTriggeredAt: z.string().datetime().nullable().openapi({ description: 'Last trigger time' }),
-    createdAt: z.string().datetime().openapi({ description: 'Creation time' }),
+    _id: z.string().describe('Webhook ID'),
+    workspaceId: z.string().describe('Workspace ID'),
+    url: z.string().url().describe('Webhook endpoint URL'),
+    events: z.array(z.string()).describe('Subscribed event types'),
+    enabled: z.boolean().describe('Whether webhook is enabled'),
+    successCount: z.number().describe('Successful deliveries'),
+    failureCount: z.number().describe('Failed deliveries'),
+    lastTriggeredAt: z.string().datetime().nullable().describe('Last trigger time'),
+    createdAt: z.string().datetime().describe('Creation time'),
   }).openapi({ description: 'Webhook endpoint' })
 );
 
@@ -141,8 +152,8 @@ registry.registerPath({
   security: [{ ApiKeyAuth: [] }],
   request: {
     query: z.object({
-      status: z.nativeEnum(PostStatus).optional(),
-      platform: z.nativeEnum(SocialPlatform).optional(),
+      status: z.enum(POST_STATUSES).optional(),
+      platform: z.enum(SOCIAL_PLATFORMS).optional(),
       socialAccountId: z.string().optional(),
       limit: z.coerce.number().min(1).max(100).default(20),
       cursor: z.string().optional(),
@@ -209,7 +220,7 @@ registry.registerPath({
     query: z.object({
       from: z.string().datetime().optional(),
       to: z.string().datetime().optional(),
-      platform: z.nativeEnum(SocialPlatform).optional(),
+      platform: z.enum(SOCIAL_PLATFORMS).optional(),
       limit: z.coerce.number().min(1).max(100).default(20),
     }),
   },
@@ -248,8 +259,8 @@ registry.registerPath({
       content: {
         'multipart/form-data': {
           schema: z.object({
-            file: z.string().openapi({ type: 'string', format: 'binary' }),
-            folderId: z.string().optional(),
+            file: z.string().describe('Binary file data'),
+            folderId: z.string().optional().describe('Optional folder ID'),
           }),
         },
       },

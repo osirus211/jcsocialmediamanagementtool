@@ -529,7 +529,7 @@ export class AuthService {
       const { emailSequenceService } = await import('./EmailSequenceService');
 
       // Start the welcome email sequence
-      await emailSequenceService.startSequence(user._id.toString());
+      await emailSequenceService.instance.startSequence(user._id.toString());
       
       logger.info('Welcome email sequence started', {
         userId: user._id.toString(),

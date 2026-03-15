@@ -431,4 +431,18 @@ export class EmailSequenceService {
   }
 }
 
-export const emailSequenceService = new EmailSequenceService();
+let emailSequenceServiceInstance: EmailSequenceService | null = null;
+
+export const getEmailSequenceService = (): EmailSequenceService => {
+  if (!emailSequenceServiceInstance) {
+    emailSequenceServiceInstance = new EmailSequenceService();
+  }
+  return emailSequenceServiceInstance;
+};
+
+// For backward compatibility
+export const emailSequenceService = {
+  get instance() {
+    return getEmailSequenceService();
+  }
+};

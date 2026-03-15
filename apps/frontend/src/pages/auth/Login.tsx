@@ -18,8 +18,11 @@ export const LoginPage = () => {
     handleSubmit,
     formState: { errors },
     setFocus,
+    trigger,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: 'onChange', // Validate on change
+    reValidateMode: 'onChange',
   });
 
   const onSubmit = async (data: LoginFormData) => {

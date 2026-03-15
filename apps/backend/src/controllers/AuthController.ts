@@ -58,6 +58,7 @@ export class AuthController {
         console.log('🔐 2FA challenge required for:', email);
         res.status(200).json({
           requiresTwoFactor: true,
+          tempToken: result.tempToken,
           userId: result.userId,
           message: result.message,
         });
