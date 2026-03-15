@@ -11,20 +11,28 @@ import { config } from '../config';
 // Configure double CSRF protection
 const doubleCsrfOptions = {
   getSecret: () => config.jwt.secret, // Use JWT secret as CSRF secret
-  cookieName: '__Host-csrf',
+  cookieName: 'csrf-token',
   cookieOptions: {
     httpOnly: true,
-    sameSite: 'strict' as const,
-    secure: config.env === 'production',
+    sameSite: config.env === 'production' ? 'strict' : 'lax' as const,
+    secure: config.env === 'production', // Only secure in production
     path: '/',
   },
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'] as const,
+  getTokenFromRequest: (req: any) => {
+    // Check multiple possible header names
+    return req.headers['x-csrf-token'] || 
+           req.headers['csrf-token'] || 
+           req.body._csrf;
+  },
+  getSessionIdentifier: (req: any) => {
+    // Use session ID or user ID if available, otherwise use a default
+    return req.sessionID || req.user?.id || 'anonymous';
+  },
 };
 
-const doubleCsrfInstance = doubleCsrf(doubleCsrfOptions as any);
-const generateToken = (doubleCsrfInstance as any).generateToken;
-const doubleCsrfProtection = doubleCsrfInstance.doubleCsrfProtection;
+const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf(doubleCsrfOptions);
 
 /**
  * CSRF protection middleware
@@ -38,7 +46,7 @@ export const csrfProtection = doubleCsrfProtection;
  */
 export const getCsrfToken = (req: Request, res: Response, next: NextFunction): void => {
   try {
-    const token = generateToken(req, res);
+    const token = generateCsrfToken(req, res);
     res.json({ csrfToken: token });
   } catch (error) {
     next(error);

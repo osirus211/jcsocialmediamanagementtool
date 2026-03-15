@@ -14,6 +14,15 @@ import {
   MembersResponse,
 } from '@/types/workspace.types';
 
+// Global request tracking for deduplication
+const activeRequests = new Map<string, Promise<any>>();
+
+interface RequestTracker {
+  promise: Promise<any>;
+  abortController: AbortController;
+  timestamp: number;
+}
+
 interface WorkspaceState {
   // State
   workspaces: Workspace[];
@@ -43,7 +52,7 @@ interface WorkspaceActions {
   setPendingInvitesLoaded: (loaded: boolean) => void;
 
   // Async actions
-  fetchWorkspaces: () => Promise<void>;
+  fetchWorkspaces: (signal?: AbortSignal) => Promise<void>;
   fetchWorkspaceById: (workspaceId: string) => Promise<Workspace>;
   createWorkspace: (input: CreateWorkspaceInput) => Promise<Workspace>;
   updateWorkspace: (workspaceId: string, input: UpdateWorkspaceInput) => Promise<Workspace>;
@@ -68,7 +77,7 @@ interface WorkspaceActions {
 
   // Utility actions
   clearWorkspaceData: () => void;
-  restoreWorkspace: () => Promise<void>;
+  restoreWorkspace: (signal?: AbortSignal) => Promise<void>;
 }
 
 interface WorkspaceStore extends WorkspaceState, WorkspaceActions {}
@@ -134,33 +143,62 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       /**
        * Fetch all workspaces for current user
+       * Implements request deduplication to prevent concurrent calls
        */
-      fetchWorkspaces: async () => {
-        try {
-          set({ isLoading: true });
-
-          const response = await apiClient.get<WorkspacesResponse>('/workspaces');
-
-          set({
-            workspaces: response.workspaces,
-            workspacesLoaded: true,
-            isLoading: false,
-          });
-
-          // If no current workspace, set first one
-          const { currentWorkspaceId, currentWorkspace } = get();
-          if (!currentWorkspace && response.workspaces.length > 0) {
-            const firstWorkspace = response.workspaces[0];
-            set({
-              currentWorkspace: firstWorkspace,
-              currentWorkspaceId: firstWorkspace._id,
-            });
-          }
-        } catch (error: any) {
-          console.error('Fetch workspaces error:', error);
-          set({ isLoading: false, workspacesLoaded: true });
-          throw error;
+      fetchWorkspaces: async (signal?: AbortSignal) => {
+        const requestKey = 'fetchWorkspaces';
+        
+        // Check if there's already a request in progress
+        if (activeRequests.has(requestKey)) {
+          console.log('fetchWorkspaces: Request already in progress, returning existing promise');
+          return activeRequests.get(requestKey);
         }
+
+        const requestPromise = (async () => {
+          try {
+            set({ isLoading: true });
+
+            const response = await apiClient.get<WorkspacesResponse>('/workspaces', {
+              signal,
+            });
+
+            // Check if request was cancelled
+            if (signal?.aborted) {
+              throw new Error('Request was cancelled');
+            }
+
+            set({
+              workspaces: response.workspaces,
+              workspacesLoaded: true,
+              isLoading: false,
+            });
+
+            // If no current workspace, set first one
+            const { currentWorkspaceId, currentWorkspace } = get();
+            if (!currentWorkspace && response.workspaces.length > 0) {
+              const firstWorkspace = response.workspaces[0];
+              set({
+                currentWorkspace: firstWorkspace,
+                currentWorkspaceId: firstWorkspace._id,
+              });
+            }
+          } catch (error: any) {
+            // Don't log cancelled requests as errors
+            if (error.name !== 'AbortError' && error.name !== 'CanceledError' && !signal?.aborted && error.message !== 'canceled') {
+              console.error('Fetch workspaces error:', error);
+            }
+            set({ isLoading: false, workspacesLoaded: true });
+            throw error;
+          } finally {
+            // Clear the request from tracking
+            activeRequests.delete(requestKey);
+          }
+        })();
+
+        // Track the request
+        activeRequests.set(requestKey, requestPromise);
+        
+        return requestPromise;
       },
 
       /**
@@ -645,38 +683,84 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       /**
        * Restore workspace on app load
        * Validates membership and falls back safely
+       * Implements exponential backoff for retries
        */
-      restoreWorkspace: async () => {
-        try {
-          // Fetch workspaces first
-          await get().fetchWorkspaces();
-
-          const { currentWorkspaceId, workspaces } = get();
-
-          // If we have a stored workspace ID, validate it
-          if (currentWorkspaceId) {
-            const workspace = workspaces.find((w) => w._id === currentWorkspaceId);
-            
-            if (workspace) {
-              // Valid workspace, set as current
-              set({ currentWorkspace: workspace });
-            } else {
-              // Stored workspace not found, fallback to first
-              const firstWorkspace = workspaces[0] || null;
-              set({
-                currentWorkspace: firstWorkspace,
-                currentWorkspaceId: firstWorkspace?._id || null,
-              });
+      restoreWorkspace: async (signal?: AbortSignal) => {
+        let attempts = 0;
+        const MAX_ATTEMPTS = 3;
+        const BASE_DELAY = 1000; // 1 second
+        
+        const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        const attemptRestore = async (): Promise<void> => {
+          try {
+            // Check if request was cancelled
+            if (signal?.aborted) {
+              throw new Error('Request was cancelled');
             }
+
+            // Fetch workspaces first
+            await get().fetchWorkspaces(signal);
+
+            const { currentWorkspaceId, workspaces } = get();
+
+            // If we have a stored workspace ID, validate it
+            if (currentWorkspaceId) {
+              const workspace = workspaces.find((w) => w._id === currentWorkspaceId);
+              
+              if (workspace) {
+                // Valid workspace, set as current
+                set({ currentWorkspace: workspace });
+              } else {
+                // Stored workspace not found, fallback to first
+                const firstWorkspace = workspaces[0] || null;
+                set({
+                  currentWorkspace: firstWorkspace,
+                  currentWorkspaceId: firstWorkspace?._id || null,
+                });
+              }
+            }
+          } catch (error: any) {
+            // Don't retry if request was cancelled
+            if (error.name === 'AbortError' || error.name === 'CanceledError' || signal?.aborted || error.message === 'canceled') {
+              throw error;
+            }
+
+            console.error(`Restore workspace error (attempt ${attempts + 1}):`, error);
+            
+            // Only retry on network/timeout errors, not on 4xx responses
+            const isRetryableError = !error.response || error.response.status >= 500;
+            
+            if (attempts < MAX_ATTEMPTS && isRetryableError) {
+              attempts++;
+              
+              // Exponential backoff: 1s, 2s, 4s
+              const delay = BASE_DELAY * Math.pow(2, attempts - 1);
+              console.log(`Retrying workspace restoration in ${delay}ms (attempt ${attempts}/${MAX_ATTEMPTS})`);
+              
+              await sleep(delay);
+              
+              // Check if cancelled during delay
+              if (signal?.aborted) {
+                throw new Error('Request was cancelled');
+              }
+              
+              return attemptRestore();
+            }
+            
+            // All retries exhausted - clear invalid data and stop retrying
+            console.error('All workspace restoration attempts failed. Clearing workspace data.');
+            set({
+              currentWorkspace: null,
+              currentWorkspaceId: null,
+              workspacesLoaded: true, // Mark as loaded to prevent further attempts
+            });
+            
+            throw error;
           }
-        } catch (error) {
-          console.error('Restore workspace error:', error);
-          // Clear invalid data
-          set({
-            currentWorkspace: null,
-            currentWorkspaceId: null,
-          });
-        }
+        };
+        
+        return attemptRestore();
       },
     }),
     {

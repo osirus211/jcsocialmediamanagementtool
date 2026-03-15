@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { useWorkspaceReady } from '@/hooks/useWorkspaceReady';
 import { queueService, QueuePauseStatus } from '@/services/queue.service';
 import { Play, Clock } from 'lucide-react';
 
@@ -16,8 +17,16 @@ interface QueueAutoResumeNotificationProps {
 
 export function QueueAutoResumeNotification({ onStatusChange }: QueueAutoResumeNotificationProps) {
   const [lastStatus, setLastStatus] = useState<QueuePauseStatus | null>(null);
+  
+  // Check if workspace is ready for API calls
+  const { isWorkspaceReady } = useWorkspaceReady();
 
   useEffect(() => {
+    // Only run when workspace is ready
+    if (!isWorkspaceReady) {
+      return;
+    }
+
     let interval: NodeJS.Timeout;
 
     const checkAutoResume = async () => {
@@ -71,7 +80,7 @@ export function QueueAutoResumeNotification({ onStatusChange }: QueueAutoResumeN
         clearInterval(interval);
       }
     };
-  }, [lastStatus, onStatusChange]);
+  }, [isWorkspaceReady, lastStatus, onStatusChange]); // Re-run when workspace becomes ready
 
   // This component doesn't render anything visible
   return null;

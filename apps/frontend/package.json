@@ -10,7 +10,15 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:auth": "playwright test e2e/auth",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:performance": "playwright test e2e/auth/performance-validation.spec.ts --project=webkit",
+    "test:performance:benchmark": "playwright test e2e/performance-benchmark.spec.ts --project=webkit",
+    "test:performance:all": "node scripts/run-performance-tests.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -53,6 +61,7 @@
   },
   "devDependencies": {
     "@fast-check/vitest": "^0.2.4",
+    "@playwright/test": "^1.58.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

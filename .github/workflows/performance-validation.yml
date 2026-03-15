@@ -1,0 +1,79 @@
+name: Performance Validation
+
+on:
+  schedule:
+    # Run performance tests twice daily
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+    inputs:
+      load_level:
+        description: 'Load test level'
+        required: true
+        default: 'standard'
+        type: choice
+        options: ['light', 'standard', 'heavy', 'stress']
+      duration:
+        description: 'Test duration (minutes)'
+        required: true
+        default: '5'
+        type: string
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  performance-tests:
+    name: Authentication Performance Tests
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7.2
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          cd apps/backend && npm ci
+          cd apps/frontend && npm ci
+
+      - name: Install Playwright
+        run: |
+          cd apps/frontend
+          npx playwright install --with-deps
+
+      - name: Start services
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: performance-test-jwt-secret-minimum-32-chars
+        run: |
+          cd apps/backend
+          npm run build && npm start &
+          cd apps/frontend
+          npm run build && npm run preview &
+          sleep 15
+
+      - name: Run performance validation
+        run: |
+          cd apps/frontend
+          npx playwright test e2e/auth/performance-validation-simple.spec.ts
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: apps/frontend/e2e/reports/

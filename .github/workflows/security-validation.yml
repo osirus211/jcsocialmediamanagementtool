@@ -1,0 +1,93 @@
+name: Security Validation
+
+on:
+  schedule:
+    # Run security tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      security_level:
+        description: 'Security test level'
+        required: true
+        default: 'comprehensive'
+        type: choice
+        options: ['basic', 'comprehensive', 'penetration']
+      target_environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options: ['staging', 'production']
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run npm audit
+        run: |
+          cd apps/backend && npm audit --audit-level=moderate
+          cd apps/frontend && npm audit --audit-level=moderate
+
+  authentication-security:
+    name: Authentication Security Tests
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7.2
+        ports:
+          - 6379:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          cd apps/backend && npm ci
+          cd apps/frontend && npm ci
+
+      - name: Run security test runner
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: security-test-jwt-secret-minimum-32-chars
+        run: |
+          cd apps/frontend/e2e
+          node security-test-runner.ts
+
+      - name: Upload security results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-test-results
+          path: apps/frontend/e2e/reports/

@@ -20,7 +20,8 @@
     "k6:smoke": "k6 run k6/scenarios/smoke-test.js",
     "k6:load": "k6 run k6/scenarios/load-test.js",
     "k6:stress": "k6 run k6/scenarios/stress-test.js",
-    "k6:spike": "k6 run k6/scenarios/spike-test.js"
+    "k6:spike": "k6 run k6/scenarios/spike-test.js",
+    "verify:infrastructure": "tsx src/scripts/server-infrastructure-verification.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.4.3",

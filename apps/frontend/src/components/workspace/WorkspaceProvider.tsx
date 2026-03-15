@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useNavigate } from 'react-router-dom';
@@ -31,11 +31,16 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
     workspaces,
     currentWorkspace,
     workspacesLoaded,
-    restoreWorkspace,
   } = useWorkspaceStore();
 
   const [isRestoring, setIsRestoring] = useState(true);
   const [restorationAttempted, setRestorationAttempted] = useState(false);
+  
+  // AbortController for request cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track if initialization is in progress to prevent duplicates
+  const initializationInProgressRef = useRef(false);
 
   useEffect(() => {
     const initializeWorkspace = async () => {
@@ -51,17 +56,27 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
         return;
       }
 
-      // Prevent duplicate restoration
-      if (restorationAttempted) {
+      // Prevent duplicate restoration - critical for StrictMode
+      if (restorationAttempted || initializationInProgressRef.current) {
         return;
       }
+
+      // Mark initialization as in progress
+      initializationInProgressRef.current = true;
 
       try {
         setIsRestoring(true);
         setRestorationAttempted(true);
 
-        // Restore workspace (fetches workspaces and validates stored ID)
-        await restoreWorkspace();
+        // Create AbortController for this initialization attempt only
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+
+        // Get the restoreWorkspace function from the store and call it
+        const { restoreWorkspace } = useWorkspaceStore.getState();
+        await restoreWorkspace(abortControllerRef.current.signal);
 
         // Check if user has any workspaces
         const { workspaces: updatedWorkspaces, currentWorkspace: current } =
@@ -73,16 +88,52 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
         } else if (!current) {
           // Has workspaces but none selected, should not happen but handle it
           console.warn('Workspaces exist but none selected');
+          // Set first workspace as current
+          const firstWorkspace = updatedWorkspaces[0];
+          useWorkspaceStore.getState().setCurrentWorkspace(firstWorkspace);
         }
       } catch (error) {
+        // Check if the error is due to cancellation
+        if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Request was cancelled' || error.message === 'canceled')) {
+          console.log('Workspace restoration was cancelled');
+          return;
+        }
+        
         console.error('Workspace restoration error:', error);
+        
+        // Check if we have workspaces loaded despite the error
+        const { workspaces: fallbackWorkspaces, workspacesLoaded: loaded } = 
+          useWorkspaceStore.getState();
+          
+        if (loaded && fallbackWorkspaces.length === 0) {
+          // No workspaces available, redirect to create
+          navigate('/workspaces/create');
+        } else if (loaded && fallbackWorkspaces.length > 0) {
+          // We have workspaces but restoration failed, use first one
+          const firstWorkspace = fallbackWorkspaces[0];
+          useWorkspaceStore.getState().setCurrentWorkspace(firstWorkspace);
+        } else {
+          // Complete failure, redirect to error or create page
+          console.error('Complete workspace restoration failure');
+          navigate('/workspaces/create');
+        }
       } finally {
         setIsRestoring(false);
+        initializationInProgressRef.current = false;
       }
     };
 
     initializeWorkspace();
-  }, [authChecked, isAuthenticated, restorationAttempted, navigate, restoreWorkspace]);
+
+    // Cleanup function to cancel in-flight requests
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      initializationInProgressRef.current = false;
+    };
+  }, [authChecked, isAuthenticated, navigate]); // Removed unstable dependencies
 
   // Show loading gate while restoring
   // Prevents UI flicker and ensures workspace is ready before rendering

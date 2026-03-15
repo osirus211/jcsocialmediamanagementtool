@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png', 'icons/*.svg'],
+      includeAssets: ['icons/*.svg', 'vite.svg'],
       manifest: false, // we have our own manifest.webmanifest
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
@@ -35,6 +35,9 @@ export default defineConfig({
         ],
         skipWaiting: true,
         clientsClaim: true
+      },
+      devOptions: {
+        enabled: false // Disable PWA in development to avoid issues
       }
     }),
     process.env.ANALYZE && visualizer({ open: true, gzipSize: true })

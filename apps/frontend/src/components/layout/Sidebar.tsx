@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher';
+import { useWorkspaceReady } from '@/hooks/useWorkspaceReady';
 import { approvalsService } from '@/services/approvals.service';
 import { draftsService } from '@/services/drafts.service';
 import { queueService, QueuePauseStatus } from '@/services/queue.service';
@@ -8,6 +9,9 @@ export const Sidebar = () => {
   const [approvalCount, setApprovalCount] = useState(0);
   const [draftCount, setDraftCount] = useState(0);
   const [queueStatus, setQueueStatus] = useState<QueuePauseStatus | null>(null);
+  
+  // Check if workspace is ready for API calls
+  const { isWorkspaceReady } = useWorkspaceReady();
 
   const fetchApprovalCount = async () => {
     try {
@@ -37,6 +41,11 @@ export const Sidebar = () => {
   };
 
   useEffect(() => {
+    // Only run API calls when workspace is ready
+    if (!isWorkspaceReady) {
+      return;
+    }
+
     fetchApprovalCount();
     fetchDraftCount();
     fetchQueueStatus();
@@ -47,8 +56,9 @@ export const Sidebar = () => {
       fetchDraftCount();
       fetchQueueStatus();
     }, 60000);
+    
     return () => clearInterval(interval);
-  }, []);
+  }, [isWorkspaceReady]); // Re-run when workspace becomes ready
   return (
     <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
       <div className="h-full flex flex-col">

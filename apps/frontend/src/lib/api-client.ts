@@ -7,8 +7,40 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
 
+// CSRF token cache
+let csrfToken: string | null = null;
+let csrfTokenPromise: Promise<string> | null = null;
+
 // Upgrade modal state
 let upgradeModalCallback: ((limitType: string, message: string) => void) | null = null;
+
+/**
+ * Get CSRF token from server
+ */
+async function getCsrfToken(): Promise<string> {
+  if (csrfToken) {
+    return csrfToken;
+  }
+
+  if (csrfTokenPromise) {
+    return csrfTokenPromise;
+  }
+
+  csrfTokenPromise = axios.get(`${API_URL}/auth/csrf-token`, {
+    withCredentials: true,
+    timeout: 5000, // Add timeout to prevent hanging requests
+  }).then(response => {
+    csrfToken = response.data.csrfToken;
+    csrfTokenPromise = null;
+    return csrfToken!;
+  }).catch(error => {
+    csrfTokenPromise = null;
+    logger.error('Failed to fetch CSRF token:', error);
+    throw error;
+  });
+
+  return csrfTokenPromise;
+}
 
 /**
  * Register callback to show upgrade modal
@@ -54,9 +86,9 @@ class ApiClient {
    * Setup request and response interceptors
    */
   private setupInterceptors() {
-    // Request interceptor: Add access token and workspace ID to headers
+    // Request interceptor: Add access token, workspace ID, and CSRF token to headers
     this.client.interceptors.request.use(
-      (config) => {
+      async (config) => {
         // Get access token from window reference (set by auth store)
         const token = getAccessTokenForInterceptor();
         logger.debug('Interceptor reading token', { hasToken: !!token });
@@ -79,6 +111,34 @@ class ApiClient {
         if (workspaceId && !skipWorkspaceHeader && config.headers) {
           config.headers['x-workspace-id'] = workspaceId;
         }
+
+        // Add CSRF token for state-changing requests (except excluded endpoints)
+        // TEMPORARILY DISABLED TO DEBUG RESOURCE EXHAUSTION
+        /*
+        if (config.method && ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
+          // Skip CSRF token for excluded endpoints
+          const excludedFromCsrf = [
+            '/auth/refresh',
+            '/webhooks',
+            '/oauth/callback'
+          ];
+          
+          const needsCsrf = !excludedFromCsrf.some(path => config.url?.includes(path));
+          
+          if (needsCsrf) {
+            try {
+              const token = await getCsrfToken();
+              if (config.headers) {
+                config.headers['x-csrf-token'] = token;
+              }
+            } catch (error) {
+              logger.warn('Failed to get CSRF token, continuing without it:', error);
+              // Continue without CSRF token - let server handle the error
+              // Don't throw here to prevent request loops
+            }
+          }
+        }
+        */
         
         return config;
       },
@@ -103,6 +163,13 @@ class ApiClient {
           }
           
           return Promise.reject(error);
+        }
+
+        // Handle 403 CSRF token errors - clear cached token
+        if (error.response?.status === 403 && 
+            error.response?.data?.message?.includes('CSRF')) {
+          csrfToken = null;
+          csrfTokenPromise = null;
         }
 
         // If error is 401 and we haven't retried yet
@@ -149,6 +216,8 @@ class ApiClient {
             return this.client(originalRequest);
           } catch (refreshError) {
             // Refresh failed, logout user
+            csrfToken = null; // Clear CSRF token on auth failure
+            csrfTokenPromise = null;
             this.handleAuthFailure();
             return Promise.reject(refreshError);
           } finally {
@@ -183,6 +252,10 @@ class ApiClient {
    * Clear auth state and redirect to login
    */
   private handleAuthFailure() {
+    // Clear CSRF token
+    csrfToken = null;
+    csrfTokenPromise = null;
+    
     import('@/store/auth.store').then(({ useAuthStore }) => {
       useAuthStore.getState().clearAuth();
     });
