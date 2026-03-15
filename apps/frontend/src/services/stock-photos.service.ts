@@ -8,7 +8,7 @@ import { apiClient } from '@/lib/api-client';
 
 export interface StockPhoto {
   id: string;
-  source: 'unsplash' | 'pexels';
+  source: 'unsplash' | 'pexels' | 'pixabay';
   url: {
     thumb: string;
     small: string;
@@ -19,6 +19,10 @@ export interface StockPhoto {
   photographerUrl: string;
   alt: string;
   downloadLocation?: string; // Unsplash only
+  tags?: string; // Pixabay tags
+  views?: number;
+  downloads?: number;
+  likes?: number;
 }
 
 export interface StockPhotoSearchResult {
@@ -27,15 +31,22 @@ export interface StockPhotoSearchResult {
   totalPages: number;
 }
 
+export interface StockPhotoFilters {
+  orientation?: 'all' | 'horizontal' | 'vertical';
+  category?: string;
+  colors?: string;
+}
+
 export const stockPhotosService = {
   /**
    * Search stock photos
    */
   async search(
     query: string,
-    source: 'unsplash' | 'pexels' | 'both' = 'both',
+    source: 'unsplash' | 'pexels' | 'pixabay' | 'all' = 'all',
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    filters?: StockPhotoFilters
   ): Promise<StockPhotoSearchResult> {
     const params = new URLSearchParams({
       q: query,
@@ -43,6 +54,18 @@ export const stockPhotosService = {
       page: page.toString(),
       perPage: perPage.toString(),
     });
+
+    if (filters?.orientation && filters.orientation !== 'all') {
+      params.append('orientation', filters.orientation);
+    }
+
+    if (filters?.category) {
+      params.append('category', filters.category);
+    }
+
+    if (filters?.colors) {
+      params.append('colors', filters.colors);
+    }
 
     const response = await apiClient.get(`/stock-photos/search?${params.toString()}`);
     return response.data;

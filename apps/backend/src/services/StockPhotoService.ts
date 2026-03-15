@@ -10,7 +10,7 @@ import { logger } from '../utils/logger';
 
 export interface StockPhoto {
   id: string;
-  source: 'unsplash' | 'pexels';
+  source: 'unsplash' | 'pexels' | 'pixabay';
   url: {
     thumb: string;
     small: string;
@@ -21,6 +21,10 @@ export interface StockPhoto {
   photographerUrl: string;
   alt: string;
   downloadLocation?: string; // Unsplash only
+  tags?: string; // Pixabay tags
+  views?: number;
+  downloads?: number;
+  likes?: number;
 }
 
 export interface StockPhotoSearchResult {
@@ -32,6 +36,7 @@ export interface StockPhotoSearchResult {
 export class StockPhotoService {
   private static readonly UNSPLASH_BASE_URL = 'https://api.unsplash.com';
   private static readonly PEXELS_BASE_URL = 'https://api.pexels.com/v1';
+  private static readonly PIXABAY_BASE_URL = 'https://pixabay.com/api';
 
   /**
    * Search Unsplash photos
@@ -245,7 +250,132 @@ export class StockPhotoService {
   }
 
   /**
+   * Search Pixabay photos
+   */
+  static async searchPixabay(
+    query: string,
+    page: number = 1,
+    perPage: number = 20,
+    filters?: {
+      orientation?: 'all' | 'horizontal' | 'vertical';
+      category?: string;
+      colors?: string;
+    }
+  ): Promise<StockPhotoSearchResult> {
+    try {
+      if (!config.stockPhotos.pixabayApiKey) {
+        throw new Error('Pixabay API key not configured');
+      }
+
+      const params: any = {
+        key: config.stockPhotos.pixabayApiKey,
+        q: query,
+        page,
+        per_page: perPage,
+        image_type: 'photo',
+        safesearch: 'true',
+      };
+
+      if (filters?.orientation && filters.orientation !== 'all') {
+        params.orientation = filters.orientation;
+      }
+
+      if (filters?.category) {
+        params.category = filters.category;
+      }
+
+      if (filters?.colors) {
+        params.colors = filters.colors;
+      }
+
+      const response = await axios.get(this.PIXABAY_BASE_URL, { params });
+
+      const photos = response.data.hits.map((photo: any) => ({
+        id: photo.id.toString(),
+        source: 'pixabay' as const,
+        url: {
+          thumb: photo.previewURL,
+          small: photo.webformatURL.replace('_640', '_340'),
+          regular: photo.webformatURL,
+          full: photo.largeImageURL || photo.webformatURL,
+        },
+        photographer: photo.user,
+        photographerUrl: `https://pixabay.com/users/${photo.user}-${photo.user_id}/`,
+        alt: photo.tags || '',
+        tags: photo.tags,
+        views: photo.views,
+        downloads: photo.downloads,
+        likes: photo.likes,
+      }));
+
+      return {
+        photos,
+        total: response.data.total,
+        totalPages: Math.ceil(response.data.total / perPage),
+      };
+    } catch (error: any) {
+      logger.error('Failed to search Pixabay photos', {
+        error: error.message,
+        query,
+        page,
+        perPage,
+      });
+      throw new Error('Failed to search Pixabay photos');
+    }
+  }
+
+  /**
+   * Get single Pixabay photo
+   */
+  static async getPixabayPhoto(id: string): Promise<StockPhoto> {
+    try {
+      if (!config.stockPhotos.pixabayApiKey) {
+        throw new Error('Pixabay API key not configured');
+      }
+
+      const response = await axios.get(this.PIXABAY_BASE_URL, {
+        params: {
+          key: config.stockPhotos.pixabayApiKey,
+          id,
+        },
+      });
+
+      const photo = response.data.hits[0];
+      if (!photo) {
+        throw new Error('Photo not found');
+      }
+
+      return {
+        id: photo.id.toString(),
+        source: 'pixabay',
+        url: {
+          thumb: photo.previewURL,
+          small: photo.webformatURL.replace('_640', '_340'),
+          regular: photo.webformatURL,
+          full: photo.largeImageURL || photo.webformatURL,
+        },
+        photographer: photo.user,
+        photographerUrl: `https://pixabay.com/users/${photo.user}-${photo.user_id}/`,
+        alt: photo.tags || '',
+        tags: photo.tags,
+        views: photo.views,
+        downloads: photo.downloads,
+        likes: photo.likes,
+      };
+    } catch (error: any) {
+      logger.error('Failed to get Pixabay photo', {
+        error: error.message,
+        photoId: id,
+      });
+      throw new Error('Failed to get Pixabay photo');
+    }
+  }
+
+  /**
    * Get curated photos from both sources
+   */
+  /**
+   * Get curated photos from all sources
    */
   static async getCuratedPhotos(
     page: number = 1,
@@ -263,7 +393,7 @@ export class StockPhotoService {
             },
             params: {
               page,
-              per_page: Math.ceil(perPage / 2),
+              per_page: Math.ceil(perPage / 3),
             },
           }).then(response => ({
             source: 'unsplash',
@@ -294,7 +424,7 @@ export class StockPhotoService {
             },
             params: {
               page,
-              per_page: Math.ceil(perPage / 2),
+              per_page: Math.ceil(perPage / 3),
             },
           }).then(response => ({
             source: 'pexels',
@@ -310,6 +440,42 @@ export class StockPhotoService {
               photographer: photo.photographer,
               photographerUrl: photo.photographer_url,
               alt: photo.alt || '',
+            })),
+          }))
+        );
+      }
+
+      // Get popular from Pixabay (no curated endpoint, use popular)
+      if (config.stockPhotos.pixabayApiKey) {
+        promises.push(
+          axios.get(this.PIXABAY_BASE_URL, {
+            params: {
+              key: config.stockPhotos.pixabayApiKey,
+              page,
+              per_page: Math.ceil(perPage / 3),
+              order: 'popular',
+              editors_choice: 'true',
+              image_type: 'photo',
+              safesearch: 'true',
+            },
+          }).then(response => ({
+            source: 'pixabay',
+            photos: response.data.hits.map((photo: any) => ({
+              id: photo.id.toString(),
+              source: 'pixabay' as const,
+              url: {
+                thumb: photo.previewURL,
+                small: photo.webformatURL.replace('_640', '_340'),
+                regular: photo.webformatURL,
+                full: photo.largeImageURL || photo.webformatURL,
+              },
+              photographer: photo.user,
+              photographerUrl: `https://pixabay.com/users/${photo.user}-${photo.user_id}/`,
+              alt: photo.tags || '',
+              tags: photo.tags,
+              views: photo.views,
+              downloads: photo.downloads,
+              likes: photo.likes,
             })),
           }))
         );

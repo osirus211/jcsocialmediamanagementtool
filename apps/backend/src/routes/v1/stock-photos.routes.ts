@@ -20,21 +20,41 @@ router.use(requireWorkspace);
 
 /**
  * GET /stock-photos/search
- * Search stock photos from Unsplash and/or Pexels
+ * Search stock photos from Unsplash, Pexels, and/or Pixabay
  */
 router.get('/search', [
   query('q').notEmpty().withMessage('Search query is required'),
-  query('source').optional().isIn(['unsplash', 'pexels', 'both']).withMessage('Source must be unsplash, pexels, or both'),
+  query('source').optional().isIn(['unsplash', 'pexels', 'pixabay', 'all']).withMessage('Source must be unsplash, pexels, pixabay, or all'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('perPage').optional().isInt({ min: 1, max: 50 }).withMessage('Per page must be between 1 and 50'),
+  query('orientation').optional().isIn(['all', 'horizontal', 'vertical']).withMessage('Orientation must be all, horizontal, or vertical'),
+  query('category').optional().isString().withMessage('Category must be a string'),
+  query('colors').optional().isString().withMessage('Colors must be a string'),
   validateRequest,
 ], async (req, res) => {
   try {
-    const { q: query, source = 'both', page = 1, perPage = 20 } = req.query as {
+    const { 
+      q: query, 
+      source = 'all', 
+      page = 1, 
+      perPage = 20,
+      orientation,
+      category,
+      colors
+    } = req.query as {
       q: string;
-      source?: 'unsplash' | 'pexels' | 'both';
+      source?: 'unsplash' | 'pexels' | 'pixabay' | 'all';
       page?: number;
       perPage?: number;
+      orientation?: 'all' | 'horizontal' | 'vertical';
+      category?: string;
+      colors?: string;
+    };
+
+    const filters = {
+      orientation,
+      category,
+      colors,
     };
 
     let result;
@@ -43,28 +63,35 @@ router.get('/search', [
       result = await StockPhotoService.searchUnsplash(query, Number(page), Number(perPage));
     } else if (source === 'pexels') {
       result = await StockPhotoService.searchPexels(query, Number(page), Number(perPage));
+    } else if (source === 'pixabay') {
+      result = await StockPhotoService.searchPixabay(query, Number(page), Number(perPage), filters);
     } else {
-      // Search both sources and combine results
-      const [unsplashResult, pexelsResult] = await Promise.allSettled([
-        StockPhotoService.searchUnsplash(query, Number(page), Math.ceil(Number(perPage) / 2)),
-        StockPhotoService.searchPexels(query, Number(page), Math.ceil(Number(perPage) / 2)),
-      ]);
+      // Search all sources and combine results
+      const promises = [];
+      const perSource = Math.ceil(Number(perPage) / 3);
 
+      promises.push(
+        StockPhotoService.searchUnsplash(query, Number(page), perSource).catch(() => ({ photos: [], total: 0, totalPages: 0 }))
+      );
+      promises.push(
+        StockPhotoService.searchPexels(query, Number(page), perSource).catch(() => ({ photos: [], total: 0, totalPages: 0 }))
+      );
+      promises.push(
+        StockPhotoService.searchPixabay(query, Number(page), perSource, filters).catch(() => ({ photos: [], total: 0, totalPages: 0 }))
+      );
+
+      const results = await Promise.allSettled(promises);
       const allPhotos = [];
       let totalResults = 0;
       let totalPages = 0;
 
-      if (unsplashResult.status === 'fulfilled') {
-        allPhotos.push(...unsplashResult.value.photos);
-        totalResults += unsplashResult.value.total;
-        totalPages = Math.max(totalPages, unsplashResult.value.totalPages);
-      }
-
-      if (pexelsResult.status === 'fulfilled') {
-        allPhotos.push(...pexelsResult.value.photos);
-        totalResults += pexelsResult.value.total;
-        totalPages = Math.max(totalPages, pexelsResult.value.totalPages);
-      }
+      results.forEach(result => {
+        if (result.status === 'fulfilled') {
+          allPhotos.push(...result.value.photos);
+          totalResults += result.value.total;
+          totalPages = Math.max(totalPages, result.value.totalPages);
+        }
+      });
 
       // Shuffle to mix sources
       const shuffledPhotos = allPhotos.sort(() => Math.random() - 0.5);
@@ -177,6 +204,37 @@ router.get('/pexels/:id', [
     });
   } catch (error: any) {
     logger.error('Failed to get Pexels photo', {
+      error: error.message,
+      photoId: req.params.id,
+      workspaceId: req.user?.workspaceId,
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get photo',
+    });
+  }
+});
+
+/**
+ * GET /stock-photos/pixabay/:id
+ * Get single Pixabay photo
+ */
+router.get('/pixabay/:id', [
+  param('id').notEmpty().withMessage('Photo ID is required'),
+  validateRequest,
+], async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const photo = await StockPhotoService.getPixabayPhoto(id);
+
+    res.json({
+      success: true,
+      data: photo,
+    });
+  } catch (error: any) {
+    logger.error('Failed to get Pixabay photo', {
       error: error.message,
       photoId: req.params.id,
       workspaceId: req.user?.workspaceId,

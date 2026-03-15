@@ -108,6 +108,7 @@ const envSchema = z.object({
   // Stock Photo APIs
   UNSPLASH_ACCESS_KEY: z.string().optional(),
   PEXELS_API_KEY: z.string().optional(),
+  PIXABAY_API_KEY: z.string().optional(),
 
   // Stripe
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -459,6 +460,7 @@ export const config = {
   stockPhotos: {
     unsplashAccessKey: env.UNSPLASH_ACCESS_KEY || '',
     pexelsApiKey: env.PEXELS_API_KEY || '',
+    pixabayApiKey: env.PIXABAY_API_KEY || '',
   },
 
   stripe: {
