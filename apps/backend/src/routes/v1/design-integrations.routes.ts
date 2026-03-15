@@ -221,6 +221,70 @@ router.get('/canva/export/:jobId', [
 });
 
 /**
+ * POST /design-integrations/canva/create
+ * Create a new Canva design
+ */
+router.post('/canva/create', [
+  body('platform').optional().isString().withMessage('Platform must be a string'),
+  body('title').optional().isString().withMessage('Title must be a string'),
+  body('designType').optional().isObject().withMessage('Design type must be an object'),
+  validateRequest,
+], async (req, res): Promise<void> => {
+  try {
+    const { workspaceId } = req.workspace!;
+    const { platform, title, designType } = req.body;
+
+    // Get workspace to check connection
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace?.integrations?.canva?.connected || !workspace.integrations.canva.accessToken) {
+      res.status(400).json({
+        success: false,
+        message: 'Canva account not connected',
+      });
+      return;
+    }
+
+    let result;
+    if (platform) {
+      // Create platform-specific design
+      result = await CanvaService.createPlatformDesign(
+        workspace.integrations.canva.accessToken,
+        platform,
+        title
+      );
+    } else if (designType) {
+      // Create custom design
+      result = await CanvaService.createDesign(
+        workspace.integrations.canva.accessToken,
+        designType,
+        title
+      );
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Either platform or designType must be provided',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    logger.error('Failed to create Canva design', {
+      error: error.message,
+      workspaceId: req.workspace?.workspaceId,
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create design',
+    });
+  }
+});
+
+/**
  * DELETE /design-integrations/canva/disconnect
  * Disconnect Canva integration
  */

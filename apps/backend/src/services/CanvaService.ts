@@ -27,6 +27,24 @@ export interface CanvaExportJob {
   url?: string;
 }
 
+export interface CanvaDesignType {
+  type: 'preset' | 'custom';
+  name?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface CanvaCreateDesignResponse {
+  id: string;
+  title: string;
+  urls: {
+    editUrl: string;
+    viewUrl: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class CanvaService {
   private static readonly BASE_URL = 'https://api.canva.com/rest/v1';
   private static readonly OAUTH_URL = 'https://www.canva.com/api/oauth/authorize';
@@ -37,10 +55,10 @@ export class CanvaService {
    */
   static getAuthUrl(workspaceId: string): string {
     const params = new URLSearchParams({
-      client_id: (config as any).integrations?.canva?.clientId || '',
-      redirect_uri: (config as any).integrations?.canva?.redirectUri || '',
+      client_id: config.integrations?.canva?.clientId || '',
+      redirect_uri: config.integrations?.canva?.redirectUri || '',
       response_type: 'code',
-      scope: 'design:read design:content:read',
+      scope: 'design:read design:content:read design:content:write',
       state: workspaceId,
     });
 
@@ -60,10 +78,10 @@ export class CanvaService {
       // Exchange code for tokens
       const tokenResponse = await axios.post(this.TOKEN_URL, {
         grant_type: 'authorization_code',
-        client_id: (config as any).integrations?.canva?.clientId,
-        client_secret: (config as any).integrations?.canva?.clientSecret,
+        client_id: config.integrations?.canva?.clientId,
+        client_secret: config.integrations?.canva?.clientSecret,
         code,
-        redirect_uri: (config as any).integrations?.canva?.redirectUri,
+        redirect_uri: config.integrations?.canva?.redirectUri,
       });
 
       const { access_token, refresh_token } = tokenResponse.data;
@@ -231,8 +249,8 @@ export class CanvaService {
     try {
       const response = await axios.post(this.TOKEN_URL, {
         grant_type: 'refresh_token',
-        client_id: (config as any).integrations?.canva?.clientId,
-        client_secret: (config as any).integrations?.canva?.clientSecret,
+        client_id: config.integrations?.canva?.clientId,
+        client_secret: config.integrations?.canva?.clientSecret,
         refresh_token: refreshToken,
       });
 
@@ -249,8 +267,92 @@ export class CanvaService {
   }
 
   /**
-   * Disconnect Canva integration
+   * Create a new Canva design
    */
+  static async createDesign(
+    accessToken: string,
+    designType: CanvaDesignType,
+    title?: string
+  ): Promise<CanvaCreateDesignResponse> {
+    try {
+      const payload: any = {
+        design_type: designType,
+      };
+
+      if (title) {
+        payload.title = title;
+      }
+
+      const response = await axios.post(
+        `${this.BASE_URL}/designs`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const design = response.data.design;
+
+      return {
+        id: design.id,
+        title: design.title,
+        urls: {
+          editUrl: design.urls.edit_url,
+          viewUrl: design.urls.view_url,
+        },
+        createdAt: design.created_at,
+        updatedAt: design.updated_at,
+      };
+    } catch (error: any) {
+      logger.error('Failed to create Canva design', {
+        error: error.message,
+        designType,
+        title,
+      });
+      throw new Error('Failed to create design in Canva');
+    }
+  }
+
+  /**
+   * Get platform-specific design dimensions
+   */
+  static getPlatformDimensions(platform: string): { width: number; height: number } {
+    const dimensions: Record<string, { width: number; height: number }> = {
+      'instagram-post': { width: 1080, height: 1080 },
+      'instagram-story': { width: 1080, height: 1920 },
+      'facebook-post': { width: 1200, height: 630 },
+      'twitter-post': { width: 1200, height: 675 },
+      'linkedin-post': { width: 1200, height: 627 },
+      'pinterest-pin': { width: 1000, height: 1500 },
+      'youtube-thumbnail': { width: 1280, height: 720 },
+    };
+
+    return dimensions[platform] || { width: 1080, height: 1080 };
+  }
+
+  /**
+   * Create platform-specific design
+   */
+  static async createPlatformDesign(
+    accessToken: string,
+    platform: string,
+    title?: string
+  ): Promise<CanvaCreateDesignResponse> {
+    const dimensions = this.getPlatformDimensions(platform);
+    
+    const designType: CanvaDesignType = {
+      type: 'custom',
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+
+    const designTitle = title || `${platform.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Design`;
+
+    return this.createDesign(accessToken, designType, designTitle);
+  }
   static async disconnectCanva(workspaceId: string): Promise<void> {
     try {
       await Workspace.findByIdAndUpdate(workspaceId, {

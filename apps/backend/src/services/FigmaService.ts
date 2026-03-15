@@ -32,8 +32,8 @@ export class FigmaService {
    */
   static getAuthUrl(workspaceId: string): string {
     const params = new URLSearchParams({
-      client_id: (config as any).integrations?.figma?.clientId || '',
-      redirect_uri: (config as any).integrations?.figma?.redirectUri || '',
+      client_id: config.integrations?.figma?.clientId || '',
+      redirect_uri: config.integrations?.figma?.redirectUri || '',
       scope: 'files:read',
       state: workspaceId,
       response_type: 'code',
@@ -54,9 +54,9 @@ export class FigmaService {
     try {
       // Exchange code for tokens
       const tokenResponse = await axios.post(this.TOKEN_URL, {
-        client_id: (config as any).integrations?.figma?.clientId,
-        client_secret: (config as any).integrations?.figma?.clientSecret,
-        redirect_uri: (config as any).integrations?.figma?.redirectUri,
+        client_id: config.integrations?.figma?.clientId,
+        client_secret: config.integrations?.figma?.clientSecret,
+        redirect_uri: config.integrations?.figma?.redirectUri,
         code,
         grant_type: 'authorization_code',
       });

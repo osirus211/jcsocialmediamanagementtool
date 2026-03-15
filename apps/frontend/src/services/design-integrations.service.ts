@@ -24,6 +24,24 @@ export interface CanvaExportJob {
   url?: string;
 }
 
+export interface CanvaCreateDesignResponse {
+  id: string;
+  title: string;
+  urls: {
+    editUrl: string;
+    viewUrl: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CanvaDesignType {
+  type: 'preset' | 'custom';
+  name?: string;
+  width?: number;
+  height?: number;
+}
+
 // Figma Types
 export interface FigmaFile {
   key: string;
@@ -83,6 +101,39 @@ export const designIntegrationsService = {
   async getCanvaExportStatus(jobId: string): Promise<CanvaExportJob> {
     const response = await apiClient.get(`/design-integrations/canva/export/${jobId}`);
     return response.data;
+  },
+
+  /**
+   * Create a new Canva design
+   */
+  async createCanvaDesign(
+    platform?: string,
+    title?: string,
+    designType?: CanvaDesignType
+  ): Promise<CanvaCreateDesignResponse> {
+    const response = await apiClient.post('/design-integrations/canva/create', {
+      platform,
+      title,
+      designType,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get platform-specific design dimensions
+   */
+  getPlatformDimensions(platform: string): { width: number; height: number } {
+    const dimensions: Record<string, { width: number; height: number }> = {
+      'instagram-post': { width: 1080, height: 1080 },
+      'instagram-story': { width: 1080, height: 1920 },
+      'facebook-post': { width: 1200, height: 630 },
+      'twitter-post': { width: 1200, height: 675 },
+      'linkedin-post': { width: 1200, height: 627 },
+      'pinterest-pin': { width: 1000, height: 1500 },
+      'youtube-thumbnail': { width: 1280, height: 720 },
+    };
+
+    return dimensions[platform] || { width: 1080, height: 1080 };
   },
 
   /**

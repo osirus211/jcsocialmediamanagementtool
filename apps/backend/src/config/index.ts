@@ -110,6 +110,14 @@ const envSchema = z.object({
   PEXELS_API_KEY: z.string().optional(),
   PIXABAY_API_KEY: z.string().optional(),
 
+  // Design Integrations
+  CANVA_CLIENT_ID: z.string().optional(),
+  CANVA_CLIENT_SECRET: z.string().optional(),
+  CANVA_REDIRECT_URI: z.string().url().optional(),
+  FIGMA_CLIENT_ID: z.string().optional(),
+  FIGMA_CLIENT_SECRET: z.string().optional(),
+  FIGMA_REDIRECT_URI: z.string().url().optional(),
+
   // Stripe
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -461,6 +469,19 @@ export const config = {
     unsplashAccessKey: env.UNSPLASH_ACCESS_KEY || '',
     pexelsApiKey: env.PEXELS_API_KEY || '',
     pixabayApiKey: env.PIXABAY_API_KEY || '',
+  },
+
+  integrations: {
+    canva: {
+      clientId: env.CANVA_CLIENT_ID,
+      clientSecret: env.CANVA_CLIENT_SECRET,
+      redirectUri: env.CANVA_REDIRECT_URI,
+    },
+    figma: {
+      clientId: env.FIGMA_CLIENT_ID,
+      clientSecret: env.FIGMA_CLIENT_SECRET,
+      redirectUri: env.FIGMA_REDIRECT_URI,
+    },
   },
 
   stripe: {

@@ -12,6 +12,16 @@ interface CanvaPickerProps {
   onError: (error: string) => void;
 }
 
+const PLATFORM_TEMPLATES = [
+  { id: 'instagram-post', name: 'Instagram Post', size: '1080 × 1080', icon: '📷' },
+  { id: 'instagram-story', name: 'Instagram Story', size: '1080 × 1920', icon: '📱' },
+  { id: 'facebook-post', name: 'Facebook Post', size: '1200 × 630', icon: '👥' },
+  { id: 'twitter-post', name: 'Twitter Post', size: '1200 × 675', icon: '🐦' },
+  { id: 'linkedin-post', name: 'LinkedIn Post', size: '1200 × 627', icon: '💼' },
+  { id: 'pinterest-pin', name: 'Pinterest Pin', size: '1000 × 1500', icon: '📌' },
+  { id: 'youtube-thumbnail', name: 'YouTube Thumbnail', size: '1280 × 720', icon: '📺' },
+];
+
 export function CanvaPicker({ onImport, onError }: CanvaPickerProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [designs, setDesigns] = useState<CanvaDesign[]>([]);
@@ -19,6 +29,8 @@ export function CanvaPicker({ onImport, onError }: CanvaPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [nextPage, setNextPage] = useState<string | undefined>();
   const [exportingDesigns, setExportingDesigns] = useState<Set<string>>(new Set());
+  const [showCreateTemplates, setShowCreateTemplates] = useState(false);
+  const [creatingDesign, setCreatingDesign] = useState<string | null>(null);
 
   // Debounced search
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -155,6 +167,28 @@ export function CanvaPicker({ onImport, onError }: CanvaPickerProps) {
     }
   };
 
+  const handleCreateDesign = async (platform: string) => {
+    if (creatingDesign) return;
+
+    try {
+      setCreatingDesign(platform);
+      
+      const result = await designIntegrationsService.createCanvaDesign(platform);
+      
+      // Open the design in a new tab for editing
+      window.open(result.urls.editUrl, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+      
+      // Refresh designs list to show the new design
+      loadDesigns(true);
+    } catch (error) {
+      console.error('Failed to create Canva design:', error);
+      onError('Failed to create new design in Canva');
+    } finally {
+      setCreatingDesign(null);
+      setShowCreateTemplates(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     try {
       await designIntegrationsService.disconnectCanva();
@@ -202,13 +236,53 @@ export function CanvaPicker({ onImport, onError }: CanvaPickerProps) {
           <h2 className="text-lg font-semibold text-gray-900">Import from Canva</h2>
         </div>
         
-        <button
-          onClick={handleDisconnect}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          Disconnect
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCreateTemplates(!showCreateTemplates)}
+            className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Create New
+          </button>
+          <button
+            onClick={handleDisconnect}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Disconnect
+          </button>
+        </div>
       </div>
+
+      {/* Create Templates Panel */}
+      {showCreateTemplates && (
+        <div className="p-4 bg-gray-50 border-b border-gray-200">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Choose a template size:</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {PLATFORM_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => handleCreateDesign(template.id)}
+                disabled={creatingDesign === template.id}
+                className="flex items-center gap-2 p-2 text-left border border-gray-200 rounded-lg hover:bg-white hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="text-lg">{template.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">{template.name}</div>
+                  <div className="text-xs text-gray-500">{template.size}</div>
+                </div>
+                {creatingDesign === template.id && (
+                  <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                )}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowCreateTemplates(false)}
+            className="mt-3 text-sm text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div className="p-4 border-b border-gray-200">
