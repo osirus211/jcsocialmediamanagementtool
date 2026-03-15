@@ -724,6 +724,91 @@ export class MediaService {
    * @param tags - Array of tags
    * @returns Updated media document
    */
+  /**
+   * Save media from URL (for AI-generated images)
+   */
+  async saveFromUrl(input: {
+    url: string;
+    filename: string;
+    workspaceId: string;
+    userId: string;
+    source: string;
+    metadata?: any;
+  }): Promise<IMedia> {
+    try {
+      // Download the image from URL
+      const response = await fetch(input.url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      const contentType = response.headers.get('content-type') || 'image/png';
+      
+      // Determine media type
+      let mediaType = MediaType.IMAGE;
+      if (contentType.startsWith('video/')) {
+        mediaType = MediaType.VIDEO;
+      }
+      // Note: AUDIO type not available in current MediaType enum
+
+      // Generate storage key
+      const storageKey = `ai-generated/${input.workspaceId}/${Date.now()}-${input.filename}`;
+
+      // Upload to storage
+      const { MediaStorageService } = await import('./MediaStorageService');
+      const mediaStorageService = MediaStorageService.getInstance();
+      
+      await mediaStorageService.uploadBuffer(
+        storageKey,
+        Buffer.from(buffer),
+        contentType
+      );
+
+      // Create media record
+      const media = await this.createMedia({
+        workspaceId: input.workspaceId,
+        userId: input.userId,
+        filename: input.filename,
+        originalFilename: input.filename,
+        mimeType: contentType,
+        mediaType,
+        size: buffer.byteLength,
+        storageKey,
+        storageProvider: StorageProvider.S3, // Assuming S3
+      });
+
+      // Update with metadata if provided
+      if (input.metadata) {
+        await Media.findByIdAndUpdate(media._id, {
+          $set: {
+            metadata: input.metadata,
+            source: input.source,
+          }
+        });
+      }
+
+      // Mark as completed
+      await this.markUploadCompleted(media._id.toString());
+
+      logger.info('Media saved from URL', {
+        mediaId: media._id.toString(),
+        workspaceId: input.workspaceId,
+        source: input.source,
+        url: input.url.substring(0, 100),
+      });
+
+      return media;
+    } catch (error: any) {
+      logger.error('Failed to save media from URL', {
+        workspaceId: input.workspaceId,
+        url: input.url.substring(0, 100),
+        error: error.message,
+      });
+      throw new Error(`Failed to save media from URL: ${error.message}`);
+    }
+  }
+
   async updateTags(
     mediaId: string,
     workspaceId: string,

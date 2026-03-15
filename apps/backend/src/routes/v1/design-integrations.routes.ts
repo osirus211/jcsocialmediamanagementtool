@@ -377,11 +377,15 @@ router.get('/figma/callback', [
 
 /**
  * GET /design-integrations/figma/files
- * List user's Figma files
+ * List user's Figma files with optional search
  */
-router.get('/figma/files', async (req, res): Promise<void> => {
+router.get('/figma/files', [
+  query('search').optional().isString().withMessage('Search must be a string'),
+  validateRequest,
+], async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
+    const { search } = req.query as { search?: string };
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
@@ -393,7 +397,10 @@ router.get('/figma/files', async (req, res): Promise<void> => {
       return;
     }
 
-    const result = await FigmaService.getUserFiles(workspace.integrations.figma.accessToken);
+    const result = await FigmaService.getUserFiles(
+      workspace.integrations.figma.accessToken,
+      search
+    );
 
     res.json({
       success: true,
@@ -413,10 +420,54 @@ router.get('/figma/files', async (req, res): Promise<void> => {
 });
 
 /**
- * GET /design-integrations/figma/files/:fileKey/frames
- * Get frames from a Figma file
+ * GET /design-integrations/figma/files/recent
+ * Get recently accessed Figma files
  */
-router.get('/figma/files/:fileKey/frames', [
+router.get('/figma/files/recent', [
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
+  validateRequest,
+], async (req, res): Promise<void> => {
+  try {
+    const { workspaceId } = req.workspace!;
+    const { limit = 10 } = req.query as { limit?: number };
+
+    // Get workspace to check connection
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace?.integrations?.figma?.connected || !workspace.integrations.figma.accessToken) {
+      res.status(400).json({
+        success: false,
+        message: 'Figma account not connected',
+      });
+      return;
+    }
+
+    const result = await FigmaService.getRecentFiles(
+      workspace.integrations.figma.accessToken,
+      Number(limit)
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    logger.error('Failed to get recent Figma files', {
+      error: error.message,
+      workspaceId: req.workspace?.workspaceId,
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recent files',
+    });
+  }
+});
+
+/**
+ * GET /design-integrations/figma/files/:fileKey/pages
+ * Get pages from a Figma file
+ */
+router.get('/figma/files/:fileKey/pages', [
   param('fileKey').notEmpty().withMessage('File key is required'),
   validateRequest,
 ], async (req, res): Promise<void> => {
@@ -434,9 +485,56 @@ router.get('/figma/files/:fileKey/frames', [
       return;
     }
 
-    const result = await FigmaService.getFileFrames(
+    const result = await FigmaService.getFilePages(
       workspace.integrations.figma.accessToken,
       fileKey
+    );
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    logger.error('Failed to get Figma file pages', {
+      error: error.message,
+      workspaceId: req.workspace?.workspaceId,
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch pages',
+    });
+  }
+});
+
+/**
+ * GET /design-integrations/figma/files/:fileKey/frames
+ * Get frames from a Figma file with optional page filtering
+ */
+router.get('/figma/files/:fileKey/frames', [
+  param('fileKey').notEmpty().withMessage('File key is required'),
+  query('pageId').optional().isString().withMessage('Page ID must be a string'),
+  validateRequest,
+], async (req, res): Promise<void> => {
+  try {
+    const { workspaceId } = req.workspace!;
+    const { fileKey } = req.params;
+    const { pageId } = req.query as { pageId?: string };
+
+    // Get workspace to check connection
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace?.integrations?.figma?.connected || !workspace.integrations.figma.accessToken) {
+      res.status(400).json({
+        success: false,
+        message: 'Figma account not connected',
+      });
+      return;
+    }
+
+    const result = await FigmaService.getFileFrames(
+      workspace.integrations.figma.accessToken,
+      fileKey,
+      pageId
     );
 
     res.json({
@@ -458,17 +556,29 @@ router.get('/figma/files/:fileKey/frames', [
 
 /**
  * POST /design-integrations/figma/export
- * Export a Figma frame
+ * Export a Figma frame with advanced options
  */
 router.post('/figma/export', [
   body('fileKey').notEmpty().withMessage('File key is required'),
   body('nodeId').notEmpty().withMessage('Node ID is required'),
-  body('format').optional().isIn(['png', 'jpg']).withMessage('Format must be png or jpg'),
+  body('format').optional().isIn(['png', 'jpg', 'svg', 'pdf']).withMessage('Format must be png, jpg, svg, or pdf'),
+  body('scale').optional().isIn([1, 2, 3]).withMessage('Scale must be 1, 2, or 3'),
+  body('platformSize').optional().isIn(['instagram-post', 'instagram-story', 'facebook-post', 'twitter-post', 'linkedin-post', 'custom']).withMessage('Invalid platform size'),
+  body('customWidth').optional().isInt({ min: 1 }).withMessage('Custom width must be a positive integer'),
+  body('customHeight').optional().isInt({ min: 1 }).withMessage('Custom height must be a positive integer'),
   validateRequest,
 ], async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
-    const { fileKey, nodeId, format = 'png' } = req.body;
+    const { 
+      fileKey, 
+      nodeId, 
+      format = 'png', 
+      scale = 2,
+      platformSize,
+      customWidth,
+      customHeight
+    } = req.body;
 
     // Get workspace to check connection
     const workspace = await Workspace.findById(workspaceId);
@@ -480,11 +590,19 @@ router.post('/figma/export', [
       return;
     }
 
+    const exportOptions = {
+      format,
+      scale,
+      platformSize,
+      customWidth,
+      customHeight,
+    };
+
     const result = await FigmaService.exportFrame(
       workspace.integrations.figma.accessToken,
       fileKey,
       nodeId,
-      format
+      exportOptions
     );
 
     res.json({
@@ -500,6 +618,44 @@ router.post('/figma/export', [
     res.status(500).json({
       success: false,
       message: 'Failed to export frame',
+    });
+  }
+});
+
+/**
+ * POST /design-integrations/figma/connect-token
+ * Connect using Personal Access Token
+ */
+router.post('/figma/connect-token', [
+  body('token').notEmpty().withMessage('Personal access token is required'),
+  validateRequest,
+], async (req, res): Promise<void> => {
+  try {
+    const { workspaceId } = req.workspace!;
+    const { token } = req.body;
+
+    const result = await FigmaService.connectWithPersonalToken(
+      workspaceId.toString(),
+      token
+    );
+
+    res.json({
+      success: true,
+      message: 'Figma account connected successfully',
+      data: {
+        userId: result.userId,
+        displayName: result.displayName,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Failed to connect Figma with personal token', {
+      error: error.message,
+      workspaceId: req.workspace?.workspaceId,
+    });
+
+    res.status(400).json({
+      success: false,
+      message: error.message,
     });
   }
 });

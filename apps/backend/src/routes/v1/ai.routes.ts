@@ -10,7 +10,7 @@ import { requireWorkspace } from '../../middleware/tenant';
 import { aiRateLimiter } from '../../middleware/rateLimiter';
 import { checkAILimit } from '../../middleware/planLimit';
 import { validateRequest } from '../../middleware/validate';
-import { generateContentSchema, improveContentSchema, generateCalendarSchema } from '../../schemas/ai.schemas';
+import { generateContentSchema, improveContentSchema, generateCalendarSchema, generateImageSchema, generateImageVariationSchema } from '../../schemas/ai.schemas';
 
 const router = Router();
 
@@ -114,6 +114,21 @@ router.post('/cta', checkAILimit, AIController.generateCTAs);
  * @route   POST /api/v1/ai/emojis
  */
 router.post('/emojis', checkAILimit, AIController.suggestEmojis);
+
+/**
+ * @route   POST /api/v1/ai/generate-image
+ */
+router.post('/generate-image', checkAILimit, validateRequest(generateImageSchema), AIController.generateImage);
+
+/**
+ * @route   POST /api/v1/ai/image-variation
+ */
+router.post('/image-variation', checkAILimit, validateRequest(generateImageVariationSchema), AIController.generateImageVariation);
+
+/**
+ * @route   GET /api/v1/ai/image-history
+ */
+router.get('/image-history', AIController.getImageHistory);
 
 /**
  * @route   POST /api/v1/ai/moderate-content

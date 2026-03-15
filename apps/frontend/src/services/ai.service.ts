@@ -259,6 +259,56 @@ export interface EmojiSuggestionOutput {
   model: string;
 }
 
+export interface ImageGenerationInput {
+  prompt: string;
+  size?: '1024x1024' | '1024x1792' | '1792x1024';
+  quality?: 'standard' | 'hd';
+  style?: 'vivid' | 'natural';
+}
+
+export interface ImageGenerationOutput {
+  imageUrl: string;
+  revisedPrompt: string;
+  mediaId: string;
+  size: string;
+  quality: string;
+  style: string;
+  tokensUsed: number;
+  provider: string;
+  model: string;
+  cost: number;
+}
+
+export interface ImageVariationInput {
+  imageUrl: string;
+  size?: '1024x1024' | '1024x1792' | '1792x1024';
+}
+
+export interface ImageVariationOutput {
+  imageUrl: string;
+  mediaId: string;
+  size: string;
+  tokensUsed: number;
+  provider: string;
+  model: string;
+  cost: number;
+}
+
+export interface ImageGenerationHistory {
+  _id: string;
+  workspaceId: string;
+  userId: string;
+  prompt: string;
+  revisedPrompt: string;
+  imageUrl: string;
+  mediaId: string;
+  size: string;
+  quality: string;
+  style: string;
+  cost: number;
+  createdAt: string;
+}
+
 class AIService {
   /**
    * Generate caption variations for a given topic
@@ -477,6 +527,42 @@ class AIService {
   /**
    * Suggest relevant emojis for content
    */
+  /**
+   * Generate AI image using DALL-E 3
+   * Superior feature - competitors don't have this!
+   */
+  async generateImage(input: ImageGenerationInput): Promise<ImageGenerationOutput> {
+    const response = await apiClient.post<{ success: boolean; data: ImageGenerationOutput }>(
+      '/ai/generate-image',
+      input
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Generate image variation using DALL-E 2
+   */
+  async generateImageVariation(input: ImageVariationInput): Promise<ImageVariationOutput> {
+    const response = await apiClient.post<{ success: boolean; data: ImageVariationOutput }>(
+      '/ai/image-variation',
+      input
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get AI image generation history
+   */
+  async getImageHistory(limit?: number): Promise<ImageGenerationHistory[]> {
+    const response = await apiClient.get<{ success: boolean; data: ImageGenerationHistory[] }>(
+      `/ai/image-history${limit ? `?limit=${limit}` : ''}`
+    );
+
+    return response.data;
+  }
+
   async suggestEmojis(input: EmojiSuggestionInput): Promise<EmojiSuggestionOutput> {
     const response = await apiClient.post('/ai/emojis', input);
     return response.data;

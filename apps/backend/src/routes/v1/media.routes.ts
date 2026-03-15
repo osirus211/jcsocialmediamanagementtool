@@ -5,9 +5,10 @@
  */
 
 import { Router } from 'express';
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { uploadController } from '../../controllers/UploadController';
 import { mediaFolderController } from '../../controllers/MediaFolderController';
+import { mediaTagController } from '../../controllers/MediaTagController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace, requirePermission } from '../../middleware/tenant';
 import { validateRequest } from '../../middleware/validate';
@@ -25,15 +26,29 @@ router.post('/upload-url', requirePermission(Permission.UPLOAD_MEDIA), uploadCon
 // Complete upload and create media record
 router.post('/complete', requirePermission(Permission.UPLOAD_MEDIA), uploadController.completeUpload.bind(uploadController));
 
-// Folder management (Phase-2)
+// Folder management
 router.post('/folders', requirePermission(Permission.UPLOAD_MEDIA), mediaFolderController.createFolder.bind(mediaFolderController));
 router.get('/folders', requirePermission(Permission.VIEW_MEDIA), mediaFolderController.getFolders.bind(mediaFolderController));
 router.patch('/folders/:id', requirePermission(Permission.UPLOAD_MEDIA), mediaFolderController.updateFolder.bind(mediaFolderController));
 router.delete('/folders/:id', requirePermission(Permission.DELETE_MEDIA), mediaFolderController.deleteFolder.bind(mediaFolderController));
 
-// Media organization (Phase-2)
+// Folder media operations
+router.get('/folders/:id/media', requirePermission(Permission.VIEW_MEDIA), mediaFolderController.getFolderMedia.bind(mediaFolderController));
+router.post('/folders/:id/move', requirePermission(Permission.UPLOAD_MEDIA), mediaFolderController.bulkMoveToFolder.bind(mediaFolderController));
+
+// Tag management
+router.get('/tags/cloud', requirePermission(Permission.VIEW_MEDIA), mediaTagController.getTagCloud.bind(mediaTagController));
+router.get('/tags/popular', requirePermission(Permission.VIEW_MEDIA), mediaTagController.getMostUsedTags.bind(mediaTagController));
+router.get('/tags/search', requirePermission(Permission.VIEW_MEDIA), mediaTagController.searchTags.bind(mediaTagController));
+router.get('/tags/stats', requirePermission(Permission.VIEW_MEDIA), mediaTagController.getTagStats.bind(mediaTagController));
+router.get('/tags/:tag/media', requirePermission(Permission.VIEW_MEDIA), mediaTagController.getMediaByTag.bind(mediaTagController));
+router.post('/tags/bulk', requirePermission(Permission.UPLOAD_MEDIA), mediaTagController.bulkTagMedia.bind(mediaTagController));
+
+// Media organization
 router.patch('/:id/folder', requirePermission(Permission.UPLOAD_MEDIA), mediaFolderController.moveMediaToFolder.bind(mediaFolderController));
 router.patch('/:id/tags', requirePermission(Permission.UPLOAD_MEDIA), mediaFolderController.updateMediaTags.bind(mediaFolderController));
+router.post('/:id/tags', requirePermission(Permission.UPLOAD_MEDIA), mediaTagController.addTags.bind(mediaTagController));
+router.delete('/:id/tags', requirePermission(Permission.UPLOAD_MEDIA), mediaTagController.removeTags.bind(mediaTagController));
 
 // Get media statistics
 router.get('/stats', requirePermission(Permission.VIEW_MEDIA), uploadController.getMediaStats.bind(uploadController));

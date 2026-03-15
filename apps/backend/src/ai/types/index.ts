@@ -169,6 +169,45 @@ export interface TemplateGenerationOutput {
   model: string;
 }
 
+export interface ImageGenerationInput {
+  prompt: string;
+  size: '1024x1024' | '1024x1792' | '1792x1024';
+  quality: 'standard' | 'hd';
+  style: 'vivid' | 'natural';
+  workspaceId: string;
+  userId: string;
+}
+
+export interface ImageGenerationOutput {
+  imageUrl: string;
+  revisedPrompt: string;
+  mediaId: string;
+  size: string;
+  quality: string;
+  style: string;
+  tokensUsed: number;
+  provider: AIProvider;
+  model: string;
+  cost: number;
+}
+
+export interface ImageVariationInput {
+  imageUrl: string;
+  size: '1024x1024' | '1024x1792' | '1792x1024';
+  workspaceId: string;
+  userId: string;
+}
+
+export interface ImageVariationOutput {
+  imageUrl: string;
+  mediaId: string;
+  size: string;
+  tokensUsed: number;
+  provider: AIProvider;
+  model: string;
+  cost: number;
+}
+
 export interface IAIProvider {
   generateCompletion(prompt: string, options?: any): Promise<string>;
   generateVisionCompletion?(prompt: string, imageUrl: string, options?: any): Promise<string>;

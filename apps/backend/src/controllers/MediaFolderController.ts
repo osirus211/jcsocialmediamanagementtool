@@ -17,7 +17,7 @@ export class MediaFolderController {
    */
   async createFolder(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, parentFolderId } = req.body;
+      const { name, parentFolderId, color, icon } = req.body;
       const workspaceId = req.workspace?.workspaceId.toString();
       const userId = req.user?.userId;
 
@@ -36,8 +36,7 @@ export class MediaFolderController {
       const folder = await MediaFolderService.createFolder(
         workspaceId,
         userId,
-        name,
-        parentFolderId
+        { name, parentFolderId, color, icon }
       );
 
       res.status(201).json({
@@ -56,13 +55,18 @@ export class MediaFolderController {
   async getFolders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const workspaceId = req.workspace?.workspaceId.toString();
-      const { parentFolderId } = req.query;
+      const { tree } = req.query;
 
       if (!workspaceId) {
         throw new UnauthorizedError('Workspace context required');
       }
 
-      const folders = await MediaFolderService.getFolders(workspaceId);
+      let folders;
+      if (tree === 'true') {
+        folders = await MediaFolderService.getFolderTree(workspaceId);
+      } else {
+        folders = await MediaFolderService.getFolders(workspaceId);
+      }
 
       res.status(200).json({
         success: true,
@@ -80,14 +84,19 @@ export class MediaFolderController {
   async updateFolder(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const { name, parentFolderId } = req.body;
+      const { name, color, icon, parentFolderId } = req.body;
       const workspaceId = req.workspace?.workspaceId.toString();
 
       if (!workspaceId) {
         throw new UnauthorizedError('Workspace context required');
       }
 
-      const folder = await MediaFolderService.renameFolder(id, workspaceId, name);
+      const folder = await MediaFolderService.updateFolder(workspaceId, id, {
+        name,
+        color,
+        icon,
+        parentFolderId,
+      });
 
       res.status(200).json({
         success: true,
@@ -179,6 +188,67 @@ export class MediaFolderController {
       res.status(200).json({
         success: true,
         data: media.toJSON(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get media by folder
+   * GET /media/folders/:id/media
+   */
+  async getFolderMedia(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const { limit = 50, skip = 0 } = req.query;
+
+      if (!workspaceId) {
+        throw new UnauthorizedError('Workspace context required');
+      }
+
+      const folderId = id === 'root' ? null : id;
+      const result = await MediaFolderService.getMediaByFolder(
+        workspaceId,
+        folderId,
+        parseInt(limit as string),
+        parseInt(skip as string)
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Move media to folder (bulk operation)
+   * POST /media/folders/:id/move
+   */
+  async bulkMoveToFolder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { mediaIds } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+
+      if (!workspaceId) {
+        throw new UnauthorizedError('Workspace context required');
+      }
+
+      if (!Array.isArray(mediaIds)) {
+        throw new BadRequestError('mediaIds must be an array');
+      }
+
+      const folderId = id === 'root' ? undefined : id;
+      await MediaFolderService.moveMediaToFolder(workspaceId, mediaIds, folderId);
+
+      res.status(200).json({
+        success: true,
+        message: `${mediaIds.length} media files moved successfully`,
       });
     } catch (error) {
       next(error);

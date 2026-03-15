@@ -50,10 +50,32 @@ export interface FigmaFile {
   lastModified: string;
 }
 
+export interface FigmaPage {
+  id: string;
+  name: string;
+  type: string;
+}
+
 export interface FigmaFrame {
   id: string;
   name: string;
   thumbnailUrl: string;
+  pageId?: string;
+  pageName?: string;
+  absoluteBoundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+export interface FigmaExportOptions {
+  format: 'png' | 'jpg' | 'svg' | 'pdf';
+  scale: 1 | 2 | 3;
+  platformSize?: 'instagram-post' | 'instagram-story' | 'facebook-post' | 'twitter-post' | 'linkedin-post' | 'custom';
+  customWidth?: number;
+  customHeight?: number;
 }
 
 export const designIntegrationsService = {
@@ -137,6 +159,43 @@ export const designIntegrationsService = {
   },
 
   /**
+   * Get available export formats for Figma
+   */
+  getFigmaExportFormats(): Array<{ value: string; label: string }> {
+    return [
+      { value: 'png', label: 'PNG' },
+      { value: 'jpg', label: 'JPG' },
+      { value: 'svg', label: 'SVG' },
+      { value: 'pdf', label: 'PDF' },
+    ];
+  },
+
+  /**
+   * Get available export scales
+   */
+  getExportScales(): Array<{ value: number; label: string }> {
+    return [
+      { value: 1, label: '1x' },
+      { value: 2, label: '2x' },
+      { value: 3, label: '3x' },
+    ];
+  },
+
+  /**
+   * Get platform-specific export sizes
+   */
+  getPlatformSizes(): Array<{ value: string; label: string; dimensions: string }> {
+    return [
+      { value: 'instagram-post', label: 'Instagram Post', dimensions: '1080×1080' },
+      { value: 'instagram-story', label: 'Instagram Story', dimensions: '1080×1920' },
+      { value: 'facebook-post', label: 'Facebook Post', dimensions: '1200×630' },
+      { value: 'twitter-post', label: 'Twitter Post', dimensions: '1200×675' },
+      { value: 'linkedin-post', label: 'LinkedIn Post', dimensions: '1200×627' },
+      { value: 'custom', label: 'Custom Size', dimensions: 'Custom' },
+    ];
+  },
+
+  /**
    * Disconnect Canva integration
    */
   async disconnectCanva(): Promise<void> {
@@ -156,37 +215,79 @@ export const designIntegrationsService = {
   },
 
   /**
-   * Get user's Figma files
+   * Get user's Figma files with optional search
    */
-  async getFigmaFiles(): Promise<{
+  async getFigmaFiles(searchQuery?: string): Promise<{
     files: FigmaFile[];
   }> {
-    const response = await apiClient.get('/design-integrations/figma/files');
+    const params = new URLSearchParams();
+    if (searchQuery) params.append('search', searchQuery);
+
+    const response = await apiClient.get(`/design-integrations/figma/files?${params.toString()}`);
     return response.data;
   },
 
   /**
-   * Get frames from a Figma file
+   * Get recently accessed Figma files
    */
-  async getFigmaFrames(fileKey: string): Promise<{
+  async getFigmaRecentFiles(limit?: number): Promise<{
+    files: FigmaFile[];
+  }> {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+
+    const response = await apiClient.get(`/design-integrations/figma/files/recent?${params.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Get pages from a Figma file
+   */
+  async getFigmaPages(fileKey: string): Promise<{
+    pages: FigmaPage[];
+  }> {
+    const response = await apiClient.get(`/design-integrations/figma/files/${fileKey}/pages`);
+    return response.data;
+  },
+
+  /**
+   * Get frames from a Figma file with optional page filtering
+   */
+  async getFigmaFrames(fileKey: string, pageId?: string): Promise<{
     frames: FigmaFrame[];
   }> {
-    const response = await apiClient.get(`/design-integrations/figma/files/${fileKey}/frames`);
+    const params = new URLSearchParams();
+    if (pageId) params.append('pageId', pageId);
+
+    const response = await apiClient.get(`/design-integrations/figma/files/${fileKey}/frames?${params.toString()}`);
     return response.data;
   },
 
   /**
-   * Export a Figma frame
+   * Export a Figma frame with advanced options
    */
   async exportFigmaFrame(
     fileKey: string,
     nodeId: string,
-    format: 'png' | 'jpg' = 'png'
+    options: FigmaExportOptions = { format: 'png', scale: 2 }
   ): Promise<{ url: string }> {
     const response = await apiClient.post('/design-integrations/figma/export', {
       fileKey,
       nodeId,
-      format,
+      ...options,
+    });
+    return response.data;
+  },
+
+  /**
+   * Connect Figma using Personal Access Token
+   */
+  async connectFigmaWithToken(token: string): Promise<{
+    userId: string;
+    displayName: string;
+  }> {
+    const response = await apiClient.post('/design-integrations/figma/connect-token', {
+      token,
     });
     return response.data;
   },

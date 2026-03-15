@@ -18,6 +18,13 @@ const CONTENT_LIMITS: Record<SocialPlatform, number> = {
   [SocialPlatform.TIKTOK]: 2200,
   [SocialPlatform.YOUTUBE]: 5000,
   [SocialPlatform.THREADS]: 500,
+  [SocialPlatform.BLUESKY]: 300,
+  [SocialPlatform.MASTODON]: 500,
+  [SocialPlatform.REDDIT]: 40000,
+  [SocialPlatform.GOOGLE_BUSINESS]: 1500,
+  [SocialPlatform.PINTEREST]: 500,
+  [SocialPlatform.GITHUB]: 65536,
+  [SocialPlatform.APPLE]: 4000,
 };
 
 /**
@@ -31,6 +38,13 @@ const MEDIA_LIMITS: Record<SocialPlatform, number> = {
   [SocialPlatform.TIKTOK]: 1,
   [SocialPlatform.YOUTUBE]: 1,
   [SocialPlatform.THREADS]: 10,
+  [SocialPlatform.BLUESKY]: 4,
+  [SocialPlatform.MASTODON]: 4,
+  [SocialPlatform.REDDIT]: 20,
+  [SocialPlatform.GOOGLE_BUSINESS]: 10,
+  [SocialPlatform.PINTEREST]: 1,
+  [SocialPlatform.GITHUB]: 10,
+  [SocialPlatform.APPLE]: 10,
 };
 
 /**

@@ -112,6 +112,88 @@ const PLATFORM_PERMISSIONS: Record<SocialPlatform, PlatformPermission> = {
     documentationLink: 'https://developers.facebook.com/docs/threads',
     requiredScopes: ['threads_basic', 'threads_content_publish', 'threads_manage_insights'],
   },
+
+  [SocialPlatform.BLUESKY]: {
+    platform: SocialPlatform.BLUESKY,
+    permissions: [
+      'atproto',
+      'com.atproto.repo.createRecord',
+      'com.atproto.repo.listRecords',
+    ],
+    explanation: 'We need permission to access your Bluesky account and create posts on your behalf.',
+    documentationLink: 'https://atproto.com/guides/applications',
+    requiredScopes: ['atproto', 'com.atproto.repo.createRecord'],
+    optionalScopes: ['com.atproto.repo.listRecords'],
+  },
+
+  [SocialPlatform.MASTODON]: {
+    platform: SocialPlatform.MASTODON,
+    permissions: [
+      'read',
+      'write',
+    ],
+    explanation: 'We need permission to read your profile and create posts on your Mastodon instance.',
+    documentationLink: 'https://docs.joinmastodon.org/methods/apps/',
+    requiredScopes: ['read', 'write'],
+  },
+
+  [SocialPlatform.REDDIT]: {
+    platform: SocialPlatform.REDDIT,
+    permissions: [
+      'identity',
+      'submit',
+      'read',
+    ],
+    explanation: 'We need permission to access your Reddit identity, submit posts, and read subreddit information.',
+    documentationLink: 'https://github.com/reddit-archive/reddit/wiki/OAuth2',
+    requiredScopes: ['identity', 'submit', 'read'],
+  },
+
+  [SocialPlatform.GOOGLE_BUSINESS]: {
+    platform: SocialPlatform.GOOGLE_BUSINESS,
+    permissions: [
+      'https://www.googleapis.com/auth/business.manage',
+    ],
+    explanation: 'We need permission to manage your Google Business Profile and create posts.',
+    documentationLink: 'https://developers.google.com/my-business/reference/rest',
+    requiredScopes: ['https://www.googleapis.com/auth/business.manage'],
+  },
+
+  [SocialPlatform.PINTEREST]: {
+    platform: SocialPlatform.PINTEREST,
+    permissions: [
+      'user_accounts:read',
+      'pins:read',
+      'pins:write',
+      'boards:read',
+      'boards:write',
+    ],
+    explanation: 'We need permission to access your Pinterest account, read and create pins, and manage boards.',
+    documentationLink: 'https://developers.pinterest.com/docs/getting-started/scopes/',
+    requiredScopes: ['user_accounts:read', 'pins:write', 'boards:read'],
+    optionalScopes: ['pins:read', 'boards:write'],
+  },
+
+  [SocialPlatform.GITHUB]: {
+    platform: SocialPlatform.GITHUB,
+    permissions: [
+      'repo',
+      'user',
+    ],
+    explanation: 'We need permission to access your repositories and user information to create releases and updates.',
+    documentationLink: 'https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps',
+    requiredScopes: ['repo', 'user'],
+  },
+
+  [SocialPlatform.APPLE]: {
+    platform: SocialPlatform.APPLE,
+    permissions: [
+      'app_store_connect',
+    ],
+    explanation: 'We need permission to access your App Store Connect account to manage app metadata and releases.',
+    documentationLink: 'https://developer.apple.com/documentation/appstoreconnectapi',
+    requiredScopes: ['app_store_connect'],
+  },
 };
 
 export class PlatformPermissionsService {

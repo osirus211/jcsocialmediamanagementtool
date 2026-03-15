@@ -206,6 +206,180 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapability> =
       threads: true,
     },
   },
+
+  [SocialPlatform.BLUESKY]: {
+    platform: SocialPlatform.BLUESKY,
+    displayName: 'Bluesky',
+    maxContentLength: 300,
+    maxMediaItems: 4,
+    supportedMediaTypes: {
+      images: true,
+      videos: true,
+      gifs: true,
+    },
+    imageFormats: ['image/jpeg', 'image/png', 'image/gif'],
+    videoFormats: ['video/mp4'],
+    maxImageSize: 1 * 1024 * 1024, // 1MB
+    maxVideoSize: 50 * 1024 * 1024, // 50MB
+    maxVideoDuration: 60, // 60 seconds
+    features: {
+      scheduling: true,
+      hashtags: true,
+      mentions: true,
+      links: true,
+      polls: false,
+      threads: true,
+    },
+  },
+
+  [SocialPlatform.MASTODON]: {
+    platform: SocialPlatform.MASTODON,
+    displayName: 'Mastodon',
+    maxContentLength: 500,
+    maxMediaItems: 4,
+    supportedMediaTypes: {
+      images: true,
+      videos: true,
+      gifs: true,
+    },
+    imageFormats: ['image/jpeg', 'image/png', 'image/gif'],
+    videoFormats: ['video/mp4', 'video/webm'],
+    maxImageSize: 10 * 1024 * 1024, // 10MB
+    maxVideoSize: 40 * 1024 * 1024, // 40MB
+    maxVideoDuration: 120, // 2 minutes
+    features: {
+      scheduling: true,
+      hashtags: true,
+      mentions: true,
+      links: true,
+      polls: true,
+      threads: true,
+    },
+  },
+
+  [SocialPlatform.REDDIT]: {
+    platform: SocialPlatform.REDDIT,
+    displayName: 'Reddit',
+    maxContentLength: 40000,
+    maxMediaItems: 20,
+    supportedMediaTypes: {
+      images: true,
+      videos: true,
+      gifs: true,
+    },
+    imageFormats: ['image/jpeg', 'image/png', 'image/gif'],
+    videoFormats: ['video/mp4'],
+    maxImageSize: 20 * 1024 * 1024, // 20MB
+    maxVideoSize: 1 * 1024 * 1024 * 1024, // 1GB
+    maxVideoDuration: 15 * 60, // 15 minutes
+    features: {
+      scheduling: true,
+      hashtags: false,
+      mentions: true,
+      links: true,
+      polls: true,
+      threads: false,
+    },
+  },
+
+  [SocialPlatform.GOOGLE_BUSINESS]: {
+    platform: SocialPlatform.GOOGLE_BUSINESS,
+    displayName: 'Google Business Profile',
+    maxContentLength: 1500,
+    maxMediaItems: 10,
+    supportedMediaTypes: {
+      images: true,
+      videos: true,
+      gifs: false,
+    },
+    imageFormats: ['image/jpeg', 'image/png'],
+    videoFormats: ['video/mp4'],
+    maxImageSize: 5 * 1024 * 1024, // 5MB
+    maxVideoSize: 100 * 1024 * 1024, // 100MB
+    maxVideoDuration: 30, // 30 seconds
+    features: {
+      scheduling: true,
+      hashtags: false,
+      mentions: false,
+      links: true,
+      polls: false,
+      threads: false,
+    },
+  },
+
+  [SocialPlatform.PINTEREST]: {
+    platform: SocialPlatform.PINTEREST,
+    displayName: 'Pinterest',
+    maxContentLength: 500,
+    maxMediaItems: 1,
+    supportedMediaTypes: {
+      images: true,
+      videos: true,
+      gifs: false,
+    },
+    imageFormats: ['image/jpeg', 'image/png'],
+    videoFormats: ['video/mp4'],
+    maxImageSize: 32 * 1024 * 1024, // 32MB
+    maxVideoSize: 2 * 1024 * 1024 * 1024, // 2GB
+    maxVideoDuration: 15 * 60, // 15 minutes
+    features: {
+      scheduling: true,
+      hashtags: true,
+      mentions: false,
+      links: true,
+      polls: false,
+      threads: false,
+    },
+  },
+
+  [SocialPlatform.GITHUB]: {
+    platform: SocialPlatform.GITHUB,
+    displayName: 'GitHub',
+    maxContentLength: 65536,
+    maxMediaItems: 10,
+    supportedMediaTypes: {
+      images: true,
+      videos: false,
+      gifs: true,
+    },
+    imageFormats: ['image/jpeg', 'image/png', 'image/gif'],
+    videoFormats: [],
+    maxImageSize: 25 * 1024 * 1024, // 25MB
+    maxVideoSize: 0,
+    features: {
+      scheduling: true,
+      hashtags: false,
+      mentions: true,
+      links: true,
+      polls: false,
+      threads: false,
+    },
+  },
+
+  [SocialPlatform.APPLE]: {
+    platform: SocialPlatform.APPLE,
+    displayName: 'Apple App Store Connect',
+    maxContentLength: 4000,
+    maxMediaItems: 10,
+    supportedMediaTypes: {
+      images: true,
+      videos: true,
+      gifs: false,
+    },
+    imageFormats: ['image/jpeg', 'image/png'],
+    videoFormats: ['video/mp4'],
+    maxImageSize: 8 * 1024 * 1024, // 8MB
+    maxVideoSize: 500 * 1024 * 1024, // 500MB
+    maxVideoDuration: 30, // 30 seconds
+    features: {
+      scheduling: true,
+      hashtags: false,
+      mentions: false,
+      links: true,
+      polls: false,
+      threads: false,
+    },
+  },
 };
 
 /**

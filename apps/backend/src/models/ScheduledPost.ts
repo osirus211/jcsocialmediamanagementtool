@@ -26,6 +26,13 @@ export enum SocialPlatform {
   YOUTUBE = 'youtube',
   THREADS = 'threads',
   TIKTOK = 'tiktok',
+  BLUESKY = 'bluesky',
+  MASTODON = 'mastodon',
+  REDDIT = 'reddit',
+  GOOGLE_BUSINESS = 'google-business',
+  PINTEREST = 'pinterest',
+  GITHUB = 'github',
+  APPLE = 'apple',
 }
 
 export interface IScheduledPost extends Document {

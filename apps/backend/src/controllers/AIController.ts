@@ -939,4 +939,172 @@ export class AIController {
       next(error);
     }
   }
+
+  /**
+   * Generate AI image using DALL-E 3
+   * Superior feature - competitors don't have this!
+   */
+  static async generateImage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { prompt, size, quality, style } = req.body;
+
+      if (!prompt) {
+        res.status(400).json({
+          success: false,
+          message: 'Prompt is required',
+        });
+        return;
+      }
+
+      // Validate size
+      const validSizes = ['1024x1024', '1024x1792', '1792x1024'];
+      if (size && !validSizes.includes(size)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid size. Must be one of: ' + validSizes.join(', '),
+        });
+        return;
+      }
+
+      // Validate quality
+      const validQualities = ['standard', 'hd'];
+      if (quality && !validQualities.includes(quality)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid quality. Must be one of: ' + validQualities.join(', '),
+        });
+        return;
+      }
+
+      // Validate style
+      const validStyles = ['vivid', 'natural'];
+      if (style && !validStyles.includes(style)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid style. Must be one of: ' + validStyles.join(', '),
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { ImageGenService } = await import('../ai/services/image-gen.service');
+
+      const service = new ImageGenService(aiModule.getProvider());
+      const result = await service.generateImage({
+        prompt,
+        size: size || '1024x1024',
+        quality: quality || 'standard',
+        style: style || 'vivid',
+        workspaceId,
+        userId,
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      logger.info('AI image generated', {
+        workspaceId,
+        userId,
+        prompt: prompt.substring(0, 100),
+        size: result.size,
+        quality: result.quality,
+        style: result.style,
+        cost: result.cost,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('AI image generation error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Generate image variation using DALL-E 2
+   */
+  static async generateImageVariation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId, userId } = req.user as any;
+      const { imageUrl, size } = req.body;
+
+      if (!imageUrl) {
+        res.status(400).json({
+          success: false,
+          message: 'Image URL is required',
+        });
+        return;
+      }
+
+      // Validate size
+      const validSizes = ['1024x1024', '1024x1792', '1792x1024'];
+      if (size && !validSizes.includes(size)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid size. Must be one of: ' + validSizes.join(', '),
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { ImageGenService } = await import('../ai/services/image-gen.service');
+
+      const service = new ImageGenService(aiModule.getProvider());
+      const result = await service.generateImageVariation({
+        imageUrl,
+        size: size || '1024x1024',
+        workspaceId,
+        userId,
+      });
+
+      // Log usage
+      await usageService.incrementAI(workspaceId);
+
+      logger.info('AI image variation generated', {
+        workspaceId,
+        userId,
+        originalImageUrl: imageUrl.substring(0, 100),
+        size: result.size,
+        cost: result.cost,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('AI image variation error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Get AI image generation history
+   */
+  static async getImageHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.user as any;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { ImageGenService } = await import('../ai/services/image-gen.service');
+
+      const service = new ImageGenService(aiModule.getProvider());
+      const history = await service.getGenerationHistory(workspaceId, limit);
+
+      res.json({
+        success: true,
+        data: history,
+      });
+    } catch (error: any) {
+      logger.error('Get image history error:', error);
+      next(error);
+    }
+  }
 }
