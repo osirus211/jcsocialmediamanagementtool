@@ -61,9 +61,9 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
     return formatDateForInput(nextWeek);
   });
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<string>>(new Set());
-  const [postsPerDay, setPostsPerDay] = useState(1);
+  const [postCount, setPostCount] = useState(7);
   const [tone, setTone] = useState<string>('casual');
-  const [topics, setTopics] = useState('');
+  const [topic, setTopic] = useState('');
 
   // Reset state when modal opens
   useEffect(() => {
@@ -92,13 +92,41 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
 
     setLoading(true);
     try {
+      // First, get existing posts in the date range to identify empty slots
+      const existingPostsResponse = await fetch(`/api/v1/posts/calendar?workspaceId=${''}&startDate=${startDate}&endDate=${endDate}`);
+      const existingPostsData = await existingPostsResponse.json();
+      
+      // Generate all possible time slots in the date range
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const allSlots: string[] = [];
+      
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        // Generate 3 time slots per day (9am, 1pm, 5pm)
+        [9, 13, 17].forEach(hour => {
+          const slot = new Date(d);
+          slot.setHours(hour, 0, 0, 0);
+          allSlots.push(slot.toISOString());
+        });
+      }
+      
+      // Filter out slots that already have posts
+      const existingSlots = new Set(
+        existingPostsData.data?.posts?.map((post: any) => 
+          new Date(post.scheduledAt).toISOString()
+        ) || []
+      );
+      
+      const emptySlots = allSlots.filter(slot => !existingSlots.has(slot));
+
       const input: GenerateCalendarInput = {
         startDate,
         endDate,
         platforms: Array.from(selectedPlatforms),
-        postsPerDay: postsPerDay,
-        topics: topics.trim() ? topics.split(',').map(t => t.trim()) : undefined,
+        postCount: Math.min(postCount, emptySlots.length),
+        topic: topic.trim() || undefined,
         tone: tone as any,
+        emptySlots,
       };
 
       const result = await aiService.generateCalendarPosts(input);
@@ -109,7 +137,7 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
       setSelectedPosts(allIndices);
       
       setStep('review');
-      toast.success(`Generated ${result.totalGenerated} posts!`);
+      toast.success(`Generated ${result.totalGenerated} posts for empty slots!`);
     } catch (error) {
       console.error('Failed to generate calendar posts:', error);
       toast.error('Failed to generate posts. Please try again.');
@@ -144,11 +172,22 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
         } as CreatePostInput;
       });
 
-      await PostService.bulkCreatePosts(postInputs);
-      setScheduledCount(postsToSchedule.length);
+      const result = await PostService.bulkCreatePosts(postInputs);
+      
+      if (result.failed.length > 0) {
+        setScheduledCount(result.created.length);
+        if (result.created.length > 0) {
+          toast.success(`${result.created.length} posts scheduled successfully. ${result.failed.length} posts failed.`);
+        } else {
+          toast.error('All posts failed to schedule. Please try again.');
+        }
+      } else {
+        setScheduledCount(result.created.length);
+        toast.success(`Successfully scheduled ${result.created.length} posts!`);
+      }
+      
       setStep('done');
-      toast.success(`Successfully scheduled ${postsToSchedule.length} posts!`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to schedule posts:', error);
       toast.error('Failed to schedule posts. Please try again.');
     } finally {
@@ -255,16 +294,20 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Posts per Day: {postsPerDay}
+          Number of Posts: {postCount}
         </label>
         <input
           type="range"
           min="1"
-          max="5"
-          value={postsPerDay}
-          onChange={(e) => setPostsPerDay(parseInt(e.target.value))}
+          max="30"
+          value={postCount}
+          onChange={(e) => setPostCount(parseInt(e.target.value))}
           className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
         />
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>1</span>
+          <span>30</span>
+        </div>
       </div>
 
       <div>
@@ -285,17 +328,26 @@ export const CalendarAutoFillModal: React.FC<CalendarAutoFillModalProps> = ({
       </div>
 
       <div>
-        <label htmlFor="topics" className="block text-sm font-medium text-gray-700 mb-1">
-          Topics (optional)
+        <label htmlFor="topic" className="block text-sm font-medium text-gray-700 mb-1">
+          Topic or Theme (optional)
         </label>
-        <textarea
-          id="topics"
-          placeholder="What topics should we cover? (comma-separated)"
-          value={topics}
-          onChange={(e) => setTopics(e.target.value)}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
+        <div className="relative">
+          <textarea
+            id="topic"
+            placeholder="e.g., Black Friday sale, product launch, wellness tips"
+            value={topic}
+            onChange={(e) => {
+              if (e.target.value.length <= 200) {
+                setTopic(e.target.value);
+              }
+            }}
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <div className="absolute bottom-2 right-2 text-xs text-gray-500">
+            {topic.length}/200
+          </div>
+        </div>
       </div>
 
       <button 

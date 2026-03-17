@@ -800,7 +800,7 @@ export class PostController {
       }));
 
       // Create posts using the static method
-      const createdPosts = await PostService.bulkCreatePosts(
+      const result = await PostService.bulkCreatePosts(
         workspaceId,
         userId,
         postsWithWorkspace
@@ -809,12 +809,22 @@ export class PostController {
       logger.info('Bulk posts created via API', {
         workspaceId,
         userId,
-        count: createdPosts.length,
+        created: result.created.length,
+        failed: result.failed.length,
       });
 
+      if (result.failed.length > 0 && result.created.length === 0) {
+        // Total failure
+        sendError(res, 'BULK_CREATE_FAILED', 'All posts failed to create', 400, {
+          failed: result.failed,
+        });
+        return;
+      }
+
       sendSuccess(res, {
-        posts: createdPosts,
-        count: createdPosts.length,
+        created: result.created,
+        failed: result.failed,
+        count: result.created.length,
       });
     } catch (error: any) {
       logger.error('Failed to bulk create posts', {

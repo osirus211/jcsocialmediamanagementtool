@@ -86,9 +86,9 @@ router.post('/suggest-reply', checkAILimit, AIController.suggestReply);
 router.post('/analyze-sentiment', AIController.analyzeSentiment);
 
 /**
- * @route   POST /api/v1/ai/generate-calendar
+ * @route   POST /api/v1/ai/generate-posts
  */
-router.post('/generate-calendar', checkAILimit, validateRequest(generateCalendarSchema), AIController.generateCalendarPosts);
+router.post('/generate-posts', checkAILimit, validateRequest(generateCalendarSchema), AIController.generateCalendarPosts);
 
 /**
  * @route   POST /api/v1/ai/image-caption

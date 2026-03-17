@@ -32,9 +32,10 @@ export const generateCalendarSchema = z.object({
   startDate: z.string().refine((date) => !isNaN(Date.parse(date)), 'Invalid start date'),
   endDate: z.string().refine((date) => !isNaN(Date.parse(date)), 'Invalid end date'),
   platforms: z.array(z.string()).min(1, 'At least one platform is required'),
-  postsPerDay: z.number().int().min(1).max(5).default(1),
-  topics: z.array(z.string()).max(10).optional(),
+  postCount: z.number().int().min(1).max(30),
+  topic: z.string().max(200).optional(),
   tone: z.enum(['professional', 'casual', 'humorous', 'inspirational']).optional(),
+  emptySlots: z.array(z.string()),
 }).refine((data) => {
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);

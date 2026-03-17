@@ -398,7 +398,7 @@ export class EnhancedSchedulingController {
       }));
 
       // Create posts using bulk service
-      const createdPosts = await PostService.bulkCreatePosts(
+      const result = await PostService.bulkCreatePosts(
         workspaceId,
         userId,
         postsWithContext
@@ -407,14 +407,16 @@ export class EnhancedSchedulingController {
       logger.info('Bulk scheduling completed', {
         workspaceId,
         userId,
-        postsScheduled: createdPosts.length,
+        postsScheduled: result.created.length,
+        postsFailed: result.failed.length,
         timezone,
         timezoneConversions: timezone !== 'UTC',
       });
 
       sendSuccess(res, {
-        scheduledPosts: createdPosts.map(post => post.toJSON()),
-        count: createdPosts.length,
+        scheduledPosts: result.created.map(post => post.toJSON()),
+        count: result.created.length,
+        failed: result.failed,
         timezone,
         scheduledAt: new Date(),
       }, 201);

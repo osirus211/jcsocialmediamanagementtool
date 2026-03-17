@@ -155,9 +155,10 @@ export interface GenerateCalendarInput {
   startDate: string;
   endDate: string;
   platforms: string[];
-  postsPerDay?: number;
-  topics?: string[];
+  postCount: number;
+  topic?: string;
   tone?: 'professional' | 'casual' | 'humorous' | 'inspirational';
+  emptySlots: string[];
 }
 
 export interface GeneratedPost {
@@ -488,7 +489,7 @@ class AIService {
    * Generate calendar posts for auto-fill
    */
   async generateCalendarPosts(input: GenerateCalendarInput): Promise<GenerateCalendarOutput> {
-    const response = await apiClient.post('/ai/generate-calendar', input);
+    const response = await apiClient.post('/ai/generate-posts', input);
     return response.data;
   }
 

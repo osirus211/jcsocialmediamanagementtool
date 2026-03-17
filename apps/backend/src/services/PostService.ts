@@ -1017,7 +1017,7 @@ export class PostService {
     workspaceId: string,
     userId: string,
     posts: CreatePostInput[]
-  ): Promise<IScheduledPost[]> {
+  ): Promise<{ created: IScheduledPost[]; failed: Array<{ post: CreatePostInput; reason: string }> }> {
     logger.info('Creating bulk scheduled posts', {
       workspaceId,
       userId,
@@ -1031,30 +1031,37 @@ export class PostService {
       }
     }
 
-    // Create all posts in parallel
+    const created: IScheduledPost[] = [];
+    const failed: Array<{ post: CreatePostInput; reason: string }> = [];
+
+    // Create posts individually to handle partial failures
     const postService = new PostService();
-    const createdPosts = await Promise.all(
-      posts.map(async (postInput) => {
-        try {
-          return await postService.createPost(postInput);
-        } catch (error) {
-          logger.error('Failed to create post in bulk operation', {
-            workspaceId,
-            error: error.message,
-            postInput,
-          });
-          throw error;
-        }
-      })
-    );
+    
+    for (const postInput of posts) {
+      try {
+        const createdPost = await postService.createPost(postInput);
+        created.push(createdPost);
+      } catch (error: any) {
+        logger.error('Failed to create post in bulk operation', {
+          workspaceId,
+          error: error.message,
+          postInput,
+        });
+        failed.push({
+          post: postInput,
+          reason: error.message,
+        });
+      }
+    }
 
     logger.info('Bulk post creation completed', {
       workspaceId,
       userId,
-      created: createdPosts.length,
+      created: created.length,
+      failed: failed.length,
     });
 
-    return createdPosts;
+    return { created, failed };
   }
 
     /**

@@ -41,9 +41,12 @@ export class PostService {
   /**
    * Create multiple posts in bulk
    */
-  static async bulkCreatePosts(posts: CreatePostInput[]): Promise<Post[]> {
+  static async bulkCreatePosts(posts: CreatePostInput[]): Promise<{ created: Post[]; failed: Array<{ post: CreatePostInput; reason: string }> }> {
     const response = await apiClient.post('/posts/bulk', { posts });
-    return response.data.posts;
+    return {
+      created: response.data.created || [],
+      failed: response.data.failed || [],
+    };
   }
 }
 

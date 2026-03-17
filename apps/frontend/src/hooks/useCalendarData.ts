@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { Post, PostStatus, PostsResponse } from '@/types/post.types';
+import { SocialPlatform } from '@/types/social.types';
 
 /**
  * Calendar data cache
@@ -28,8 +29,11 @@ interface DateRange {
  * - Lazy loading by date range
  * - Caching by range
  * - Member filtering (client-side)
+ * - Platform filtering (client-side)
+ * - Account filtering (client-side)
  * - Optimistic updates
  * - Rollback on failure
+ * - Filter state persistence
  * 
  * Performance:
  * - Only fetches visible date range
@@ -40,6 +44,8 @@ interface DateRange {
 export function useCalendarData() {
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [activePlatforms, setActivePlatforms] = useState<string[]>([]);
+  const [activeAccountIds, setActiveAccountIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -49,25 +55,149 @@ export function useCalendarData() {
   // Track current range to prevent duplicate fetches
   const currentRangeRef = useRef<string | null>(null);
 
+  // Load filter state from localStorage on mount
+  useEffect(() => {
+    const savedFilters = localStorage.getItem('calendar-filters');
+    if (savedFilters) {
+      try {
+        const { activePlatforms: savedPlatforms, activeAccountIds: savedAccounts } = JSON.parse(savedFilters);
+        if (Array.isArray(savedPlatforms)) setActivePlatforms(savedPlatforms);
+        if (Array.isArray(savedAccounts)) setActiveAccountIds(savedAccounts);
+      } catch (error) {
+        console.warn('Failed to load saved calendar filters:', error);
+      }
+    }
+  }, []);
+
+  // Save filter state to localStorage when it changes
+  useEffect(() => {
+    const filters = { activePlatforms, activeAccountIds };
+    localStorage.setItem('calendar-filters', JSON.stringify(filters));
+  }, [activePlatforms, activeAccountIds]);
+
   /**
-   * Filter posts by selected members (client-side)
+   * Filter posts by selected members, platforms, and accounts (client-side)
    */
   const filteredPosts = useMemo(() => {
-    if (selectedMemberIds.length === 0) {
-      return allPosts; // Show all if no filter
+    let filtered = allPosts;
+    
+    // Filter by members
+    if (selectedMemberIds.length > 0) {
+      filtered = filtered.filter(post => {
+        const createdBy = typeof post.createdBy === 'string' ? post.createdBy : post.createdBy?._id;
+        return createdBy && selectedMemberIds.includes(createdBy);
+      });
     }
     
-    return allPosts.filter(post => {
-      const createdBy = typeof post.createdBy === 'string' ? post.createdBy : post.createdBy?._id;
-      return createdBy && selectedMemberIds.includes(createdBy);
-    });
-  }, [allPosts, selectedMemberIds]);
+    // Filter by platforms
+    if (activePlatforms.length > 0) {
+      filtered = filtered.filter(post => {
+        const account = typeof post.socialAccountId === 'string' ? null : post.socialAccountId;
+        if (!account) return false;
+        return activePlatforms.includes(account.platform);
+      });
+    }
+    
+    // Filter by accounts
+    if (activeAccountIds.length > 0) {
+      filtered = filtered.filter(post => {
+        const accountId = typeof post.socialAccountId === 'string' ? post.socialAccountId : post.socialAccountId?._id;
+        return accountId && activeAccountIds.includes(accountId);
+      });
+    }
+    
+    return filtered;
+  }, [allPosts, selectedMemberIds, activePlatforms, activeAccountIds]);
 
+  /**
+   * Calculate platform counts based on current filters
+   */
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    
+    // Apply member and account filters, but not platform filters
+    let postsForCounting = allPosts;
+    
+    if (selectedMemberIds.length > 0) {
+      postsForCounting = postsForCounting.filter(post => {
+        const createdBy = typeof post.createdBy === 'string' ? post.createdBy : post.createdBy?._id;
+        return createdBy && selectedMemberIds.includes(createdBy);
+      });
+    }
+    
+    if (activeAccountIds.length > 0) {
+      postsForCounting = postsForCounting.filter(post => {
+        const accountId = typeof post.socialAccountId === 'string' ? post.socialAccountId : post.socialAccountId?._id;
+        return accountId && activeAccountIds.includes(accountId);
+      });
+    }
+    
+    // Count posts by platform
+    postsForCounting.forEach(post => {
+      const account = typeof post.socialAccountId === 'string' ? null : post.socialAccountId;
+      if (account?.platform) {
+        counts[account.platform] = (counts[account.platform] || 0) + 1;
+      }
+    });
+    
+    return counts;
+  }, [allPosts, selectedMemberIds, activeAccountIds]);
+
+  /**
+   * Check if any filters are active
+   */
+  const hasActiveFilters = useMemo(() => {
+    return activePlatforms.length > 0 || activeAccountIds.length > 0;
+  }, [activePlatforms, activeAccountIds]);
   /**
    * Update member filter
    */
   const filterByMembers = useCallback((memberIds: string[]) => {
     setSelectedMemberIds(memberIds);
+  }, []);
+
+  /**
+   * Platform filter actions
+   */
+  const setActivePlatformsAction = useCallback((platforms: string[]) => {
+    setActivePlatforms(platforms);
+  }, []);
+
+  const togglePlatform = useCallback((platform: string) => {
+    setActivePlatforms(prev => 
+      prev.includes(platform) 
+        ? prev.filter(p => p !== platform)
+        : [...prev, platform]
+    );
+  }, []);
+
+  /**
+   * Account filter actions
+   */
+  const setActiveAccountIdsAction = useCallback((accountIds: string[]) => {
+    setActiveAccountIds(accountIds);
+  }, []);
+
+  const toggleAccountId = useCallback((accountId: string) => {
+    if (accountId === '') {
+      // Clear all account filters
+      setActiveAccountIds([]);
+      return;
+    }
+    
+    setActiveAccountIds(prev => 
+      prev.includes(accountId) 
+        ? prev.filter(id => id !== accountId)
+        : [...prev, accountId]
+    );
+  }, []);
+
+  /**
+   * Clear all filters
+   */
+  const clearAllFilters = useCallback(() => {
+    setActivePlatforms([]);
+    setActiveAccountIds([]);
   }, []);
 
   /**
@@ -250,6 +380,12 @@ export function useCalendarData() {
     posts: filteredPosts,
     allPosts,
     selectedMemberIds,
+    platformCounts,
+    
+    // Filter state
+    activePlatforms,
+    activeAccountIds,
+    hasActiveFilters,
     
     // State
     isLoading,
@@ -258,6 +394,11 @@ export function useCalendarData() {
     // Actions
     fetchPostsByRange,
     filterByMembers,
+    setActivePlatforms: setActivePlatformsAction,
+    setActiveAccountIds: setActiveAccountIdsAction,
+    togglePlatform,
+    toggleAccountId,
+    clearAllFilters,
     refetch,
     reschedulePost,
     clearError,

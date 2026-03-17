@@ -54,10 +54,19 @@ export const CalendarPage = () => {
     posts,
     allPosts,
     selectedMemberIds,
+    platformCounts,
+    activePlatforms,
+    activeAccountIds,
+    hasActiveFilters,
     isLoading,
     error,
     fetchPostsByRange,
     filterByMembers,
+    setActivePlatforms,
+    setActiveAccountIds,
+    togglePlatform,
+    toggleAccountId,
+    clearAllFilters,
     reschedulePost,
     clearError,
   } = useCalendarData();
@@ -337,9 +346,16 @@ export const CalendarPage = () => {
           onViewModeChange={setViewMode}
           selectedMemberIds={selectedMemberIds}
           onFilterByMembers={filterByMembers}
-          postCount={filteredPosts.length}
+          postCount={posts.length}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          activePlatforms={activePlatforms}
+          activeAccountIds={activeAccountIds}
+          platformCounts={platformCounts}
+          hasActiveFilters={hasActiveFilters}
+          onTogglePlatform={togglePlatform}
+          onToggleAccountId={toggleAccountId}
+          onClearAllFilters={clearAllFilters}
         />
 
         <div className="flex-1 p-6">

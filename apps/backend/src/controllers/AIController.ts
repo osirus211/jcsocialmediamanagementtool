@@ -14,6 +14,8 @@ import {
 } from '../ai/types';
 import { logger } from '../utils/logger';
 import { usageService } from '../services/UsageService';
+import { Workspace } from '../models/Workspace';
+import { redisClient } from '../utils/redisClient';
 
 export class AIController {
   /**
@@ -780,24 +782,36 @@ export class AIController {
    */
   static async generateCalendarPosts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { startDate, endDate, platforms, postsPerDay = 1, topics, tone } = req.body;
+      const { startDate, endDate, platforms, postCount, topic, tone, emptySlots } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
 
-      if (!startDate || !endDate || !platforms || !Array.isArray(platforms)) {
+      if (!workspaceId) {
         res.status(400).json({
           success: false,
-          message: 'Missing required fields: startDate, endDate, platforms (array)',
+          message: 'Workspace ID is required',
         });
         return;
       }
 
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (daysDiff > 30) {
-        res.status(400).json({
+      // Fetch workspace context for brand information
+      const workspace = await Workspace.findById(workspaceId);
+      if (!workspace) {
+        res.status(404).json({
           success: false,
-          message: 'Date range cannot exceed 30 days',
+          message: 'Workspace not found',
+        });
+        return;
+      }
+
+      // Rate limiting: max 10 generation requests per workspace per hour
+      const rateLimitKey = `ai_generation:${workspaceId}`;
+      const redis = redisClient.getClient();
+      const currentCount = await redis.get(rateLimitKey);
+      if (currentCount && parseInt(currentCount) >= 10) {
+        res.status(429).json({
+          success: false,
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Maximum 10 AI generation requests per hour per workspace',
         });
         return;
       }
@@ -805,80 +819,71 @@ export class AIController {
       const aiModule = getAIModule();
       const generatedPosts = [];
 
-      // Generate posts for each day and platform
-      for (let day = 0; day <= daysDiff; day++) {
-        const currentDate = new Date(start);
-        currentDate.setDate(start.getDate() + day);
+      // Use only the requested number of empty slots
+      const slotsToFill = emptySlots.slice(0, postCount);
 
+      // Generate posts for each empty slot and platform
+      for (const slot of slotsToFill) {
         for (const platform of platforms) {
-          for (let postIndex = 0; postIndex < postsPerDay; postIndex++) {
-            try {
-              // Generate content suggestions
-              const suggestionResult = await aiModule.suggestion.generateSuggestions({
-                platform,
-                type: 'hook',
-              });
+          try {
+            // Build context-aware prompt
+            const contextPrompt = [
+              workspace.name && `Brand: ${workspace.name}`,
+              workspace.settings.industry && `Industry: ${workspace.settings.industry}`,
+              workspace.clientPortal.brandName && `Brand Name: ${workspace.clientPortal.brandName}`,
+              topic && `Topic: ${topic}`,
+            ].filter(Boolean).join(', ');
 
-              const topic = topics && topics.length > 0 
-                ? topics[Math.floor(Math.random() * topics.length)]
-                : suggestionResult.suggestions[0] || 'Engaging content';
+            // Generate caption with workspace context
+            const captionResult = await aiModule.caption.generateCaption({
+              topic: contextPrompt || 'Engaging content',
+              tone: tone || 'casual',
+              platform,
+              length: ContentLength.MEDIUM,
+            });
 
-              // Generate caption
-              const captionResult = await aiModule.caption.generateCaption({
-                topic,
-                tone: tone || 'casual',
-                platform,
-                length: ContentLength.MEDIUM,
-              });
+            // Generate hashtags
+            const hashtagResult = await aiModule.hashtag.generateHashtags({
+              caption: captionResult.caption,
+              platform,
+              count: 5,
+            });
 
-              // Generate hashtags
-              const hashtagResult = await aiModule.hashtag.generateHashtags({
-                caption: captionResult.caption,
-                platform,
-                count: 5,
-              });
-
-              // Calculate optimal posting time (spread across business hours 9am-6pm)
-              const scheduledTime = new Date(currentDate);
-              const baseHour = 9 + Math.floor((postIndex * 9) / postsPerDay); // Spread across 9am-6pm
-              const randomMinutes = Math.floor(Math.random() * 60);
-              scheduledTime.setHours(baseHour, randomMinutes, 0, 0);
-
-              generatedPosts.push({
-                platform,
-                content: captionResult.caption,
-                hashtags: hashtagResult.hashtags,
-                scheduledAt: scheduledTime.toISOString(),
-                suggestedTime: scheduledTime.toISOString(),
-              });
-            } catch (error) {
-              logger.error('Failed to generate post for calendar', {
-                day,
-                platform,
-                postIndex,
-                error: error.message,
-              });
-            }
+            generatedPosts.push({
+              platform,
+              content: captionResult.caption,
+              hashtags: hashtagResult.hashtags,
+              scheduledAt: slot,
+              proposedScheduledAt: slot,
+            });
+          } catch (error) {
+            logger.error('Failed to generate post for calendar slot', {
+              slot,
+              platform,
+              error: error.message,
+            });
           }
         }
       }
 
+      // Increment rate limit counter
+      await redis.setex(rateLimitKey, 3600, (parseInt(currentCount || '0') + 1).toString());
+
       // Track AI usage
-      const workspaceId = req.workspace?.workspaceId.toString();
       if (workspaceId) {
-        // Increment for each AI call made
-        const aiCallsCount = generatedPosts.length * 3; // suggestion + caption + hashtag per post
+        const aiCallsCount = generatedPosts.length * 2; // caption + hashtag per post
         for (let i = 0; i < aiCallsCount; i++) {
           await usageService.incrementAI(workspaceId);
         }
       }
 
       logger.info('Calendar posts generated', {
-        workspaceId: req.workspace?.workspaceId,
+        workspaceId,
         userId: req.user?.userId,
         totalGenerated: generatedPosts.length,
         dateRange: { startDate, endDate },
         platforms,
+        emptySlots: slotsToFill.length,
       });
 
       res.json({
@@ -889,6 +894,15 @@ export class AIController {
         },
       });
     } catch (error: any) {
+      if (error.message.includes('AI_PROVIDER_ERROR')) {
+        res.status(502).json({
+          success: false,
+          code: 'AI_PROVIDER_ERROR',
+          message: 'AI service is temporarily unavailable',
+        });
+        return;
+      }
+      
       logger.error('Generate calendar posts error:', error);
       next(error);
     }
