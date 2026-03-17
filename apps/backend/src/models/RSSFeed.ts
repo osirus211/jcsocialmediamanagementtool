@@ -13,6 +13,9 @@ export interface IRSSFeed extends Document {
   enabled: boolean;
   failureCount: number;
   lastError?: string;
+  keywordsInclude: string[]; // Articles must contain at least one
+  keywordsExclude: string[]; // Articles skipped if they contain any
+  targetPlatforms: string[]; // Default platforms for drafts
   createdAt: Date;
   updatedAt: Date;
   createdBy: mongoose.Types.ObjectId;
@@ -63,6 +66,20 @@ const RSSFeedSchema = new Schema<IRSSFeed>(
     lastError: {
       type: String,
     },
+    keywordsInclude: [{
+      type: String,
+      trim: true,
+      lowercase: true,
+    }],
+    keywordsExclude: [{
+      type: String,
+      trim: true,
+      lowercase: true,
+    }],
+    targetPlatforms: [{
+      type: String,
+      enum: ['linkedin', 'twitter', 'facebook', 'instagram'],
+    }],
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'User',

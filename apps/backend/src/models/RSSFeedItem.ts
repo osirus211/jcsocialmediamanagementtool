@@ -15,6 +15,7 @@ export interface IRSSFeedItem extends Document {
   author?: string;
   content?: string;
   categories?: string[];
+  status: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
 }
 
@@ -70,6 +71,12 @@ const RSSFeedItemSchema = new Schema<IRSSFeedItem>(
         trim: true,
       },
     ],
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
+      index: true,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
@@ -82,8 +89,11 @@ const RSSFeedItemSchema = new Schema<IRSSFeedItem>(
 // Deduplication - prevent duplicate items by guid per feed
 RSSFeedItemSchema.index({ feedId: 1, guid: 1 }, { unique: true });
 
-// Query items by feed with pagination
-RSSFeedItemSchema.index({ workspaceId: 1, feedId: 1, createdAt: -1 });
+// Query items by feed with pagination and status
+RSSFeedItemSchema.index({ workspaceId: 1, feedId: 1, status: 1, createdAt: -1 });
+
+// Query pending items across workspace
+RSSFeedItemSchema.index({ workspaceId: 1, status: 1, createdAt: -1 });
 
 // TTL index - automatically delete feed items older than 30 days
 RSSFeedItemSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });

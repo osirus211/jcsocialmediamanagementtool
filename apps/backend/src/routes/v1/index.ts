@@ -32,6 +32,7 @@ import trendsRoutes from './trends.routes'; // Phase-4: Trends
 import workflowsRoutes from './workflows.routes'; // Phase-5: Automation workflows
 import alttextRoutes from './alttext.routes'; // Alt text generation and validation
 import rssFeedsRoutes from './rss-feeds.routes'; // Phase-5: RSS feeds
+import rssArticlesRoutes from './rss-articles.routes'; // Phase-5: RSS articles
 import evergreenRoutes from './evergreen.routes'; // Phase-5: Evergreen content
 import reportsRoutes from './reports.routes'; // Phase-3: Scheduled reports
 import webhooksOutboundRoutes from './webhooks-outbound.routes'; // Outbound webhooks
@@ -101,6 +102,7 @@ router.get('/', (_req, res) => {
       trends: '/api/v1/trends',
       workflows: '/api/v1/workflows',
       rssFeeds: '/api/v1/rss-feeds',
+      rssArticles: '/api/v1/rss/articles',
       evergreenRules: '/api/v1/evergreen-rules',
       reports: '/api/v1/reports',
       webhooksOutbound: '/api/v1/webhooks/outbound',
@@ -177,6 +179,7 @@ router.use('/mentions', mentionsRoutes); // Phase-4: Mentions
 router.use('/trends', trendsRoutes); // Phase-4: Trends
 router.use('/workflows', workflowsRoutes); // Phase-5: Automation workflows
 router.use('/rss-feeds', rssFeedsRoutes); // Phase-5: RSS feeds
+router.use('/rss/articles', rssArticlesRoutes); // Phase-5: RSS articles
 router.use('/evergreen-rules', evergreenRoutes); // Phase-5: Evergreen content
 router.use('/reports', reportsRoutes); // Phase-3: Scheduled reports
 router.use('/webhooks/outbound', webhooksOutboundRoutes); // Outbound webhooks

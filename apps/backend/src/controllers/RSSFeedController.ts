@@ -7,6 +7,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { RSSFeedService } from '../services/RSSFeedService';
+import { RSSFeedItem } from '../models/RSSFeedItem';
 import { logger } from '../utils/logger';
 import {
   sendSuccess,
@@ -288,6 +289,241 @@ export class RSSFeedController {
   }
 
   /**
+   * POST /api/v1/rss-feeds/:id/fetch
+   * Trigger immediate feed refresh
+   */
+  async refreshRSSFeed(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const workspaceId = req.workspace?.workspaceId.toString();
+
+      if (!workspaceId) {
+        sendError(res, 'MISSING_WORKSPACE', 'Workspace required', 400);
+        return;
+      }
+
+      const result = await RSSFeedService.refreshFeed(id, workspaceId);
+
+      logger.info('RSS feed refreshed via API', {
+        feedId: id,
+        workspaceId,
+        newItems: result.newItems,
+      });
+
+      sendSuccess(res, {
+        message: `Feed refreshed successfully. ${result.newItems} new items found.`,
+        newItems: result.newItems,
+      });
+    } catch (error: any) {
+      logger.error('Failed to refresh RSS feed', {
+        error: error.message,
+        feedId: req.params.id,
+      });
+
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/rss/articles
+   * Get pending articles across workspace
+   */
+  async getPendingArticles(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const { page, limit, status } = req.query;
+
+      if (!workspaceId) {
+        sendError(res, 'MISSING_WORKSPACE', 'Workspace required', 400);
+        return;
+      }
+
+      const result = await RSSFeedService.getPendingArticles(workspaceId, {
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20,
+      });
+
+      const totalPages = Math.ceil(result.total / result.limit);
+
+      sendSuccess(
+        res,
+        {
+          articles: result.items,
+        },
+        200,
+        {
+          pagination: {
+            total: result.total,
+            page: result.page,
+            limit: result.limit,
+            totalPages,
+          },
+        }
+      );
+    } catch (error: any) {
+      logger.error('Failed to get pending articles', {
+        error: error.message,
+      });
+
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/rss/articles/:id
+   * Update article status (approve/reject)
+   */
+  async updateArticleStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      if (!workspaceId || !userId) {
+        sendError(res, 'MISSING_REQUIRED_FIELDS', 'Workspace and user required', 400);
+        return;
+      }
+
+      if (!['approved', 'rejected'].includes(status)) {
+        sendValidationError(res, [{ field: 'status', message: 'Status must be approved or rejected' }]);
+        return;
+      }
+
+      const article = await RSSFeedService.updateArticleStatus(id, workspaceId, status);
+
+      if (!article) {
+        sendNotFound(res, 'Article not found');
+        return;
+      }
+
+      // If approved, convert to draft
+      if (status === 'approved') {
+        try {
+          const draft = await RSSFeedService.convertItemToDraft(
+            article,
+            workspaceId,
+            userId,
+            { aiEnhance: false }
+          );
+
+          logger.info('Article approved and converted to draft', {
+            articleId: id,
+            draftId: draft._id,
+            workspaceId,
+          });
+
+          sendSuccess(res, {
+            article: article.toJSON(),
+            draft: draft.toJSON(),
+            message: 'Article approved and draft created',
+          });
+        } catch (draftError: any) {
+          logger.error('Failed to create draft after approval', {
+            articleId: id,
+            error: draftError.message,
+          });
+
+          sendSuccess(res, {
+            article: article.toJSON(),
+            message: 'Article approved but draft creation failed',
+            error: draftError.message,
+          });
+        }
+      } else {
+        sendSuccess(res, {
+          article: article.toJSON(),
+          message: 'Article rejected',
+        });
+      }
+    } catch (error: any) {
+      logger.error('Failed to update article status', {
+        error: error.message,
+        articleId: req.params.id,
+      });
+
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/rss/articles/bulk
+   * Bulk approve or reject articles
+   */
+  async bulkUpdateArticleStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids, status } = req.body;
+      const workspaceId = req.workspace?.workspaceId.toString();
+      const userId = req.user?.userId.toString();
+
+      if (!workspaceId || !userId) {
+        sendError(res, 'MISSING_REQUIRED_FIELDS', 'Workspace and user required', 400);
+        return;
+      }
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        sendValidationError(res, [{ field: 'ids', message: 'IDs array is required' }]);
+        return;
+      }
+
+      if (!['approved', 'rejected'].includes(status)) {
+        sendValidationError(res, [{ field: 'status', message: 'Status must be approved or rejected' }]);
+        return;
+      }
+
+      const updatedCount = await RSSFeedService.bulkUpdateArticleStatus(ids, workspaceId, status);
+
+      // If approved, convert all to drafts
+      let draftsCreated = 0;
+      if (status === 'approved') {
+        for (const articleId of ids) {
+          try {
+            const article = await RSSFeedItem.findOne({
+              _id: articleId,
+              workspaceId,
+              status: 'approved',
+            });
+
+            if (article) {
+              await RSSFeedService.convertItemToDraft(
+                article,
+                workspaceId,
+                userId,
+                { aiEnhance: false }
+              );
+              draftsCreated++;
+            }
+          } catch (draftError: any) {
+            logger.error('Failed to create draft in bulk operation', {
+              articleId,
+              error: draftError.message,
+            });
+          }
+        }
+      }
+
+      logger.info('Bulk article status update completed', {
+        workspaceId,
+        status,
+        updatedCount,
+        draftsCreated,
+      });
+
+      sendSuccess(res, {
+        message: `${updatedCount} articles ${status}${status === 'approved' ? `, ${draftsCreated} drafts created` : ''}`,
+        updatedCount,
+        draftsCreated,
+      });
+    } catch (error: any) {
+      logger.error('Failed to bulk update article status', {
+        error: error.message,
+      });
+
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/v1/rss-feeds/items/:itemId/convert-to-draft
    * Convert RSS item to draft post
    */
@@ -304,7 +540,6 @@ export class RSSFeedController {
       }
 
       // Get the RSS feed item
-      const { RSSFeedItem } = await import('../models/RSSFeedItem');
       const feedItem = await RSSFeedItem.findOne({
         _id: itemId,
         workspaceId,

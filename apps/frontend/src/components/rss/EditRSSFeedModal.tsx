@@ -1,38 +1,34 @@
 /**
- * Add RSS Feed Modal Component
- * Modal form for adding new RSS feeds
+ * Edit RSS Feed Modal Component
+ * Modal form for editing existing RSS feeds
  */
 
-import React, { useState } from 'react';
-import { X, Loader2, Globe, Sparkles, ToggleLeft, ToggleRight } from 'lucide-react';
-import { rssService, CreateFeedInput } from '@/services/rss.service';
+import React, { useState, useEffect } from 'react';
+import { X, Loader2, Globe, Tag, AlertCircle } from 'lucide-react';
+import { rssService, RSSFeed, UpdateFeedInput } from '@/services/rss.service';
 import { toast } from '@/lib/notifications';
 
-interface AddRSSFeedModalProps {
+interface EditRSSFeedModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onFeedAdded: () => void;
+  feed: RSSFeed;
+  onFeedUpdated: () => void;
 }
 
-export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
+export const EditRSSFeedModal: React.FC<EditRSSFeedModalProps> = ({
   isOpen,
   onClose,
-  onFeedAdded,
+  feed,
+  onFeedUpdated,
 }) => {
   const [formData, setFormData] = useState({
-    url: '',
     name: '',
     pollingInterval: 60,
-    enabled: true,
   });
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [keywordsInclude, setKeywordsInclude] = useState<string[]>([]);
   const [keywordsExclude, setKeywordsExclude] = useState<string[]>([]);
-  const [autoCreateDrafts, setAutoCreateDrafts] = useState(false);
-  const [aiEnhanceDrafts, setAiEnhanceDrafts] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [validating, setValidating] = useState(false);
-  const [urlError, setUrlError] = useState<string>('');
 
   const platforms = [
     { id: 'linkedin', name: 'LinkedIn' },
@@ -42,14 +38,26 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
   ];
 
   const pollingIntervals = [
-    { value: 15, label: '15 minutes' },
-    { value: 30, label: '30 minutes' },
     { value: 60, label: '1 hour' },
     { value: 120, label: '2 hours' },
+    { value: 240, label: '4 hours' },
     { value: 360, label: '6 hours' },
     { value: 720, label: '12 hours' },
     { value: 1440, label: '24 hours' },
   ];
+
+  // Pre-fill form with current feed values
+  useEffect(() => {
+    if (isOpen && feed) {
+      setFormData({
+        name: feed.name,
+        pollingInterval: feed.pollingInterval,
+      });
+      setSelectedPlatforms(feed.targetPlatforms || ['linkedin']);
+      setKeywordsInclude(feed.keywordsInclude || []);
+      setKeywordsExclude(feed.keywordsExclude || []);
+    }
+  }, [isOpen, feed]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -57,110 +65,9 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
     }
   };
 
-  const validateUrl = (url: string): boolean => {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  const handleUrlChange = async (url: string) => {
-    setFormData(prev => ({ ...prev, url }));
-    setUrlError('');
-    
-    // Auto-generate name from URL if name is empty
-    if (!formData.name && url) {
-      try {
-        const urlObj = new URL(url);
-        const hostname = urlObj.hostname.replace('www.', '');
-        const suggestedName = hostname.split('.')[0];
-        setFormData(prev => ({ 
-          ...prev, 
-          name: suggestedName.charAt(0).toUpperCase() + suggestedName.slice(1) + ' RSS'
-        }));
-      } catch {
-        // Invalid URL, don't auto-generate name
-      }
-    }
-
-    // Check for duplicate URL
-    if (validateUrl(url)) {
-      try {
-        const duplicateCheck = await rssService.checkDuplicateFeed(url);
-        if (duplicateCheck.exists) {
-          setUrlError(`This feed is already added as "${duplicateCheck.feedName}"`);
-        }
-      } catch (error) {
-        // Ignore duplicate check errors
-      }
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateUrl(formData.url)) {
-      toast.error('Please enter a valid HTTP or HTTPS URL');
-      return;
-    }
-
-    if (urlError) {
-      toast.error(urlError);
-      return;
-    }
-
-    if (!formData.name.trim()) {
-      toast.error('Please enter a feed name');
-      return;
-    }
-
-    setLoading(true);
-    setValidating(true);
-
-    try {
-      const feedInput: CreateFeedInput = {
-        name: formData.name.trim(),
-        url: formData.url.trim(),
-        pollingInterval: formData.pollingInterval,
-        enabled: formData.enabled,
-        keywordsInclude,
-        keywordsExclude,
-        targetPlatforms: selectedPlatforms,
-      };
-
-      await rssService.addFeed(feedInput);
-      
-      toast.success('RSS feed added successfully!');
-      onFeedAdded();
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
       onClose();
-      
-      // Reset form
-      setFormData({
-        url: '',
-        name: '',
-        pollingInterval: 60,
-        enabled: true,
-      });
-      setSelectedPlatforms(['linkedin']);
-      setKeywordsInclude([]);
-      setKeywordsExclude([]);
-      setAutoCreateDrafts(false);
-      setAiEnhanceDrafts(false);
-      setUrlError('');
-    } catch (error: any) {
-      console.error('Failed to add RSS feed:', error);
-      if (error.response?.status === 422) {
-        toast.error('Could not parse RSS feed — check the URL');
-      } else if (error.response?.status === 409) {
-        toast.error('This RSS feed URL is already added');
-      } else {
-        toast.error('Failed to add RSS feed');
-      }
-    } finally {
-      setLoading(false);
-      setValidating(false);
     }
   };
 
@@ -205,18 +112,52 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
     );
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      toast.error('Please enter a feed name');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const updateData: UpdateFeedInput = {
+        name: formData.name.trim(),
+        pollingInterval: formData.pollingInterval,
+        keywordsInclude,
+        keywordsExclude,
+        targetPlatforms: selectedPlatforms,
+      };
+
+      await rssService.updateFeed(feed._id, updateData);
+      
+      toast.success('RSS feed updated successfully!');
+      onFeedUpdated();
+      onClose();
+    } catch (error: any) {
+      console.error('Failed to update RSS feed:', error);
+      toast.error('Failed to update RSS feed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-900">
-            Add RSS Feed
+            Edit RSS Feed
           </h2>
           <button
             onClick={onClose}
@@ -227,31 +168,7 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* RSS URL */}
-          <div>
-            <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-2">
-              RSS Feed URL *
-            </label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="url"
-                id="url"
-                value={formData.url}
-                onChange={(e) => handleUrlChange(e.target.value)}
-                placeholder="https://example.com/feed.xml"
-                className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  urlError ? 'border-red-300' : 'border-gray-300'
-                }`}
-                required
-              />
-            </div>
-            {urlError && (
-              <p className="mt-1 text-sm text-red-600">{urlError}</p>
-            )}
-          </div>
-
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[calc(90vh-120px)] overflow-y-auto">
           {/* Feed Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -265,6 +182,7 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
               placeholder="My Blog RSS"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required
+              autoFocus
             />
           </div>
 
@@ -383,55 +301,6 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
             </div>
           </div>
 
-          {/* Auto-create Drafts Toggle */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <div className="flex items-center">
-                <span className="text-sm font-medium text-gray-700">Auto-create drafts</span>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Automatically create draft posts from new RSS items
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAutoCreateDrafts(!autoCreateDrafts)}
-              className="flex items-center"
-            >
-              {autoCreateDrafts ? (
-                <ToggleRight className="w-6 h-6 text-blue-500" />
-              ) : (
-                <ToggleLeft className="w-6 h-6 text-gray-400" />
-              )}
-            </button>
-          </div>
-
-          {/* AI Enhancement Toggle (only if auto-create is enabled) */}
-          {autoCreateDrafts && (
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-              <div>
-                <div className="flex items-center">
-                  <Sparkles className="w-4 h-4 text-blue-500 mr-1" />
-                  <span className="text-sm font-medium text-gray-700">AI Enhance drafts</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Use AI to improve content before creating drafts
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAiEnhanceDrafts(!aiEnhanceDrafts)}
-                className="flex items-center"
-              >
-                {aiEnhanceDrafts ? (
-                  <ToggleRight className="w-6 h-6 text-blue-500" />
-                ) : (
-                  <ToggleLeft className="w-6 h-6 text-gray-400" />
-                )}
-              </button>
-            </div>
-          )}
-
           {/* Submit Button */}
           <div className="flex space-x-3">
             <button
@@ -443,16 +312,16 @@ export const AddRSSFeedModal: React.FC<AddRSSFeedModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.url || !formData.name || !!urlError}
+              disabled={loading || !formData.name}
               className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {validating ? 'Validating feed...' : 'Adding...'}
+                  Updating...
                 </>
               ) : (
-                'Add Feed'
+                'Update Feed'
               )}
             </button>
           </div>

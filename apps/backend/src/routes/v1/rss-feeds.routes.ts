@@ -359,5 +359,34 @@ router.post('/items/:itemId/convert-to-draft', (req, res, next) => {
   rssFeedController.convertItemToDraft(req, res, next);
 });
 
+/**
+ * @openapi
+ * /api/v1/rss-feeds/{id}/fetch:
+ *   post:
+ *     summary: Trigger immediate feed refresh
+ *     description: Manually refresh an RSS feed to fetch new items
+ *     tags:
+ *       - RSS Feeds
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: RSS feed ID
+ *     responses:
+ *       200:
+ *         description: Feed refreshed successfully
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: RSS feed not found
+ */
+router.post('/:id/fetch', (req, res, next) => {
+  rssFeedController.refreshRSSFeed(req, res, next);
+});
+
 export default router;
 

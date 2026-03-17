@@ -4,21 +4,23 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Rss, TrendingUp, FileText, Info } from 'lucide-react';
+import { Plus, Rss, TrendingUp, FileText, Info, Clock } from 'lucide-react';
 import { rssService, RSSFeed } from '@/services/rss.service';
 import { RSSFeedCard } from '@/components/rss/RSSFeedCard';
 import { AddRSSFeedModal } from '@/components/rss/AddRSSFeedModal';
+import { PendingArticlesQueue } from '@/components/rss/PendingArticlesQueue';
 import { toast } from '@/lib/notifications';
 
 export const RSSPage: React.FC = () => {
   const [feeds, setFeeds] = useState<RSSFeed[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'feeds' | 'pending'>('feeds');
   const [stats, setStats] = useState({
     totalFeeds: 0,
     activeFeeds: 0,
     itemsThisWeek: 0,
-    draftsCreated: 0,
+    pendingArticles: 0,
   });
 
   useEffect(() => {
@@ -28,7 +30,11 @@ export const RSSPage: React.FC = () => {
   const loadFeeds = async () => {
     setLoading(true);
     try {
-      const feedsData = await rssService.getFeeds();
+      const [feedsData, pendingData] = await Promise.all([
+        rssService.getFeeds(),
+        rssService.getPendingArticles(1, 1) // Just get count
+      ]);
+      
       setFeeds(feedsData);
       
       // Calculate stats
@@ -37,7 +43,7 @@ export const RSSPage: React.FC = () => {
         totalFeeds: feedsData.length,
         activeFeeds,
         itemsThisWeek: 0, // TODO: Calculate from actual data
-        draftsCreated: 0, // TODO: Calculate from actual data
+        pendingArticles: pendingData.total,
       });
     } catch (error) {
       console.error('Failed to load RSS feeds:', error);
@@ -81,6 +87,10 @@ export const RSSPage: React.FC = () => {
     loadFeeds(); // Reload feeds after adding a new one
   };
 
+  const handleArticleProcessed = () => {
+    loadFeeds(); // Reload to update pending count
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -114,13 +124,44 @@ export const RSSPage: React.FC = () => {
             Import content from your favorite blogs and websites
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Feed
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* Tab Navigation */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('feeds')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'feeds'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Feeds
+            </button>
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors relative ${
+                activeTab === 'pending'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Pending
+              {stats.pendingArticles > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {stats.pendingArticles > 99 ? '99+' : stats.pendingArticles}
+                </span>
+              )}
+            </button>
+          </div>
+          
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Feed
+          </button>
+        </div>
       </div>
 
       {/* Info Banner */}
@@ -177,46 +218,52 @@ export const RSSPage: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center">
             <div className="p-2 bg-orange-100 rounded-lg">
-              <FileText className="w-5 h-5 text-orange-600" />
+              <Clock className="w-5 h-5 text-orange-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Drafts Created</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.draftsCreated}</p>
+              <p className="text-sm font-medium text-gray-600">Pending Articles</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.pendingArticles}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Feeds List */}
-      {feeds.length === 0 ? (
-        <div className="text-center py-12">
-          <Rss className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No RSS feeds yet
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Add your first RSS feed to start importing content automatically
-          </p>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center mx-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Your First Feed
-          </button>
-        </div>
+      {/* Content based on active tab */}
+      {activeTab === 'feeds' ? (
+        /* Feeds List */
+        feeds.length === 0 ? (
+          <div className="text-center py-12">
+            <Rss className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No RSS feeds yet
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Add your first RSS feed to start importing content automatically
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center mx-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Your First Feed
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {feeds.map((feed) => (
+              <RSSFeedCard
+                key={feed._id}
+                feed={feed}
+                onUpdate={handleUpdateFeed}
+                onDelete={handleDeleteFeed}
+                onRefresh={handleRefreshFeed}
+              />
+            ))}
+          </div>
+        )
       ) : (
-        <div className="space-y-4">
-          {feeds.map((feed) => (
-            <RSSFeedCard
-              key={feed._id}
-              feed={feed}
-              onUpdate={handleUpdateFeed}
-              onDelete={handleDeleteFeed}
-              onRefresh={handleRefreshFeed}
-            />
-          ))}
-        </div>
+        /* Pending Articles Queue */
+        <PendingArticlesQueue onArticleProcessed={handleArticleProcessed} />
       )}
 
       {/* Add Feed Modal */}

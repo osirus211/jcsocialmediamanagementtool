@@ -3,7 +3,7 @@
  * Shows a single RSS feed with controls and status
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
   Clock, 
@@ -15,10 +15,13 @@ import {
   Trash2, 
   ChevronDown, 
   ChevronUp,
-  Sparkles
+  Sparkles,
+  Tag,
+  AlertCircle
 } from 'lucide-react';
-import { RSSFeed } from '@/services/rss.service';
+import { RSSFeed, rssService } from '@/services/rss.service';
 import { RSSFeedItemList } from './RSSFeedItemList';
+import { EditRSSFeedModal } from './EditRSSFeedModal';
 import { toast } from '@/lib/notifications';
 
 interface RSSFeedCardProps {
@@ -37,6 +40,21 @@ export const RSSFeedCard: React.FC<RSSFeedCardProps> = ({
   const [showItems, setShowItems] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    loadPendingCount();
+  }, [feed._id]);
+
+  const loadPendingCount = async () => {
+    try {
+      const result = await rssService.getFeedItems(feed._id, 1, 1, 'pending');
+      setPendingCount(result.total);
+    } catch (error) {
+      // Ignore errors for pending count
+    }
+  };
 
   const formatTimeAgo = (date?: Date) => {
     if (!date) return 'Never';
@@ -71,12 +89,18 @@ export const RSSFeedCard: React.FC<RSSFeedCardProps> = ({
     setIsRefreshing(true);
     try {
       await onRefresh(feed._id);
+      await loadPendingCount(); // Reload pending count after refresh
       toast.success('Feed refreshed successfully');
     } catch (error) {
       toast.error('Failed to refresh feed');
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  const handleFeedUpdated = () => {
+    loadPendingCount(); // Reload pending count after update
+    onUpdate(feed._id, {}); // Trigger parent to reload feeds
   };
 
   const handleDelete = async () => {
@@ -114,6 +138,7 @@ export const RSSFeedCard: React.FC<RSSFeedCardProps> = ({
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
           <button
+            onClick={() => setShowEditModal(true)}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Edit feed"
           >
@@ -159,12 +184,67 @@ export const RSSFeedCard: React.FC<RSSFeedCardProps> = ({
 
         {/* Item Count Badge */}
         <div className="flex items-center space-x-2">
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+              <Clock className="w-3 h-3 mr-1" />
+              {pendingCount} pending
+            </span>
+          )}
           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             <Hash className="w-3 h-3 mr-1" />
             Items
           </span>
         </div>
       </div>
+
+      {/* Keyword Filters Display */}
+      {(feed.keywordsInclude?.length > 0 || feed.keywordsExclude?.length > 0) && (
+        <div className="flex items-center space-x-4 text-sm">
+          {feed.keywordsInclude?.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <Tag className="w-4 h-4 text-green-600" />
+              <span className="text-gray-600">Include:</span>
+              <div className="flex flex-wrap gap-1">
+                {feed.keywordsInclude.slice(0, 3).map((keyword) => (
+                  <span
+                    key={keyword}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                  >
+                    {keyword}
+                  </span>
+                ))}
+                {feed.keywordsInclude.length > 3 && (
+                  <span className="text-xs text-gray-500">
+                    +{feed.keywordsInclude.length - 3} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {feed.keywordsExclude?.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <span className="text-gray-600">Exclude:</span>
+              <div className="flex flex-wrap gap-1">
+                {feed.keywordsExclude.slice(0, 3).map((keyword) => (
+                  <span
+                    key={keyword}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                  >
+                    {keyword}
+                  </span>
+                ))}
+                {feed.keywordsExclude.length > 3 && (
+                  <span className="text-xs text-gray-500">
+                    +{feed.keywordsExclude.length - 3} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Auto-draft Settings */}
       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -212,6 +292,14 @@ export const RSSFeedCard: React.FC<RSSFeedCardProps> = ({
           <RSSFeedItemList feedId={feed._id} />
         </div>
       )}
+
+      {/* Edit Feed Modal */}
+      <EditRSSFeedModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        feed={feed}
+        onFeedUpdated={handleFeedUpdated}
+      />
     </div>
   );
 };

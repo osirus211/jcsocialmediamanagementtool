@@ -143,16 +143,16 @@ export class RSSCollectorWorker {
             return;
           }
 
-          // Check if feed should be polled (based on pollingInterval)
+          // Check if feed should be polled (based on individual refreshIntervalHours)
           if (feed.lastFetchedAt) {
-            const timeSinceLastFetch = Date.now() - feed.lastFetchedAt.getTime();
-            const pollingIntervalMs = feed.pollingInterval * 60 * 1000;
-            
-            if (timeSinceLastFetch < pollingIntervalMs) {
+            const refreshIntervalHours = feed.pollingInterval / 60; // Convert minutes to hours
+            const nextFetchDue = new Date(feed.lastFetchedAt.getTime() + refreshIntervalHours * 60 * 60 * 1000);
+            if (nextFetchDue > new Date()) {
               logger.debug('RSS feed not due for polling yet', {
                 feedId,
-                timeSinceLastFetch,
-                pollingInterval: pollingIntervalMs,
+                lastFetchedAt: feed.lastFetchedAt,
+                refreshIntervalHours,
+                nextFetchDue,
               });
               return;
             }
