@@ -17,12 +17,13 @@ interface AnalyticsState {
   dateRange: {
     startDate: string | null;
     endDate: string | null;
+    preset: string | null;
   };
 }
 
 interface AnalyticsActions {
   setLoading: (loading: boolean) => void;
-  setDateRange: (startDate: string | null, endDate: string | null) => void;
+  setDateRange: (startDate: string | null, endDate: string | null, preset?: string | null) => void;
   
   fetchOverview: (startDate?: string, endDate?: string) => Promise<void>;
   fetchPlatformMetrics: (startDate?: string, endDate?: string) => Promise<void>;
@@ -49,12 +50,13 @@ export const useAnalyticsStore = create<AnalyticsStore>((set, get) => ({
   dateRange: {
     startDate: null,
     endDate: null,
+    preset: null,
   },
 
   // Setters
   setLoading: (loading) => set({ isLoading: loading }),
   
-  setDateRange: (startDate, endDate) => set({ dateRange: { startDate, endDate } }),
+  setDateRange: (startDate, endDate, preset = null) => set({ dateRange: { startDate, endDate, preset } }),
 
   /**
    * Fetch overview metrics
@@ -184,6 +186,7 @@ export const useAnalyticsStore = create<AnalyticsStore>((set, get) => ({
       dateRange: {
         startDate: null,
         endDate: null,
+        preset: null,
       },
     });
   },

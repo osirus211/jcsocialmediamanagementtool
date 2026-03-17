@@ -33,6 +33,8 @@ const mockTopPosts = [
     comments: 20,
     shares: 15,
     saves: 5,
+    clicks: 25,
+    engagements: 165,
     reach: 1000,
     impressions: 2000,
     engagementRate: 14.0,
@@ -47,6 +49,8 @@ const mockTopPosts = [
     comments: 10,
     shares: 8,
     saves: 2,
+    clicks: 15,
+    engagements: 85,
     reach: 500,
     impressions: 1000,
     engagementRate: 14.0,
@@ -64,6 +68,8 @@ const mockWorstPosts = [
     comments: 1,
     shares: 0,
     saves: 0,
+    clicks: 2,
+    engagements: 8,
     reach: 100,
     impressions: 200,
     engagementRate: 6.0,
@@ -94,8 +100,8 @@ describe('individual post metrics', () => {
     
     render(<TopPostsGrid data={postWithMissingReach} />);
     
-    // Should show "—" for zero reach
-    expect(screen.getByText('—')).toBeInTheDocument();
+    // Should show "—" for zero reach - check that at least one dash exists
+    expect(screen.getAllByText('—')).toHaveLength(1);
   });
 
   it('shows platform-appropriate label (Retweets for Twitter)', () => {
@@ -125,9 +131,12 @@ describe('performance score', () => {
     
     render(<TopPostsGrid data={lowScorePost} />);
     
-    // Check for red color class
-    const scoreElement = screen.getByText('25');
-    expect(scoreElement).toHaveClass('text-red-600');
+    // Check for red color class on the performance score specifically
+    const scoreElements = screen.getAllByText('25');
+    const performanceScoreElement = scoreElements.find(el => 
+      el.classList.contains('text-red-600')
+    );
+    expect(performanceScoreElement).toBeTruthy();
   });
 
   it('score 40–69 has amber color indicator', () => {

@@ -46,6 +46,76 @@ export interface GrowthMetrics {
   engagementRate: number;
 }
 
+export interface BestTimeHeatmap {
+  hour: number;
+  day: string;
+  engagementRate: number;
+  postCount: number;
+}
+
+export interface CompetitorAnalytics {
+  competitorName: string;
+  platform: string;
+  followerCount: number;
+  avgEngagementRate: number;
+  avgPostsPerDay: number;
+  growthTrend: number;
+}
+
+export interface HashtagAnalytics {
+  _id?: string;
+  hashtag: string;
+  platform: string;
+  usageCount: number;
+  avgEngagementRate: number;
+  trendScore: number;
+  totalReach?: number;
+  impressions?: number;
+  isRising?: boolean;
+}
+
+export interface LinkClickAnalytics {
+  url: string;
+  platform: string;
+  clicks: number;
+  impressions: number;
+  clickThroughRate: number;
+  postCount: number;
+  day?: string;
+  hour?: number;
+  country?: string;
+  device?: string;
+  totalClicks?: number;
+  uniqueClicks?: number;
+  conversionRate?: number;
+}
+
+export interface ExportOptions {
+  title?: string;
+  startDate: Date;
+  endDate: Date;
+  platforms?: string[];
+  format?: 'pdf' | 'csv';
+  includeOverview: boolean;
+  includePostMetrics: boolean;
+  includeEngagementCharts: boolean;
+  includeFollowerGrowth: boolean;
+  includeHashtagAnalytics: boolean;
+  includeBestTimes: boolean;
+  includeLinkClicks: boolean;
+  includeCompetitors: boolean;
+}
+
+export interface DashboardAnalytics {
+  overview: OverviewMetrics;
+  platforms: PlatformMetrics[];
+  growth: GrowthMetrics[];
+  hashtags: any[];
+  bestTimes: any[];
+  linkClicks: any[];
+  competitors: any[];
+}
+
 // API Response types
 export interface AnalyticsResponse<T> {
   success: boolean;

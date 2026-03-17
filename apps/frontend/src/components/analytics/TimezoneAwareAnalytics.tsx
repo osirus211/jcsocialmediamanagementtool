@@ -19,6 +19,7 @@ import {
 } from '@/utils/timezones';
 import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
 import { Calendar, Clock, TrendingUp, BarChart3, Globe } from 'lucide-react';
+import { calcEngagementRate } from '../../utils/engagementRate';
 
 interface AnalyticsData {
   date: string;
@@ -118,7 +119,7 @@ export const TimezoneAwareAnalytics: React.FC<TimezoneAwareAnalyticsProps> = ({
 
   const totalEngagements = timezoneAwareData.reduce((sum, item) => sum + item.engagements, 0);
   const totalImpressions = timezoneAwareData.reduce((sum, item) => sum + item.impressions, 0);
-  const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions * 100).toFixed(2) : '0';
+  const engagementRate = calcEngagementRate(0, 0, totalEngagements, totalImpressions).toFixed(2);
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,7 @@ import { AnalyticsController } from '../../controllers/AnalyticsController';
 import { AnalyticsService } from '../../services/AnalyticsService';
 import { FollowerAnalyticsService } from '../../services/FollowerAnalyticsService';
 import { HashtagAnalyticsService } from '../../services/HashtagAnalyticsService';
+import { getRollingWindowDates } from '../../utils/rollingWindow';
 import { PostROIService } from '../../services/PostROIService';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace, requirePermission } from '../../middleware/tenant';
@@ -396,9 +397,8 @@ router.get('/summary', requirePermission(Permission.VIEW_ANALYTICS), async (req,
       return;
     }
 
-    // Calculate previous period dates
-    const previousStartDate = new Date(startDate.getTime() - (endDate.getTime() - startDate.getTime()));
-    const previousEndDate = new Date(startDate);
+    // Calculate previous period dates using rolling window
+    const { previousStart: previousStartDate, previousEnd: previousEndDate } = getRollingWindowDates(startDate, endDate);
 
     const summary = await AnalyticsService.getSummaryMetrics(
       workspaceId, 

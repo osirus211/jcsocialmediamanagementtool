@@ -10,6 +10,8 @@ interface TopPost {
   comments: number;
   shares: number;
   saves: number;
+  clicks: number;
+  engagements: number;
   reach: number;
   impressions: number;
   engagementRate: number;
@@ -47,7 +49,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   bluesky: 'bg-blue-500 text-white',
 };
 
-type SortField = 'engagementRate' | 'reach' | 'impressions' | 'likes' | 'comments' | 'shares' | 'saves' | 'performanceScore';
+type SortField = 'engagementRate' | 'reach' | 'impressions' | 'clicks' | 'engagements' | 'likes' | 'comments' | 'shares' | 'saves' | 'performanceScore';
 type SortDirection = 'asc' | 'desc';
 
 export function TopPostsGrid({ 
@@ -61,6 +63,8 @@ export function TopPostsGrid({
 }: TopPostsGridProps) {
   const [sortField, setSortField] = useState<SortField>('engagementRate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -69,6 +73,7 @@ export function TopPostsGrid({
       setSortField(field);
       setSortDirection('desc');
     }
+    setCurrentPage(1); // Reset to first page when sorting
   };
 
   const sortedData = [...data].sort((a, b) => {
@@ -77,6 +82,16 @@ export function TopPostsGrid({
     const multiplier = sortDirection === 'desc' ? -1 : 1;
     return (aValue - bValue) * multiplier;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = sortedData.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const formatNumber = (num: number | undefined | null): string => {
     if (num == null || num === undefined) {
@@ -177,6 +192,8 @@ export function TopPostsGrid({
           { field: 'performanceScore' as SortField, label: 'Performance Score' },
           { field: 'reach' as SortField, label: 'Audience Reached' },
           { field: 'impressions' as SortField, label: 'Impressions' },
+          { field: 'clicks' as SortField, label: 'Clicks' },
+          { field: 'engagements' as SortField, label: 'Engagements' },
           { field: 'likes' as SortField, label: 'Likes' },
           { field: 'comments' as SortField, label: 'Comments' },
           { field: 'shares' as SortField, label: 'Shares' },
@@ -199,7 +216,7 @@ export function TopPostsGrid({
 
       {/* Posts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="top-posts-section">
-        {sortedData.map((post, index) => (
+        {paginatedData.map((post, index) => (
           <div
             key={post.postId}
             className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
@@ -315,6 +332,18 @@ export function TopPostsGrid({
                   </div>
                 </div>
                 <div>
+                  <div className="text-gray-500">Clicks</div>
+                  <div className="font-semibold text-indigo-500">
+                    {formatNumber(post.clicks)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Engagements</div>
+                  <div className="font-semibold text-purple-600">
+                    {formatNumber(post.engagements)}
+                  </div>
+                </div>
+                <div>
                   <div className="text-gray-500">Likes</div>
                   <div className="font-semibold text-red-500">
                     {formatNumber(post.likes)}
@@ -359,6 +388,9 @@ export function TopPostsGrid({
               <th>Published Date</th>
               <th>Engagement Rate</th>
               <th>Reach</th>
+              <th>Impressions</th>
+              <th>Clicks</th>
+              <th>Engagements</th>
               <th>Likes</th>
               <th>Comments</th>
               <th>Shares</th>
@@ -366,12 +398,15 @@ export function TopPostsGrid({
             </tr>
           </thead>
           <tbody>
-            {sortedData.map((post) => (
+            {paginatedData.map((post) => (
               <tr key={post.postId}>
                 <td>{post.platform}</td>
                 <td>{post.publishedAt}</td>
                 <td>{post.engagementRate}%</td>
                 <td>{post.reach}</td>
+                <td>{post.impressions}</td>
+                <td>{post.clicks}</td>
+                <td>{post.engagements}</td>
                 <td>{post.likes}</td>
                 <td>{post.comments}</td>
                 <td>{post.shares}</td>
@@ -381,6 +416,41 @@ export function TopPostsGrid({
           </tbody>
         </table>
       </div>
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-2 text-sm border rounded-lg ${
+                currentPage === page
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

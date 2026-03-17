@@ -363,7 +363,7 @@ export class AnalyticsController {
             content: post.content,
             mediaUrls: post.mediaUrls,
             publishedAt: post.publishedAt,
-            accountName: post.accountName
+            socialAccountId: post.socialAccountId
           },
           history: postAnalytics.map(analytics => ({
             collectedAt: analytics.collectedAt,

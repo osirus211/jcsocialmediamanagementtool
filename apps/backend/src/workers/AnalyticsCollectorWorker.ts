@@ -142,11 +142,13 @@ export class AnalyticsCollectorWorker {
 
       for (const post of postsNeedingRefresh) {
         if (post.platformPostId) {
-          await queue.addJob({
+          await queue.addCollectionJob({
             postId: post._id.toString(),
             platform: post.platform,
             socialAccountId: post.socialAccountId.toString(),
+            workspaceId: post.workspaceId.toString(),
             platformPostId: post.platformPostId,
+            publishedAt: post.publishedAt || new Date(),
             collectionAttempt: 1,
             correlationId: `refresh-${Date.now()}-${post._id}`
           });

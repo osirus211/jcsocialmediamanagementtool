@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
-import request from 'supertest';
+const request = require('supertest');
 import testApp from './test-app';
 import { PostAnalytics } from '../../models/PostAnalytics';
 import { Workspace } from '../../models/Workspace';

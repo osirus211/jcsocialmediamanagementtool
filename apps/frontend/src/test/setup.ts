@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, beforeEach } from 'vitest';
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
@@ -37,4 +37,16 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
+});
+
+// Ensure document.body exists for React Testing Library
+beforeEach(() => {
+  // Clean up any existing DOM
+  document.body.innerHTML = '';
+  
+  // Ensure document.body exists and is properly set up
+  if (!document.body) {
+    document.body = document.createElement('body');
+    document.documentElement.appendChild(document.body);
+  }
 });

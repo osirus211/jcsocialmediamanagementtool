@@ -10,6 +10,7 @@
  */
 
 import { apiClient } from '../lib/api-client';
+import { calcEngagementRateWithSaves } from '../utils/engagementRate';
 
 export interface InstagramLocation {
   id: string;
@@ -264,8 +265,7 @@ class InstagramService {
    * Format engagement rate for display
    */
   formatEngagementRate(likes: number, comments: number, shares: number, saves: number, reach: number): string {
-    if (reach === 0) return '0.0%';
-    const engagement = (likes + comments + shares + saves) / reach * 100;
+    const engagement = calcEngagementRateWithSaves(likes, comments, shares, saves, reach);
     return `${engagement.toFixed(1)}%`;
   }
 

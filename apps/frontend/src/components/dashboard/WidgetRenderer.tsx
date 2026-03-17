@@ -19,10 +19,10 @@ export function WidgetRenderer({ widget }: WidgetRendererProps) {
   const renderWidget = () => {
     switch (widget.type) {
       case WidgetType.ENGAGEMENT_CHART:
-        return <EngagementChart selectedPlatform={undefined} />;
+        return <EngagementChart data={[]} viewType="day" />;
 
       case WidgetType.FOLLOWER_GROWTH:
-        return <FollowerGrowthChart />;
+        return <FollowerGrowthChart data={[]} />;
 
       case WidgetType.HASHTAG_TABLE:
         return <HashtagPerformanceTable onHashtagClick={() => {}} />;

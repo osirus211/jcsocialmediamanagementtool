@@ -6,6 +6,8 @@
 import { PostAnalytics, IPostAnalytics } from '../models/PostAnalytics';
 import { Post } from '../models/Post';
 import { logger } from '../utils/logger';
+import { getRollingWindowDates, calcPercentChange } from '../utils/rollingWindow';
+import { calcEngagementRateWithSaves } from '../utils/engagementRate';
 import mongoose from 'mongoose';
 
 export interface AnalyticsSnapshot {
@@ -177,11 +179,12 @@ export class AnalyticsService {
 
     // Calculate totals
     const totalReach = latestAnalytics.reduce((sum, a) => sum + a.reach, 0);
+    const totalImpressions = latestAnalytics.reduce((sum, a) => sum + a.impressions, 0);
     const totalEngagement = latestAnalytics.reduce(
       (sum, a) => sum + (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.clicks || 0) + (a.saves || 0),
       0
     );
-    const engagementRate = totalReach > 0 ? (totalEngagement / totalReach) * 100 : 0;
+    const engagementRate = calcEngagementRateWithSaves(0, 0, totalEngagement, 0, totalReach);
 
     // Find best performing post
     const bestPerforming = latestAnalytics.reduce((best, current) => {
@@ -386,9 +389,7 @@ export class AnalyticsService {
         return { impressions: 0, engagement: 0 };
       }
 
-      const periodDuration = endDate.getTime() - startDate.getTime();
-      const previousStart = new Date(startDate.getTime() - periodDuration);
-      const previousEnd = startDate;
+      const { previousStart, previousEnd } = getRollingWindowDates(startDate, endDate);
 
       // Current period metrics
       const currentMetrics = await this.getBaseMetrics(workspaceId, startDate, endDate);
@@ -396,17 +397,12 @@ export class AnalyticsService {
       // Previous period metrics
       const previousMetrics = await this.getBaseMetrics(workspaceId, previousStart, previousEnd);
 
-      const impressionsGrowth = previousMetrics.totalImpressions > 0
-        ? ((currentMetrics.totalImpressions - previousMetrics.totalImpressions) / previousMetrics.totalImpressions) * 100
-        : 0;
-
-      const engagementGrowth = previousMetrics.totalEngagement > 0
-        ? ((currentMetrics.totalEngagement - previousMetrics.totalEngagement) / previousMetrics.totalEngagement) * 100
-        : 0;
+      const impressionsGrowth = calcPercentChange(previousMetrics.totalImpressions, currentMetrics.totalImpressions);
+      const engagementGrowth = calcPercentChange(previousMetrics.totalEngagement, currentMetrics.totalEngagement);
 
       return {
-        impressions: Math.round(impressionsGrowth * 10) / 10,
-        engagement: Math.round(engagementGrowth * 10) / 10,
+        impressions: impressionsGrowth,
+        engagement: engagementGrowth,
       };
     } catch (error: any) {
       logger.error('Calculate growth error:', error);
@@ -477,10 +473,7 @@ export class AnalyticsService {
       const currentMetrics = await this.getBaseMetrics(workspaceId, startDate, endDate);
       const previousMetrics = await this.getBaseMetrics(workspaceId, previousStartDate, previousEndDate);
 
-      const calculateChange = (current: number, previous: number) => {
-        if (previous === 0) return current > 0 ? 100 : 0;
-        return Math.round(((current - previous) / previous) * 100 * 10) / 10;
-      };
+      const calculateChange = calcPercentChange;
 
       return {
         reach: {
@@ -724,8 +717,12 @@ export class AnalyticsService {
             comments: 1,
             shares: 1,
             saves: 1,
+            clicks: 1,
+            engagements: { $add: ['$likes', '$comments', '$shares', '$clicks', '$saves'] },
             reach: 1,
+            impressions: 1,
             engagementRate: 1,
+            performanceScore: { $multiply: ['$engagementRate', 1] }, // Use engagement rate as performance score for now
             _id: 0
           }
         },

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { useAnalyticsStore } from '../../store/analytics.store';
 
 interface DateRangePickerProps {
   startDate: Date;
@@ -13,19 +15,50 @@ const PRESETS = [
   { label: 'Last 90 days', days: 90 },
 ];
 
+const MONTH_PRESETS = [
+  { 
+    label: 'This month',
+    start: startOfMonth(new Date()),
+    end: endOfMonth(new Date())
+  },
+  { 
+    label: 'Last month',
+    start: startOfMonth(subMonths(new Date(), 1)),
+    end: endOfMonth(subMonths(new Date(), 1))
+  }
+];
+
 export function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [customStartDate, setCustomStartDate] = useState(startDate.toISOString().split('T')[0]);
-  const [customEndDate, setCustomEndDate] = useState(endDate.toISOString().split('T')[0]);
   const [showCustom, setShowCustom] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const { dateRange, setDateRange } = useAnalyticsStore();
+  
+  // Use store values if available, otherwise use props
+  const currentStartDate = dateRange.startDate ? new Date(dateRange.startDate) : startDate;
+  const currentEndDate = dateRange.endDate ? new Date(dateRange.endDate) : endDate;
+  
+  const [customStartDate, setCustomStartDate] = useState(currentStartDate.toISOString().split('T')[0]);
+  const [customEndDate, setCustomEndDate] = useState(currentEndDate.toISOString().split('T')[0]);
 
   const handlePreset = (preset: { label: string; days: number }) => {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - preset.days);
     
+    // Update both store and call parent onChange
+    setDateRange(start.toISOString(), end.toISOString(), preset.label);
     onChange(start, end, preset.label);
+    setIsOpen(false);
+    setShowCustom(false);
+    setError(null);
+  };
+
+  const handleMonthPreset = (preset: { label: string; start: Date; end: Date }) => {
+    // Update both store and call parent onChange
+    setDateRange(preset.start.toISOString(), preset.end.toISOString(), preset.label);
+    onChange(preset.start, preset.end, preset.label);
     setIsOpen(false);
     setShowCustom(false);
     setError(null);
@@ -52,6 +85,8 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
       return;
     }
     
+    // Update both store and call parent onChange
+    setDateRange(start.toISOString(), end.toISOString(), 'Custom range');
     onChange(start, end, 'Custom range');
     setIsOpen(false);
     setShowCustom(false);
@@ -59,15 +94,15 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
   };
 
   const formatDateRange = () => {
-    const start = startDate.toLocaleDateString('en-US', { 
+    const start = currentStartDate.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
-      year: startDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+      year: currentStartDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
     });
-    const end = endDate.toLocaleDateString('en-US', { 
+    const end = currentEndDate.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
-      year: endDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+      year: currentEndDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
     });
     return `${start} – ${end}`;
   };
@@ -93,7 +128,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
           />
 
           {/* Dropdown */}
-          <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+          <div className="absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">
             <div className="p-4">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Select Date Range</h3>
 
@@ -103,6 +138,15 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
                   <button
                     key={preset.label}
                     onClick={() => handlePreset(preset)}
+                    className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+                {MONTH_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => handleMonthPreset(preset)}
                     className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
                   >
                     {preset.label}
@@ -119,7 +163,7 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
               {/* Custom date inputs */}
               {showCustom && (
                 <div className="border-t pt-4">
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Start Date

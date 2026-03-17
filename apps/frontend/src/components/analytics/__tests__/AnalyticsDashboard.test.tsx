@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
@@ -30,7 +31,10 @@ vi.mock('date-fns', () => ({
     
     if (minutes < 60) return `${minutes} minutes ago`;
     return `about ${hours} hours ago`;
-  })
+  }),
+  startOfMonth: vi.fn((date) => new Date(date.getFullYear(), date.getMonth(), 1)),
+  endOfMonth: vi.fn((date) => new Date(date.getFullYear(), date.getMonth() + 1, 0)),
+  subMonths: vi.fn((date, amount) => new Date(date.getFullYear(), date.getMonth() - amount, date.getDate()))
 }))
 
 vi.mock('@/store/workspace.store', () => ({

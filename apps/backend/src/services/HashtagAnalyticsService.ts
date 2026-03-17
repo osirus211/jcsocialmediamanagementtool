@@ -16,6 +16,7 @@ export interface HashtagPerformanceData {
   totalComments: number;
   totalShares: number;
   totalImpressions: number;
+  totalReach: number;
   avgEngagementRate: number;
   bestPost: {
     postId: string;
@@ -79,6 +80,7 @@ export class HashtagAnalyticsService {
             totalComments: { $sum: { $ifNull: ['$analytics.comments', 0] } },
             totalShares: { $sum: { $ifNull: ['$analytics.shares', 0] } },
             totalImpressions: { $sum: { $ifNull: ['$analytics.impressions', 0] } },
+            totalReach: { $sum: { $ifNull: ['$analytics.reach', '$analytics.impressions', 0] } },
             engagementRates: { $push: { $ifNull: ['$analytics.engagementRate', 0] } },
             posts: {
               $push: {
@@ -143,6 +145,7 @@ export class HashtagAnalyticsService {
             totalComments: 1,
             totalShares: 1,
             totalImpressions: 1,
+            totalReach: 1,
             avgEngagementRate: { $round: ['$avgEngagementRate', 2] },
             bestPost: {
               postId: { $toString: '$bestPost.postId' },
@@ -263,6 +266,7 @@ export class HashtagAnalyticsService {
             totalComments: { $sum: { $ifNull: ['$analytics.comments', 0] } },
             totalShares: { $sum: { $ifNull: ['$analytics.shares', 0] } },
             totalImpressions: { $sum: { $ifNull: ['$analytics.impressions', 0] } },
+            totalReach: { $sum: { $ifNull: ['$analytics.reach', '$analytics.impressions', 0] } },
             engagementRates: { $push: { $ifNull: ['$analytics.engagementRate', 0] } },
             bestPost: {
               $max: {
@@ -281,6 +285,7 @@ export class HashtagAnalyticsService {
             totalComments: 1,
             totalShares: 1,
             totalImpressions: 1,
+            totalReach: 1,
             avgEngagementRate: { $round: [{ $avg: '$engagementRates' }, 2] },
             bestPost: {
               postId: { $toString: '$bestPost.postId' },

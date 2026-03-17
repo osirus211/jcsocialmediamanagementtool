@@ -5,6 +5,7 @@
  */
 
 import mongoose, { Schema, Document } from 'mongoose';
+import { calcEngagementRateWithSaves } from '../utils/engagementRate';
 
 export interface IPostAnalytics extends Document {
   _id: mongoose.Types.ObjectId;
@@ -190,8 +191,13 @@ PostAnalyticsSchema.index({ postId: 1, platform: 1 }); // For cross-platform pos
 PostAnalyticsSchema.pre('save', function (next) {
   // Calculate engagement rate using reach (not impressions)
   if (this.reach > 0) {
-    const totalEngagement = this.likes + this.comments + this.shares + (this.saves || 0);
-    this.engagementRate = Number(((totalEngagement / this.reach) * 100).toFixed(2));
+    this.engagementRate = Number(calcEngagementRateWithSaves(
+      this.likes, 
+      this.comments, 
+      this.shares, 
+      this.saves || 0, 
+      this.reach
+    ).toFixed(2));
   } else {
     this.engagementRate = 0;
   }
@@ -221,3 +227,6 @@ PostAnalyticsSchema.pre('save', function (next) {
 });
 
 export const PostAnalytics = mongoose.model<IPostAnalytics>('PostAnalytics', PostAnalyticsSchema);
+
+// Storage limits
+export const MAX_POST_METRICS_DAYS = 365;

@@ -115,7 +115,7 @@ export function BestTimeHeatmap({ platform }: BestTimeHeatmapProps) {
   const maxEngagement = getMaxEngagement();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="img" aria-label="Best times to post heatmap showing optimal posting times by day and hour">
       <div className="text-sm text-gray-600">
         Hover over cells to see engagement details
       </div>
@@ -142,7 +142,15 @@ export function BestTimeHeatmap({ platform }: BestTimeHeatmapProps) {
           {DAYS.map((day, dayIndex) => (
             <div key={day} className="grid gap-1 mb-1" style={{ gridTemplateColumns: 'auto repeat(24, 1fr)' }}>
               {/* Day label */}
-              <div className="text-sm font-medium text-gray-700 text-right pr-2 py-1">
+              <div 
+                className="text-sm font-medium text-gray-700 text-right pr-2 py-1"
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  backgroundColor: 'white'
+                }}
+              >
                 {day}
               </div>
               
@@ -169,6 +177,36 @@ export function BestTimeHeatmap({ platform }: BestTimeHeatmapProps) {
             </div>
           ))}
         </div>
+      </div>
+      
+      {/* Screen reader accessible data table */}
+      <div className="sr-only">
+        <table>
+          <caption>Best times to post heatmap data</caption>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Hour</th>
+              <th>Engagement Score</th>
+              <th>Post Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DAYS.map((day, dayIndex) => 
+              HOURS.map(hour => {
+                const data = getEngagementForSlot(dayIndex, hour);
+                return (
+                  <tr key={`${dayIndex}-${hour}`}>
+                    <td>{day}</td>
+                    <td>{formatTime(hour)}</td>
+                    <td>{data?.avgEngagement.toFixed(1) || 0}%</td>
+                    <td>{data?.postCount || 0}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Legend */}
