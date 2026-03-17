@@ -75,7 +75,9 @@ export const mockTopPostsData = [
     shares: 15,
     saves: 10,
     reach: 2500,
-    engagementRate: 6.8
+    impressions: 3200,
+    engagementRate: 6.8,
+    performanceScore: 75
   },
   {
     postId: '507f1f77bcf86cd799439012',
@@ -87,7 +89,9 @@ export const mockTopPostsData = [
     shares: 8,
     saves: 3,
     reach: 1200,
-    engagementRate: 5.7
+    impressions: 1800,
+    engagementRate: 5.7,
+    performanceScore: 65
   }
 ];
 

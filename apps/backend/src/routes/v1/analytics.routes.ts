@@ -54,11 +54,50 @@ router.get('/growth', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsCon
 
 /**
  * @route   GET /api/v1/analytics/posts
- * @desc    Get top performing posts
+ * @desc    Get posts with metrics and performance scores
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms, sortBy, sortDir, limit
+ */
+router.get('/posts', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getPosts);
+
+/**
+ * @route   GET /api/v1/analytics/posts/top
+ * @desc    Get top performing posts by engagement rate
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms, limit
+ */
+router.get('/posts/top', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getTopPostsNew);
+
+/**
+ * @route   GET /api/v1/analytics/posts/worst
+ * @desc    Get worst performing posts (score < 40) with suggestions
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms
+ */
+router.get('/posts/worst', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getWorstPosts);
+
+/**
+ * @route   GET /api/v1/analytics/posts/compare
+ * @desc    Compare 2-4 posts side by side
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   postIds (comma-separated, 2-4 IDs)
+ */
+router.get('/posts/compare', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.comparePosts);
+
+/**
+ * @route   GET /api/v1/analytics/posts/:postId
+ * @desc    Get specific post analytics with history
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ */
+router.get('/posts/:postId', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getPostById);
+
+/**
+ * @route   GET /api/v1/analytics/posts
+ * @desc    Get top performing posts (legacy endpoint)
  * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
  * @query   startDate, endDate, limit (optional)
  */
-router.get('/posts', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getTopPosts);
+router.get('/posts-legacy', requirePermission(Permission.VIEW_ANALYTICS), AnalyticsController.getTopPosts);
 
 /**
  * @route   GET /api/v1/analytics/post/:postId

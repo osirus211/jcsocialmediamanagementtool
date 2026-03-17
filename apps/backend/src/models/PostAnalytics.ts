@@ -17,15 +17,20 @@ export interface IPostAnalytics extends Document {
   likes: number;
   comments: number;
   shares: number;
+  reach: number; // unique users reached
   impressions: number;
-  clicks: number;
   saves?: number; // Instagram, LinkedIn
   retweets?: number; // Twitter
   views?: number; // TikTok, YouTube
+  clicks: number;
   
   // Computed metrics
-  engagementRate: number; // (likes + comments + shares) / impressions * 100
+  engagementRate: number; // (likes + comments + shares + saves) / reach * 100
+  performanceScore: number; // 0-100 weighted score vs account averages
   clickThroughRate?: number; // clicks / impressions * 100
+  
+  // Refresh tracking
+  lastRefreshedAt?: Date;
   
   // ROI and attribution metrics
   linkClicks: number; // clicks from short links attributed to this post
@@ -85,6 +90,10 @@ const PostAnalyticsSchema = new Schema<IPostAnalytics>(
       type: Number,
       default: 0,
     },
+    reach: {
+      type: Number,
+      default: 0,
+    },
     impressions: {
       type: Number,
       default: 0,
@@ -111,9 +120,21 @@ const PostAnalyticsSchema = new Schema<IPostAnalytics>(
       type: Number,
       default: 0,
     },
+    performanceScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
     clickThroughRate: {
       type: Number,
       default: 0,
+    },
+    
+    // Refresh tracking
+    lastRefreshedAt: {
+      type: Date,
+      index: true,
     },
     
     // ROI and attribution metrics
@@ -165,16 +186,23 @@ PostAnalyticsSchema.index({ workspaceId: 1, platform: 1, collectedAt: -1 }); // 
 PostAnalyticsSchema.index({ workspaceId: 1, postId: 1 }); // For post-level analytics lookup
 PostAnalyticsSchema.index({ postId: 1, platform: 1 }); // For cross-platform post comparison
 
-// Calculate engagement rate before saving
+// Calculate engagement rate and performance score before saving
 PostAnalyticsSchema.pre('save', function (next) {
-  if (this.impressions > 0) {
-    const totalEngagement = this.likes + this.comments + this.shares;
-    this.engagementRate = (totalEngagement / this.impressions) * 100;
-    
-    if (this.clicks > 0) {
-      this.clickThroughRate = (this.clicks / this.impressions) * 100;
-    }
+  // Calculate engagement rate using reach (not impressions)
+  if (this.reach > 0) {
+    const totalEngagement = this.likes + this.comments + this.shares + (this.saves || 0);
+    this.engagementRate = Number(((totalEngagement / this.reach) * 100).toFixed(2));
+  } else {
+    this.engagementRate = 0;
   }
+  
+  // Calculate click-through rate
+  if (this.impressions > 0 && this.clicks > 0) {
+    this.clickThroughRate = (this.clicks / this.impressions) * 100;
+  }
+  
+  // Performance score will be calculated by service after account averages are known
+  // This is just a placeholder - actual calculation happens in AnalyticsService
   
   // Calculate ROI metrics if data is available
   if (this.adSpend && this.adSpend > 0) {

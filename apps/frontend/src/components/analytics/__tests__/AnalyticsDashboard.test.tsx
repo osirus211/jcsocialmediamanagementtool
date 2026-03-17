@@ -12,6 +12,7 @@ vi.mock('@/services/analytics.service', () => ({
     getFollowerGrowthData: vi.fn(),
     getEngagementData: vi.fn(),
     getTopPostsData: vi.fn(),
+    getWorstPostsData: vi.fn(),
     getPlatformComparisonData: vi.fn(),
     exportPDF: vi.fn(),
     exportCSV: vi.fn(),
@@ -59,6 +60,7 @@ describe('AnalyticsDashboard', () => {
     mockAnalyticsService.getFollowerGrowthData.mockResolvedValue(mockAnalyticsData.followerGrowth)
     mockAnalyticsService.getEngagementData.mockResolvedValue(mockAnalyticsData.engagementByDay)
     mockAnalyticsService.getTopPostsData.mockResolvedValue(mockAnalyticsData.topPosts)
+    mockAnalyticsService.getWorstPostsData.mockResolvedValue([])
     mockAnalyticsService.getPlatformComparisonData.mockResolvedValue(mockAnalyticsData.platformComparison)
   })
 
@@ -471,15 +473,15 @@ describe('AnalyticsDashboard', () => {
       renderWithProviders(<AnalyticsPage />)
       
       await waitFor(() => {
-        // Find the sortable Reach header button specifically (not just any "Reach" text)
-        const reachHeaders = screen.getAllByText('Reach')
+        // Find the sortable "Audience Reached" header button specifically (not just any "Reach" text)
+        const reachHeaders = screen.getAllByText(/Audience Reached/i)
         const sortableReachHeader = reachHeaders.find(header => 
           header.closest('button') && header.closest('button')?.querySelector('svg')
         )
         expect(sortableReachHeader).toBeInTheDocument()
       })
       
-      const reachHeaders = screen.getAllByText('Reach')
+      const reachHeaders = screen.getAllByText(/Audience Reached/i)
       const sortableReachHeader = reachHeaders.find(header => 
         header.closest('button') && header.closest('button')?.querySelector('svg')
       )!
@@ -495,15 +497,15 @@ describe('AnalyticsDashboard', () => {
       renderWithProviders(<AnalyticsPage />)
       
       await waitFor(() => {
-        // Find the sortable Reach header button specifically
-        const reachHeaders = screen.getAllByText('Reach')
+        // Find the sortable "Audience Reached" header button specifically
+        const reachHeaders = screen.getAllByText(/Audience Reached/i)
         const sortableReachHeader = reachHeaders.find(header => 
           header.closest('button') && header.closest('button')?.querySelector('svg')
         )
         expect(sortableReachHeader).toBeInTheDocument()
       })
       
-      const reachHeaders = screen.getAllByText('Reach')
+      const reachHeaders = screen.getAllByText(/Audience Reached/i)
       const sortableReachHeader = reachHeaders.find(header => 
         header.closest('button') && header.closest('button')?.querySelector('svg')
       )!
@@ -574,16 +576,18 @@ describe('AnalyticsDashboard', () => {
       renderWithProviders(<AnalyticsPage />)
       
       await waitFor(() => {
-        const csvButton = screen.getByText(/Export CSV/i)
-        expect(csvButton).toBeInTheDocument()
-        expect(csvButton).not.toBeDisabled()
+        // Use getAllByText to handle multiple CSV buttons and pick the first one (header button)
+        const csvButtons = screen.getAllByText(/Export CSV/i)
+        expect(csvButtons.length).toBeGreaterThan(0)
+        expect(csvButtons[0]).toBeInTheDocument()
+        expect(csvButtons[0]).not.toBeDisabled()
       })
       
-      const csvButton = screen.getByText(/Export CSV/i)
-      await user.click(csvButton)
+      const csvButtons = screen.getAllByText(/Export CSV/i)
+      await user.click(csvButtons[0])
       
       // Just verify the button was clicked - don't test complex DOM manipulation
-      expect(csvButton).toBeInTheDocument()
+      expect(csvButtons[0]).toBeInTheDocument()
     })
 
     it('CSV button has correct aria-label', async () => {
@@ -629,28 +633,27 @@ describe('AnalyticsDashboard', () => {
       })
     })
 
+
+
     it('PDF button shows loading state during request', async () => {
-      const user = userEvent.setup()
-      
-      // Mock a slow PDF generation
-      mockAnalyticsService.exportPDF.mockReturnValue(new Promise(resolve => 
-        setTimeout(resolve, 100)
-      ))
+      // Mock the PDF export to take time (RULE 28)
+      vi.mocked(analyticsService.exportPDF).mockImplementation(() => 
+        new Promise(resolve => setTimeout(() => resolve(new Blob()), 150))
+      )
       
       renderWithProviders(<AnalyticsPage />)
       
+      // Wait for data to load and button to become enabled
       await waitFor(() => {
-        const pdfButton = screen.getByText(/Export PDF/i)
-        expect(pdfButton).toBeInTheDocument()
-      })
+        const btn = screen.getByTestId('export-pdf-button')
+        expect(btn).not.toBeDisabled()
+      }, { timeout: 3000 })
       
-      const pdfButton = screen.getByText(/Export PDF/i)
-      await user.click(pdfButton)
+      // Click the button
+      await userEvent.click(screen.getByTestId('export-pdf-button'))
       
-      // Should show loading state - the button text changes to "Generating..."
-      await waitFor(() => {
-        expect(screen.getByText(/Generating.../i)).toBeInTheDocument()
-      })
+      // Loading text should appear immediately after click (RULE 28)
+      expect(screen.getByText(/generating/i)).toBeInTheDocument()
     })
   })
 })

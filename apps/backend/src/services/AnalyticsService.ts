@@ -176,12 +176,12 @@ export class AnalyticsService {
     ]);
 
     // Calculate totals
-    const totalImpressions = latestAnalytics.reduce((sum, a) => sum + a.impressions, 0);
+    const totalReach = latestAnalytics.reduce((sum, a) => sum + a.reach, 0);
     const totalEngagement = latestAnalytics.reduce(
       (sum, a) => sum + (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.clicks || 0) + (a.saves || 0),
       0
     );
-    const engagementRate = totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0;
+    const engagementRate = totalReach > 0 ? (totalEngagement / totalReach) * 100 : 0;
 
     // Find best performing post
     const bestPerforming = latestAnalytics.reduce((best, current) => {
@@ -709,24 +709,9 @@ export class AnalyticsService {
         { $unwind: '$post' },
         {
           $addFields: {
-            engagementRate: {
-              $cond: [
-                { $gt: ['$impressions', 0] },
-                {
-                  $multiply: [
-                    {
-                      $divide: [
-                        { $add: ['$likes', '$comments', '$shares', '$saves'] },
-                        '$impressions'
-                      ]
-                    },
-                    100
-                  ]
-                },
-                0
-              ]
-            },
-            reach: '$impressions'
+            // Use the engagementRate already calculated by the model (uses reach)
+            // Don't recalculate here to avoid duplication
+            reach: '$impressions' // For backward compatibility, map impressions to reach
           }
         },
         {
@@ -827,6 +812,216 @@ export class AnalyticsService {
   /**
    * Generate PDF report
    */
+  /**
+   * Calculate performance score for a post (0-100)
+   * Formula: weighted sum of normalized metrics vs account averages
+   */
+  static async calculatePerformanceScore(
+    workspaceId: string,
+    postAnalytics: any,
+    platform: string
+  ): Promise<number> {
+    try {
+      // Get account averages for this platform in the workspace
+      const { PostAnalytics } = await import('../models/PostAnalytics');
+      const mongoose = await import('mongoose');
+
+      const accountAverages = await PostAnalytics.aggregate([
+        {
+          $match: {
+            workspaceId: new mongoose.Types.ObjectId(workspaceId),
+            platform,
+            reach: { $gt: 0 }, // Only posts with reach data
+            collectedAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } // Last 90 days
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            avgEngagementRate: { $avg: '$engagementRate' },
+            avgReach: { $avg: '$reach' },
+            avgImpressions: { $avg: '$impressions' },
+            avgSaves: { $avg: '$saves' }
+          }
+        }
+      ]);
+
+      if (!accountAverages.length) {
+        // No historical data, return neutral score
+        return 50;
+      }
+
+      const averages = accountAverages[0];
+      
+      // Weights for performance score calculation
+      const weights = {
+        engagementRate: 0.40, // 40%
+        reach: 0.25,          // 25%
+        impressions: 0.20,    // 20%
+        saves: 0.15           // 15%
+      };
+
+      let score = 0;
+
+      // Normalize and weight each metric
+      if (averages.avgEngagementRate > 0) {
+        const engagementRatio = Math.min(postAnalytics.engagementRate / averages.avgEngagementRate, 3); // Cap at 3x
+        score += engagementRatio * weights.engagementRate * 100;
+      }
+
+      if (averages.avgReach > 0) {
+        const reachRatio = Math.min(postAnalytics.reach / averages.avgReach, 3);
+        score += reachRatio * weights.reach * 100;
+      }
+
+      if (averages.avgImpressions > 0) {
+        const impressionsRatio = Math.min(postAnalytics.impressions / averages.avgImpressions, 3);
+        score += impressionsRatio * weights.impressions * 100;
+      }
+
+      if (averages.avgSaves > 0 && postAnalytics.saves > 0) {
+        const savesRatio = Math.min(postAnalytics.saves / averages.avgSaves, 3);
+        score += savesRatio * weights.saves * 100;
+      } else if (averages.avgSaves === 0) {
+        // If no historical saves data, give neutral score for this component
+        score += weights.saves * 50;
+      }
+
+      // Clamp score to 0-100 range
+      return Math.max(0, Math.min(100, Math.round(score)));
+    } catch (error) {
+      logger.error('Error calculating performance score:', error);
+      return 50; // Return neutral score on error
+    }
+  }
+
+  /**
+   * Get suggestion for underperforming post
+   */
+  static getSuggestion(post: any): string {
+    const suggestions = [
+      'Try posting at a different time',
+      'Add more hashtags to increase discoverability',
+      'Use an image for higher engagement',
+      'Ask a question to encourage comments',
+      'Include a call-to-action',
+      'Post when your audience is most active'
+    ];
+
+    // Simple rule-based suggestions
+    if (post.engagementRate < 1) {
+      return 'Try posting at a different time';
+    }
+    if (post.reach < 100) {
+      return 'Add more hashtags to increase discoverability';
+    }
+    if (post.comments === 0) {
+      return 'Ask a question to encourage comments';
+    }
+    if (post.saves === 0 && post.platform === 'instagram') {
+      return 'Create more saveable content like tips or tutorials';
+    }
+    
+    // Random suggestion as fallback
+    return suggestions[Math.floor(Math.random() * suggestions.length)];
+  }
+
+  /**
+   * Get posts with all metrics and performance scores
+   */
+  static async getPostsWithMetrics(
+    workspaceId: string,
+    startDate?: Date,
+    endDate?: Date,
+    platforms?: string[],
+    sortBy: string = 'engagementRate',
+    sortDir: string = 'desc',
+    limit?: number
+  ): Promise<any[]> {
+    try {
+      const { PostAnalytics } = await import('../models/PostAnalytics');
+      const { ScheduledPost } = await import('../models/ScheduledPost');
+      const mongoose = await import('mongoose');
+
+      const matchStage: any = {
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      };
+
+      if (startDate || endDate) {
+        matchStage.collectedAt = {};
+        if (startDate) matchStage.collectedAt.$gte = startDate;
+        if (endDate) matchStage.collectedAt.$lte = endDate;
+      }
+
+      if (platforms && platforms.length > 0) {
+        matchStage.platform = { $in: platforms };
+      }
+
+      const sortDirection = sortDir === 'asc' ? 1 : -1;
+      const sortStage: any = {};
+      sortStage[sortBy] = sortDirection;
+
+      const pipeline: any[] = [
+        { $match: matchStage },
+        {
+          $lookup: {
+            from: 'scheduledposts',
+            localField: 'postId',
+            foreignField: '_id',
+            as: 'post'
+          }
+        },
+        { $unwind: '$post' },
+        {
+          $project: {
+            postId: 1,
+            platform: 1,
+            likes: 1,
+            comments: 1,
+            shares: 1,
+            reach: 1,
+            impressions: 1,
+            saves: 1,
+            engagementRate: 1,
+            performanceScore: 1,
+            collectedAt: 1,
+            publishedAt: '$post.publishedAt',
+            content: '$post.content',
+            mediaUrls: '$post.mediaUrls'
+          }
+        },
+        { $sort: sortStage }
+      ];
+
+      if (limit) {
+        pipeline.push({ $limit: limit });
+      }
+
+      const posts = await PostAnalytics.aggregate(pipeline);
+
+      // Calculate performance scores for posts that don't have them
+      for (const post of posts) {
+        if (!post.performanceScore) {
+          post.performanceScore = await this.calculatePerformanceScore(
+            workspaceId,
+            post,
+            post.platform
+          );
+          
+          // Update the database with the calculated score
+          await PostAnalytics.findByIdAndUpdate(post._id, {
+            performanceScore: post.performanceScore
+          });
+        }
+      }
+
+      return posts;
+    } catch (error) {
+      logger.error('Error getting posts with metrics:', error);
+      return [];
+    }
+  }
+
   static async generatePDFReport(
     workspaceId: string,
     startDate: Date,

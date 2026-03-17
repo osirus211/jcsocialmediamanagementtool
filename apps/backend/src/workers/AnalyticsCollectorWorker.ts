@@ -18,8 +18,10 @@ import {
 export class AnalyticsCollectorWorker {
   private worker: Worker | null = null;
   private isRunning: boolean = false;
+  private refreshScheduler: NodeJS.Timeout | null = null;
 
   private readonly CONCURRENCY = 3;
+  private readonly REFRESH_INTERVAL_HOURS = 6;
 
   // Metrics
   private metrics = {
@@ -29,7 +31,7 @@ export class AnalyticsCollectorWorker {
   };
 
   /**
-   * Start worker
+   * Start worker and refresh scheduler
    */
   start(): void {
     if (this.isRunning) {
@@ -58,18 +60,118 @@ export class AnalyticsCollectorWorker {
       }
     });
 
+    // Start the 6-hour refresh scheduler
+    this.startRefreshScheduler();
+
     this.isRunning = true;
 
     logger.info('Analytics collector worker started', {
       concurrency: this.CONCURRENCY,
+      refreshIntervalHours: this.REFRESH_INTERVAL_HOURS,
     });
   }
 
   /**
-   * Stop worker
+   * Start the 6-hour refresh scheduler
+   */
+  private startRefreshScheduler(): void {
+    // Run immediately on start
+    this.scheduleRefreshJobs();
+    
+    // Then run every hour to check for posts needing refresh
+    this.refreshScheduler = setInterval(() => {
+      this.scheduleRefreshJobs();
+    }, 60 * 60 * 1000); // Check every hour
+  }
+
+  /**
+   * Schedule refresh jobs for posts that need updating
+   */
+  private async scheduleRefreshJobs(): Promise<void> {
+    try {
+      const { ScheduledPost } = await import('../models/ScheduledPost');
+      const mongoose = await import('mongoose');
+
+      // Find posts that need refresh (published posts with no recent analytics)
+      const sixHoursAgo = new Date(Date.now() - this.REFRESH_INTERVAL_HOURS * 60 * 60 * 1000);
+      
+      const postsNeedingRefresh = await ScheduledPost.aggregate([
+        {
+          $match: {
+            status: 'published',
+            publishedAt: { $exists: true, $ne: null }
+          }
+        },
+        {
+          $lookup: {
+            from: 'postanalytics',
+            localField: '_id',
+            foreignField: 'postId',
+            as: 'analytics'
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { analytics: { $size: 0 } }, // No analytics yet
+              { 
+                'analytics.lastRefreshedAt': { 
+                  $not: { $gte: sixHoursAgo } 
+                } 
+              } // Last refresh was more than 6 hours ago
+            ]
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            platform: 1,
+            socialAccountId: 1,
+            platformPostId: 1,
+            publishedAt: 1
+          }
+        },
+        { $limit: 100 } // Process max 100 posts per run to avoid overwhelming
+      ]);
+
+      logger.info(`Found ${postsNeedingRefresh.length} posts needing analytics refresh`);
+
+      // Queue refresh jobs for each post
+      const { AnalyticsCollectionQueue } = await import('../queue/AnalyticsCollectionQueue');
+      const queue = AnalyticsCollectionQueue.getInstance();
+
+      for (const post of postsNeedingRefresh) {
+        if (post.platformPostId) {
+          await queue.addJob({
+            postId: post._id.toString(),
+            platform: post.platform,
+            socialAccountId: post.socialAccountId.toString(),
+            platformPostId: post.platformPostId,
+            collectionAttempt: 1,
+            correlationId: `refresh-${Date.now()}-${post._id}`
+          });
+        }
+      }
+
+      if (postsNeedingRefresh.length > 0) {
+        logger.info(`Scheduled ${postsNeedingRefresh.length} analytics refresh jobs`);
+      }
+    } catch (error: any) {
+      logger.error('Error scheduling refresh jobs:', error);
+    }
+  }
+
+  /**
+   * Stop worker and refresh scheduler
    */
   async stop(): Promise<void> {
     if (!this.isRunning || !this.worker) return;
+
+    // Stop refresh scheduler
+    if (this.refreshScheduler) {
+      clearInterval(this.refreshScheduler);
+      this.refreshScheduler = null;
+    }
 
     await this.worker.close();
     this.worker = null;
@@ -130,6 +232,12 @@ export class AnalyticsCollectorWorker {
             collectionAttempt,
             analytics,
           });
+
+          // Update lastRefreshedAt timestamp
+          await PostAnalytics.findOneAndUpdate(
+            { postId, collectionAttempt },
+            { lastRefreshedAt: new Date() }
+          );
 
           const duration = Date.now() - startTime;
           this.metrics.collection_success_total++;

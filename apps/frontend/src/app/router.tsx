@@ -197,6 +197,10 @@ const router = createBrowserRouter([
         element: <SuspenseWrapper><AnalyticsPage /></SuspenseWrapper>,
       },
       {
+        path: 'analytics/posts/:postId',
+        element: <SuspenseWrapper><AnalyticsPage /></SuspenseWrapper>,
+      },
+      {
         path: 'analytics/dashboard',
         element: <SuspenseWrapper><CustomDashboard /></SuspenseWrapper>,
       },

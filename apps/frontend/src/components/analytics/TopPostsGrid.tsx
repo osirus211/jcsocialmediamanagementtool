@@ -11,12 +11,20 @@ interface TopPost {
   shares: number;
   saves: number;
   reach: number;
+  impressions: number;
   engagementRate: number;
+  performanceScore: number;
+  content?: string;
 }
 
 interface TopPostsGridProps {
   data: TopPost[];
   isLoading?: boolean;
+  showRanking?: boolean;
+  onPostClick?: (postId: string) => void;
+  onPostSelect?: (postId: string, selected: boolean) => void;
+  selectedPosts?: string[];
+  maxSelectable?: number;
 }
 
 const PLATFORM_ICONS: Record<string, string> = {
@@ -39,10 +47,18 @@ const PLATFORM_COLORS: Record<string, string> = {
   bluesky: 'bg-blue-500 text-white',
 };
 
-type SortField = 'engagementRate' | 'reach' | 'likes' | 'comments' | 'shares';
+type SortField = 'engagementRate' | 'reach' | 'impressions' | 'likes' | 'comments' | 'shares' | 'saves' | 'performanceScore';
 type SortDirection = 'asc' | 'desc';
 
-export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
+export function TopPostsGrid({ 
+  data, 
+  isLoading = false, 
+  showRanking = true,
+  onPostClick,
+  onPostSelect,
+  selectedPosts = [],
+  maxSelectable = 4
+}: TopPostsGridProps) {
   const [sortField, setSortField] = useState<SortField>('engagementRate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -62,7 +78,10 @@ export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
     return (aValue - bValue) * multiplier;
   });
 
-  const formatNumber = (num: number): string => {
+  const formatNumber = (num: number | undefined | null): string => {
+    if (num == null || num === undefined) {
+      return '—';
+    }
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
     } else if (num >= 1000) {
@@ -88,6 +107,33 @@ export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
       ? <TrendingDown className="h-4 w-4 text-blue-600" />
       : <TrendingUp className="h-4 w-4 text-blue-600" />;
   };
+
+  const getPerformanceColor = (score: number): string => {
+    if (score >= 70) return 'text-green-600';
+    if (score >= 40) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
+  const getPerformanceLabel = (score: number): string => {
+    if (score >= 70) return 'Excellent';
+    if (score >= 40) return 'Good';
+    return 'Needs Improvement';
+  };
+
+  const handlePostSelect = (postId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    if (onPostSelect) {
+      onPostSelect(postId, event.target.checked);
+    }
+  };
+
+  const handlePostClick = (postId: string) => {
+    if (onPostClick) {
+      onPostClick(postId);
+    }
+  };
+
+  const isPostSelected = (postId: string) => selectedPosts.includes(postId);
+  const canSelectMore = selectedPosts.length < maxSelectable;
 
   if (isLoading) {
     return (
@@ -128,10 +174,13 @@ export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
         <span className="text-sm font-medium text-gray-700 mr-2">Sort by:</span>
         {[
           { field: 'engagementRate' as SortField, label: 'Engagement Rate' },
-          { field: 'reach' as SortField, label: 'Reach' },
+          { field: 'performanceScore' as SortField, label: 'Performance Score' },
+          { field: 'reach' as SortField, label: 'Audience Reached' },
+          { field: 'impressions' as SortField, label: 'Impressions' },
           { field: 'likes' as SortField, label: 'Likes' },
           { field: 'comments' as SortField, label: 'Comments' },
           { field: 'shares' as SortField, label: 'Shares' },
+          { field: 'saves' as SortField, label: 'Saves' },
         ].map(({ field, label }) => (
           <button
             key={field}
@@ -149,15 +198,29 @@ export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
       </div>
 
       {/* Posts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="top-posts-section">
         {sortedData.map((post, index) => (
           <div
             key={post.postId}
-            className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+            className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => handlePostClick(post.postId)}
           >
-            {/* Platform Badge */}
+            {/* Header with platform, rank, and selection */}
             <div className="flex items-center justify-between p-4 pb-2">
               <div className="flex items-center gap-2">
+                {onPostSelect && (
+                  <input
+                    type="checkbox"
+                    checked={isPostSelected(post.postId)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handlePostSelect(post.postId, e);
+                    }}
+                    disabled={!isPostSelected(post.postId) && !canSelectMore}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    title={!canSelectMore && !isPostSelected(post.postId) ? `Maximum ${maxSelectable} posts can be compared at once` : ''}
+                  />
+                )}
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm ${PLATFORM_COLORS[post.platform] || 'bg-gray-500 text-white'}`}>
                   {PLATFORM_ICONS[post.platform] || '📱'}
                 </div>
@@ -165,8 +228,40 @@ export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
                   {post.platform}
                 </span>
               </div>
-              <div className="text-xs text-gray-500">
-                #{index + 1}
+              {showRanking && (
+                <div className="text-xs text-gray-500">
+                  #{index + 1}
+                </div>
+              )}
+            </div>
+
+            {/* Performance Score */}
+            <div className="px-4 pb-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Performance Score</span>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className={`w-12 h-2 bg-gray-200 rounded-full overflow-hidden`}
+                    role="progressbar"
+                    aria-valuenow={post.performanceScore}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Performance score: ${post.performanceScore} out of 100`}
+                  >
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        post.performanceScore >= 70 ? 'bg-green-500' :
+                        post.performanceScore >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${post.performanceScore}%` }}
+                    />
+                  </div>
+                  <span 
+                    className={`text-sm font-semibold ${getPerformanceColor(post.performanceScore)}`}
+                  >
+                    {post.performanceScore}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -208,9 +303,15 @@ export function TopPostsGrid({ data, isLoading = false }: TopPostsGridProps) {
                   </div>
                 </div>
                 <div>
-                  <div className="text-gray-500">Reach</div>
+                  <div className="text-gray-500">Audience Reached</div>
                   <div className="font-semibold">
-                    {formatNumber(post.reach)}
+                    {post.reach > 0 ? formatNumber(post.reach) : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-gray-500">Impressions</div>
+                  <div className="font-semibold">
+                    {formatNumber(post.impressions)}
                   </div>
                 </div>
                 <div>

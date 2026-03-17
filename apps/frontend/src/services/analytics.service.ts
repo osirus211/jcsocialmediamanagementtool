@@ -376,7 +376,54 @@ class AnalyticsService {
     }
 
     const response = await apiClient.get<{ success: boolean; data: Array<any> }>(
-      `/analytics/top-posts?${params.toString()}`
+      `/analytics/posts/top?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get worst performing posts
+   */
+  async getWorstPostsData(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<Array<any>> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    if (platforms) {
+      platforms.forEach(platform => params.append('platforms', platform));
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: Array<any> }>(
+      `/analytics/posts/worst?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Compare multiple posts
+   */
+  async comparePosts(postIds: string[]): Promise<Array<any>> {
+    const params = new URLSearchParams();
+    params.append('postIds', postIds.join(','));
+
+    const response = await apiClient.get<{ success: boolean; data: Array<any> }>(
+      `/analytics/posts/compare?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get post detail with history
+   */
+  async getPostDetail(postId: string): Promise<any> {
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      `/analytics/posts/${postId}`
     );
 
     return response.data;

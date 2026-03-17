@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { analyticsService } from '@/services/analytics.service';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 // Components
 import { KPICard } from '@/components/analytics/KPICard';
 import { FollowerGrowthChart } from '@/components/analytics/FollowerGrowthChart';
 import { EngagementChart } from '@/components/analytics/EngagementChart';
 import { TopPostsGrid } from '@/components/analytics/TopPostsGrid';
+import { WorstPostsGrid } from '@/components/analytics/WorstPostsGrid';
+import { PostComparison } from '@/components/analytics/PostComparison';
+import { PostDetailView } from '@/components/analytics/PostDetailView';
 import { PlatformComparisonTable } from '@/components/analytics/PlatformComparisonTable';
 import { DateRangePicker } from '@/components/analytics/DateRangePicker';
 import { PlatformFilter } from '@/components/analytics/PlatformFilter';
 import { ExportButtons } from '@/components/analytics/ExportButtons';
+import { PostMetricsExport } from '@/components/analytics/PostMetricsExport';
 
 const PLATFORMS = [
   { id: 'twitter', name: 'Twitter', icon: '𝕏' },
@@ -25,6 +29,11 @@ const PLATFORMS = [
 
 export function AnalyticsPage() {
   const { currentWorkspaceId, workspacesLoaded, workspaces } = useWorkspaceStore();
+  const navigate = useNavigate();
+  
+  // View state
+  const [currentView, setCurrentView] = useState<'dashboard' | 'post-detail'>('dashboard');
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   
   // Date range state
   const [dateRange, setDateRange] = useState<{
@@ -46,7 +55,13 @@ export function AnalyticsPage() {
   const [followerGrowthData, setFollowerGrowthData] = useState<any[]>([]);
   const [engagementData, setEngagementData] = useState<any[]>([]);
   const [topPostsData, setTopPostsData] = useState<any[]>([]);
+  const [worstPostsData, setWorstPostsData] = useState<any[]>([]);
   const [platformComparisonData, setPlatformComparisonData] = useState<any[]>([]);
+  
+  // Post comparison state
+  const [selectedPostsForComparison, setSelectedPostsForComparison] = useState<string[]>([]);
+  const [comparisonPosts, setComparisonPosts] = useState<any[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
   
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -69,11 +84,12 @@ export function AnalyticsPage() {
     try {
       const platforms = selectedPlatforms.length > 0 ? selectedPlatforms : undefined;
 
-      const [summary, followerGrowth, engagement, topPosts, platformComparison] = await Promise.all([
+      const [summary, followerGrowth, engagement, topPosts, worstPosts, platformComparison] = await Promise.all([
         analyticsService.getSummaryMetrics(dateRange.startDate, dateRange.endDate, platforms),
         analyticsService.getFollowerGrowthData(dateRange.startDate, dateRange.endDate, platforms),
         analyticsService.getEngagementData(dateRange.startDate, dateRange.endDate, platforms, engagementView),
         analyticsService.getTopPostsData(dateRange.startDate, dateRange.endDate, platforms),
+        analyticsService.getWorstPostsData(dateRange.startDate, dateRange.endDate, platforms),
         analyticsService.getPlatformComparisonData(dateRange.startDate, dateRange.endDate)
       ]);
 
@@ -81,6 +97,7 @@ export function AnalyticsPage() {
       setFollowerGrowthData(followerGrowth);
       setEngagementData(engagement);
       setTopPostsData(topPosts);
+      setWorstPostsData(worstPosts);
       setPlatformComparisonData(platformComparison);
     } catch (err: any) {
       setError(err.message || 'Failed to load analytics data');
@@ -96,6 +113,55 @@ export function AnalyticsPage() {
 
   const handlePlatformFilterChange = (platforms: string[]) => {
     setSelectedPlatforms(platforms);
+  };
+
+  const handlePostClick = (postId: string) => {
+    // Save scroll position before navigating to post detail
+    sessionStorage.setItem('analyticsScrollY', String(window.scrollY));
+    setSelectedPostId(postId);
+    setCurrentView('post-detail');
+  };
+
+  const handleBackToDashboard = () => {
+    setCurrentView('dashboard');
+    setSelectedPostId(null);
+    
+    // Restore scroll position after navigation settles
+    requestAnimationFrame(() => {
+      const savedY = sessionStorage.getItem('analyticsScrollY');
+      if (savedY) {
+        window.scrollTo({ top: parseInt(savedY, 10), behavior: 'instant' });
+        sessionStorage.removeItem('analyticsScrollY');
+      }
+    });
+  };
+
+  const handlePostSelect = (postId: string, selected: boolean) => {
+    if (selected) {
+      if (selectedPostsForComparison.length < 4) {
+        setSelectedPostsForComparison([...selectedPostsForComparison, postId]);
+      }
+    } else {
+      setSelectedPostsForComparison(selectedPostsForComparison.filter(id => id !== postId));
+    }
+  };
+
+  const handleCompareSelected = async () => {
+    if (selectedPostsForComparison.length < 2) return;
+    
+    try {
+      const posts = await analyticsService.comparePosts(selectedPostsForComparison);
+      setComparisonPosts(posts);
+      setShowComparison(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load comparison data');
+    }
+  };
+
+  const handleClearComparison = () => {
+    setSelectedPostsForComparison([]);
+    setShowComparison(false);
+    setComparisonPosts([]);
   };
 
   const formatNumber = (num: number): string => {
@@ -118,6 +184,15 @@ export function AnalyticsPage() {
     if (change < 0) return 'text-red-600';
     return 'text-gray-600';
   };
+
+  if (currentView === 'post-detail' && selectedPostId) {
+    return (
+      <PostDetailView 
+        postId={selectedPostId} 
+        onBack={handleBackToDashboard}
+      />
+    );
+  }
 
   if (!currentWorkspaceId) {
     if (workspacesLoaded && workspaces.length === 0) {
@@ -311,10 +386,52 @@ export function AnalyticsPage() {
 
         {/* Top Posts Grid */}
         <section>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Performing Posts</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Top Performing Posts</h2>
+            <div className="flex items-center gap-3">
+              <PostMetricsExport
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+                platforms={selectedPlatforms}
+                posts={topPostsData}
+                disabled={isLoading}
+              />
+              {selectedPostsForComparison.length >= 2 && (
+                <>
+                  <button
+                    onClick={handleCompareSelected}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
+                    Compare Selected ({selectedPostsForComparison.length})
+                  </button>
+                  <button
+                    onClick={handleClearComparison}
+                    className="px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors text-sm"
+                  >
+                    Clear
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
           <TopPostsGrid 
             data={topPostsData}
             isLoading={isLoading}
+            showRanking={true}
+            onPostClick={handlePostClick}
+            onPostSelect={handlePostSelect}
+            selectedPosts={selectedPostsForComparison}
+            maxSelectable={4}
+          />
+        </section>
+
+        {/* Worst Posts Grid */}
+        <section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Posts Needing Attention</h2>
+          <WorstPostsGrid 
+            data={worstPostsData}
+            isLoading={isLoading}
+            onPostClick={handlePostClick}
           />
         </section>
 
@@ -327,6 +444,13 @@ export function AnalyticsPage() {
           />
         </section>
       </div>
+
+      {/* Post Comparison Modal */}
+      <PostComparison 
+        posts={comparisonPosts}
+        isOpen={showComparison}
+        onClose={() => setShowComparison(false)}
+      />
     </div>
   );
 }
