@@ -103,6 +103,7 @@ export interface IWorkspace extends Document {
   
   // Status
   isActive: boolean;
+  deletedAt?: Date;
   
   createdAt: Date;
   updatedAt: Date;
@@ -350,6 +351,10 @@ const WorkspaceSchema = new Schema<IWorkspace>(
       default: true,
       index: true,
     },
+    deletedAt: {
+      type: Date,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -357,9 +362,9 @@ const WorkspaceSchema = new Schema<IWorkspace>(
 );
 
 // Indexes
-WorkspaceSchema.index({ ownerId: 1, isActive: 1 });
-WorkspaceSchema.index({ plan: 1, isActive: 1 });
-WorkspaceSchema.index({ slug: 1 }, { unique: true });
+WorkspaceSchema.index({ ownerId: 1, isActive: 1, deletedAt: 1 });
+WorkspaceSchema.index({ plan: 1, isActive: 1, deletedAt: 1 });
+WorkspaceSchema.index({ slug: 1, deletedAt: 1 }, { unique: true });
 
 // Update plan limits when plan changes
 WorkspaceSchema.pre('save', function (next) {

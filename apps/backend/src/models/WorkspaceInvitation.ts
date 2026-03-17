@@ -158,10 +158,10 @@ WorkspaceInvitationSchema.statics.validateToken = function(providedToken: string
   );
 };
 
-// Pre-save middleware to set expiry date (7 days from creation)
+// Pre-save middleware to set expiry date (72 hours from creation)
 WorkspaceInvitationSchema.pre('save', function(next) {
   if (this.isNew) {
-    this.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    this.expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
   }
   next();
 });

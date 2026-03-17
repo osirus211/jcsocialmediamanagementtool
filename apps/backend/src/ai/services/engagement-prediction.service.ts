@@ -106,10 +106,10 @@ export class EngagementPredictionService {
           $match: {
             workspaceId: new mongoose.Types.ObjectId(workspaceId),
             platform,
-            recordedAt: { $gte: ninetyDaysAgo },
+            collectedAt: { $gte: ninetyDaysAgo },
           },
         },
-        { $sort: { postId: 1, recordedAt: -1 } },
+        { $sort: { postId: 1, collectedAt: -1 } },
         {
           $group: {
             _id: '$postId',
@@ -157,7 +157,7 @@ export class EngagementPredictionService {
     const hourlyPerformance: Record<number, number[]> = {};
     
     historicalData.forEach((post) => {
-      const postHour = new Date(post.recordedAt).getHours();
+      const postHour = new Date(post.collectedAt).getHours();
       const engagement = post.likes + post.comments + post.shares + post.clicks + post.saves;
       const rate = post.impressions > 0 ? (engagement / post.impressions) * 100 : 0;
       

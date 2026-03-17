@@ -20,33 +20,37 @@ const AutomationPage: React.FC = () => {
   }, []);
 
   const loadData = async () => {
+    console.log('[DEBUG AutomationPage] loadData() called');
     try {
       setLoading(true);
       const [keysData, webhooksData] = await Promise.all([
         AutomationService.getAutomationApiKeys(),
         AutomationService.getWebhooks(),
       ]);
+      console.log('[DEBUG AutomationPage] loadData() success', { apiKeys: keysData, webhooks: webhooksData });
       setApiKeys(keysData);
       setWebhooks(webhooksData);
     } catch (error) {
+      console.error('[DEBUG AutomationPage] loadData() FAILED:', error);
       toast.error('Failed to load automation data');
-      console.error('Failed to load automation data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const createApiKey = async () => {
+    console.log('[DEBUG AutomationPage] createApiKey() called');
     try {
       setCreatingKey(true);
       const result = await AutomationService.createAutomationApiKey('Automation Integration');
+      console.log('[DEBUG AutomationPage] createApiKey() success', { result });
       setApiKeys([...apiKeys, result.apiKey]);
       
       // Show the full API key in a toast (only time it's visible)
       toast.success(`API Key Created! Copy this key now - it won't be shown again: ${result.key}`);
     } catch (error) {
+      console.error('[DEBUG AutomationPage] createApiKey() FAILED:', error);
       toast.error('Failed to create API key');
-      console.error('Failed to create API key:', error);
     } finally {
       setCreatingKey(false);
     }
@@ -60,13 +64,15 @@ const AutomationPage: React.FC = () => {
   const deleteWebhook = async (id: string) => {
     if (!confirm('Are you sure you want to delete this webhook?')) return;
 
+    console.log('[DEBUG AutomationPage] deleteWebhook() called', { id });
     try {
       await AutomationService.deleteWebhook(id);
+      console.log('[DEBUG AutomationPage] deleteWebhook() success', { id });
       setWebhooks(webhooks.filter(w => w._id !== id));
       toast.success('Webhook deleted');
     } catch (error) {
+      console.error('[DEBUG AutomationPage] deleteWebhook() FAILED:', error);
       toast.error('Failed to delete webhook');
-      console.error('Failed to delete webhook:', error);
     }
   };
 

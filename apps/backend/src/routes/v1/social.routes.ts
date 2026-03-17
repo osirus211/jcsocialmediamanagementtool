@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { socialAccountController } from '../../controllers/SocialAccountController';
 import { requireAuth } from '../../middleware/auth';
-import { requireWorkspace } from '../../middleware/tenant';
+import { requireWorkspace, requireAdmin } from '../../middleware/tenant';
 import { checkSocialAccountLimit } from '../../middleware/planLimit';
 
 const router = Router();
@@ -16,7 +16,7 @@ router.use(requireWorkspace);
  */
 
 // Connect account (OAuth placeholder)
-router.post('/connect/:platform', checkSocialAccountLimit, socialAccountController.connectAccount.bind(socialAccountController));
+router.post('/connect/:platform', requireAdmin, checkSocialAccountLimit, socialAccountController.connectAccount.bind(socialAccountController));
 
 // Get all accounts
 router.get('/accounts', socialAccountController.getAccounts.bind(socialAccountController));
@@ -28,7 +28,7 @@ router.get('/accounts/platform/:platform', socialAccountController.getAccountsBy
 router.get('/accounts/:id', socialAccountController.getAccount.bind(socialAccountController));
 
 // Disconnect account
-router.delete('/accounts/:id', socialAccountController.disconnectAccount.bind(socialAccountController));
+router.delete('/accounts/:id', requireAdmin, socialAccountController.disconnectAccount.bind(socialAccountController));
 
 // Refresh token
 router.post('/accounts/:id/refresh', socialAccountController.refreshToken.bind(socialAccountController));

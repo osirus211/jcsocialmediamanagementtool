@@ -62,7 +62,7 @@ export const useOnboardingStore = create<OnboardingStore>()(
         try {
           set({ isLoading: true });
           
-          const response = await apiClient.post<{ data: OnboardingProgress }>('/onboarding/complete');
+          const response = await apiClient.post<{ data: OnboardingProgress }>('/onboarding/complete', {});
           
           set({
             progress: response.data,
@@ -79,7 +79,7 @@ export const useOnboardingStore = create<OnboardingStore>()(
         try {
           set({ isLoading: true });
           
-          const response = await apiClient.post<{ data: OnboardingProgress }>('/onboarding/skip');
+          const response = await apiClient.post<{ data: OnboardingProgress }>('/onboarding/skip', {});
           
           set({
             progress: response.data,

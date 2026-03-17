@@ -97,6 +97,8 @@ export interface IUser extends Document {
   addRefreshToken(token: string): Promise<void>;
   removeRefreshToken(token: string): Promise<void>;
   revokeAllTokens(): Promise<void>;
+  getActiveSessionCount(): number;
+  wouldExceedSessionLimit(): boolean;
 }
 
 // User schema
@@ -312,24 +314,65 @@ UserSchema.methods.getFullName = function (): string {
 
 // Instance method: Add refresh token
 UserSchema.methods.addRefreshToken = async function (token: string): Promise<void> {
-  // Limit to 5 active refresh tokens per user
+  // Enhanced concurrent session management: Limit to 5 active refresh tokens per user
+  // This prevents unlimited concurrent sessions while allowing reasonable multi-device usage
   if (this.refreshTokens.length >= 5) {
-    this.refreshTokens.shift(); // Remove oldest token
+    // Remove oldest token to make room for new session
+    const removedToken = this.refreshTokens.shift();
+    console.info('Session limit reached, removed oldest session', { 
+      userId: this._id, 
+      sessionCount: this.refreshTokens.length + 1,
+      removedTokenPrefix: removedToken?.substring(0, 8) + '...'
+    });
   }
+  
   this.refreshTokens.push(token);
+  this.lastLoginAt = new Date(); // Update last login timestamp
   await this.save();
 };
 
 // Instance method: Remove specific refresh token
 UserSchema.methods.removeRefreshToken = async function (token: string): Promise<void> {
+  const initialCount = this.refreshTokens.length;
   this.refreshTokens = this.refreshTokens.filter((t: string) => t !== token);
+  
+  // Log session termination for security monitoring
+  if (this.refreshTokens.length < initialCount) {
+    console.info('Session terminated', { 
+      userId: this._id, 
+      remainingSessions: this.refreshTokens.length,
+      terminatedTokenPrefix: token?.substring(0, 8) + '...'
+    });
+  }
+  
   await this.save();
 };
 
 // Instance method: Revoke all refresh tokens (logout from all devices)
 UserSchema.methods.revokeAllTokens = async function (): Promise<void> {
+  const sessionCount = this.refreshTokens.length;
   this.refreshTokens = [];
+  
+  // Log mass session termination for security monitoring
+  if (sessionCount > 0) {
+    console.info('All sessions revoked', { 
+      userId: this._id, 
+      revokedSessionCount: sessionCount,
+      reason: 'user_initiated_logout_all'
+    });
+  }
+  
   await this.save();
+};
+
+// Instance method: Get active session count
+UserSchema.methods.getActiveSessionCount = function (): number {
+  return this.refreshTokens.length;
+};
+
+// Instance method: Check if session limit would be exceeded
+UserSchema.methods.wouldExceedSessionLimit = function (): boolean {
+  return this.refreshTokens.length >= 5;
 };
 
 // Static method: Find by email (excluding soft-deleted)

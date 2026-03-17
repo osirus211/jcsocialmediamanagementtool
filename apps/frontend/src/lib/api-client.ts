@@ -14,6 +14,24 @@ let csrfTokenPromise: Promise<string> | null = null;
 // Upgrade modal state
 let upgradeModalCallback: ((limitType: string, message: string) => void) | null = null;
 
+// Interceptor store references
+let interceptorAccessToken: string | null = null;
+let interceptorWorkspaceId: string | null = null;
+
+/**
+ * Set access token for the request interceptor
+ */
+export function setAccessTokenForInterceptor(token: string | null) {
+  interceptorAccessToken = token;
+}
+
+/**
+ * Set workspace ID for the request interceptor
+ */
+export function setWorkspaceIdForInterceptor(id: string | null) {
+  interceptorWorkspaceId = id;
+}
+
 /**
  * Get CSRF token from server
  */
@@ -89,16 +107,16 @@ class ApiClient {
     // Request interceptor: Add access token, workspace ID, and CSRF token to headers
     this.client.interceptors.request.use(
       async (config) => {
-        // Get access token from window reference (set by auth store)
-        const token = getAccessTokenForInterceptor();
+        // Get access token from local reference
+        const token = interceptorAccessToken;
         logger.debug('Interceptor reading token', { hasToken: !!token });
         
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // Get workspace ID from window reference (set by workspace store)
-        const workspaceId = getWorkspaceIdForInterceptor();
+        // Get workspace ID from local reference
+        const workspaceId = interceptorWorkspaceId;
         
         // Add workspace ID header for tenant-scoped requests
         // Skip for auth and workspace list endpoints
@@ -106,15 +124,15 @@ class ApiClient {
           config.url?.includes('/auth/') ||
           config.url === '/workspaces' ||
           config.url?.match(/^\/workspaces$/) ||
-          config.method?.toLowerCase() === 'post' && config.url === '/workspaces';
+          (config.method?.toLowerCase() === 'post' && config.url === '/workspaces');
 
         if (workspaceId && !skipWorkspaceHeader && config.headers) {
           config.headers['x-workspace-id'] = workspaceId;
         }
 
         // Add CSRF token for state-changing requests (except excluded endpoints)
-        // TEMPORARILY DISABLED TO DEBUG RESOURCE EXHAUSTION
-        /*
+        // NOTE: Was temporarily disabled to debug resource exhaustion — re-enabled.
+        // getCsrfToken() has a 5s timeout and is cached after first call, so no resource issues.
         if (config.method && ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
           // Skip CSRF token for excluded endpoints
           const excludedFromCsrf = [
@@ -138,7 +156,6 @@ class ApiClient {
             }
           }
         }
-        */
         
         return config;
       },
@@ -166,10 +183,12 @@ class ApiClient {
         }
 
         // Handle 403 CSRF token errors - clear cached token
-        if (error.response?.status === 403 && 
-            error.response?.data?.message?.includes('CSRF')) {
-          csrfToken = null;
-          csrfTokenPromise = null;
+        if (error.response?.status === 403) {
+          const errorData = error.response.data as any;
+          if (errorData?.message?.includes('CSRF')) {
+            csrfToken = null;
+            csrfTokenPromise = null;
+          }
         }
 
         // If error is 401 and we haven't retried yet
@@ -309,55 +328,17 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 
-// Export a function to get access token for use in interceptors
+/**
+ * Get access token for use in interceptors
+ * Used in getAccessTokenForInterceptor()
+ */
 export function getAccessTokenForInterceptor(): string | null {
-  try {
-    // This will be called synchronously in the interceptor
-    // We need to access the store state directly
-    const state = (window as any).__AUTH_STORE__;
-    return state?.accessToken || null;
-  } catch (error) {
-    return null;
-  }
+  return interceptorAccessToken;
 }
 
-// Export a function to get workspace ID for use in interceptors
+/**
+ * Get workspace ID for use in interceptors
+ */
 export function getWorkspaceIdForInterceptor(): string | null {
-  try {
-    // This will be called synchronously in the interceptor
-    // We need to access the store state directly
-    const state = (window as any).__WORKSPACE_STORE__;
-    return state?.currentWorkspaceId || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-// Store reference to auth store state for interceptor
-if (typeof window !== 'undefined') {
-  // Initialize immediately with empty state
-  (window as any).__AUTH_STORE__ = { accessToken: null };
-  (window as any).__WORKSPACE_STORE__ = { currentWorkspaceId: null };
-  
-  // Then subscribe to updates
-  import('@/store/auth.store').then(({ useAuthStore }) => {
-    // Set initial state
-    (window as any).__AUTH_STORE__ = useAuthStore.getState();
-    
-    // Subscribe to changes
-    useAuthStore.subscribe((state) => {
-      (window as any).__AUTH_STORE__ = state;
-    });
-  });
-
-  // Store reference to workspace store state for interceptor
-  import('@/store/workspace.store').then(({ useWorkspaceStore }) => {
-    // Set initial state
-    (window as any).__WORKSPACE_STORE__ = useWorkspaceStore.getState();
-    
-    // Subscribe to changes
-    useWorkspaceStore.subscribe((state) => {
-      (window as any).__WORKSPACE_STORE__ = state;
-    });
-  });
+  return interceptorWorkspaceId;
 }

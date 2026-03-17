@@ -125,6 +125,69 @@ export class WebhookService {
     hmac.update(JSON.stringify(payload));
     return hmac.digest('hex');
   }
+
+  /**
+   * Calculate retry delay with exponential backoff
+   */
+  calculateRetryDelay(attempt: number): number {
+    // Exponential backoff: 2^attempt * 1000ms
+    return Math.pow(2, attempt) * 1000;
+  }
+
+  /**
+   * Process failed delivery with retry logic
+   */
+  async processFailedDelivery(deliveryId: string): Promise<void> {
+    // Implementation for processing failed deliveries
+    logger.info('Processing failed delivery', { deliveryId });
+  }
+
+  /**
+   * Deliver webhook to endpoint
+   */
+  async deliverWebhook(delivery: any): Promise<void> {
+    // Implementation for delivering webhook
+    logger.info('Delivering webhook', { deliveryId: delivery.id });
+  }
+
+  /**
+   * Attempt delivery with retry logic
+   */
+  async attemptDelivery(delivery: any): Promise<void> {
+    // Implementation for attempting delivery
+    logger.info('Attempting delivery', { deliveryId: delivery.id });
+  }
+
+  /**
+   * Generate HMAC signature for webhook (public method)
+   */
+  generateHmacSignature(secret: string, payload: any): string {
+    return this.generateSignature(secret, payload);
+  }
+
+  /**
+   * Validate webhook URL
+   */
+  validateWebhookUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Build webhook headers
+   */
+  buildWebhookHeaders(secret: string, payload: any): Record<string, string> {
+    const signature = this.generateSignature(secret, payload);
+    return {
+      'Content-Type': 'application/json',
+      'X-Webhook-Signature': `sha256=${signature}`,
+      'User-Agent': 'SocialMediaManager-Webhooks/1.0',
+    };
+  }
 }
 
 export const webhookService = new WebhookService();

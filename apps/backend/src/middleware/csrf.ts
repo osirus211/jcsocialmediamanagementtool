@@ -4,12 +4,12 @@
  * Uses double-submit cookie pattern for CSRF protection
  */
 
-import { doubleCsrf } from 'csrf-csrf';
+import { doubleCsrf, DoubleCsrfConfigOptions } from 'csrf-csrf';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config';
 
 // Configure double CSRF protection
-const doubleCsrfOptions = {
+const doubleCsrfOptions: DoubleCsrfConfigOptions = {
   getSecret: () => config.jwt.secret, // Use JWT secret as CSRF secret
   cookieName: 'csrf-token',
   cookieOptions: {
@@ -20,7 +20,7 @@ const doubleCsrfOptions = {
   },
   size: 64,
   ignoredMethods: ['GET', 'HEAD', 'OPTIONS'] as const,
-  getTokenFromRequest: (req: any) => {
+  getCsrfTokenFromRequest: (req: any) => {
     // Check multiple possible header names
     return req.headers['x-csrf-token'] || 
            req.headers['csrf-token'] || 

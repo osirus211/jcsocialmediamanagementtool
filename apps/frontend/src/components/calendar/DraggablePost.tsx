@@ -9,6 +9,7 @@ interface DraggablePostProps {
   onPostClick: (post: Post) => void;
   showTime?: boolean;
   compact?: boolean;
+  className?: string;
 }
 
 /**
@@ -33,7 +34,8 @@ export function DraggablePost({
   post, 
   onPostClick, 
   showTime = false,
-  compact = false 
+  compact = false,
+  className = ''
 }: DraggablePostProps) {
   const {
     attributes,
@@ -72,6 +74,7 @@ export function DraggablePost({
           : 'hover:shadow-md hover:border-gray-300'
         }
         ${compact ? 'p-2' : 'p-3'}
+        ${className}
       `}
       onClick={() => onPostClick(post)}
     >

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { WorkspaceService } from '../services/WorkspaceService';
 import { WorkspaceRole } from '../models/WorkspaceMember';
+import { Workspace } from '../models/Workspace';
 import { logger } from '../utils/logger';
 import { getPaginationParams } from '../utils/pagination';
 import { logAudit } from '../utils/auditLogger';
@@ -214,6 +215,33 @@ export class WorkspaceController {
   }
 
   /**
+   * Generate deletion confirmation token
+   * POST /api/v1/workspaces/:workspaceId/delete-token
+   */
+  static async generateDeleteToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const confirmToken = await workspaceService.generateDeleteToken({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+      });
+
+      res.status(200).json({
+        confirmToken,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Delete workspace (soft delete)
    * DELETE /api/v1/workspaces/:workspaceId
    */
@@ -257,13 +285,30 @@ export class WorkspaceController {
   static async getMembers(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { workspaceId } = req.params;
+      const { 
+        page = 1, 
+        limit = 25, 
+        search, 
+        role, 
+        sortBy = 'joinedAt', 
+        sortOrder = 'asc',
+        isActive,
+        includeDeactivated = true 
+      } = req.query;
 
-      const members = await workspaceService.getMembers(new mongoose.Types.ObjectId(workspaceId));
-
-      res.status(200).json({
-        members,
-        count: members.length,
+      const result = await workspaceService.getMembers({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        search: search as string,
+        role: role as any,
+        sortBy: sortBy as string,
+        sortOrder: sortOrder as 'asc' | 'desc',
+        isActive: isActive ? isActive === 'true' : undefined,
+        includeDeactivated: includeDeactivated === 'true'
       });
+
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -581,6 +626,59 @@ export class WorkspaceController {
 
       res.status(200).json({
         message: 'Left workspace successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Bulk update member roles
+   */
+  static async bulkUpdateMemberRoles(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const { updates } = req.body;
+
+      if (!Array.isArray(updates) || updates.length === 0) {
+        res.status(400).json({ error: 'Updates array is required' });
+        return;
+      }
+
+      const result = await workspaceService.bulkUpdateMemberRoles({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        changedBy: new mongoose.Types.ObjectId(req.user!.userId),
+        updates: updates.map((u: any) => ({
+          userId: new mongoose.Types.ObjectId(u.userId),
+          newRole: u.newRole
+        }))
+      });
+
+      res.status(200).json({
+        message: 'Bulk role update completed',
+        ...result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Check slug availability
+   */
+  static async checkSlugAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { slug } = req.params;
+
+      const existingWorkspace = await Workspace.findOne({ 
+        slug: slug.toLowerCase(), 
+        isActive: true 
+      });
+
+      res.status(200).json({
+        available: !existingWorkspace,
+        // Don't reveal the exact reason for security
+        message: existingWorkspace ? 'Slug is not available' : 'Slug is available'
       });
     } catch (error) {
       next(error);

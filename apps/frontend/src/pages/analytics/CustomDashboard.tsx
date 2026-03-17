@@ -8,8 +8,10 @@ import { WidgetWrapper } from '@/components/dashboard/WidgetWrapper';
 import { WidgetRenderer } from '@/components/dashboard/WidgetRenderer';
 import { AddWidgetPanel } from '@/components/dashboard/AddWidgetPanel';
 import { ExportReportButton } from '@/components/analytics/ExportReportButton';
+import { useWorkspaceStore } from '@/store/workspace.store';
 
 export function CustomDashboard() {
+  const { currentWorkspaceId } = useWorkspaceStore();
   const [layout, setLayout] = useState<DashboardLayout | null>(null);
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +34,7 @@ export function CustomDashboard() {
         await dashboardService.saveLayout(widgetsToSave);
       } catch (err) {
         console.error('Failed to save layout:', err);
-        setError('Failed to save dashboard layout');
+        setError('Failed to dashboard layout');
       } finally {
         setIsSaving(false);
       }
@@ -42,8 +44,10 @@ export function CustomDashboard() {
 
   // Load layout on mount
   useEffect(() => {
-    loadLayout();
-  }, []);
+    if (currentWorkspaceId) {
+      loadLayout();
+    }
+  }, [currentWorkspaceId]);
 
   // Save layout when widgets change
   useEffect(() => {

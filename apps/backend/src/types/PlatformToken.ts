@@ -11,8 +11,10 @@ export interface PlatformToken {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date | null;
+  expiresIn?: number; // Added missing property
   tokenType: TokenType;
   platform: SocialPlatform;
+  scope?: string[]; // Added missing property
 }
 
 /**

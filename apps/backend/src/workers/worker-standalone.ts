@@ -63,8 +63,7 @@ const gracefulShutdown = async (signal: string) => {
       logger.info('Worker stopped successfully');
     }
 
-    // Give time for in-flight jobs to complete
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    // Jobs complete immediately - no delay needed
 
     logger.info('Graceful shutdown complete');
     process.exit(0);

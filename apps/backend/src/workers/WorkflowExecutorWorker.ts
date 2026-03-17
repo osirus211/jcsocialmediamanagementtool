@@ -82,6 +82,27 @@ export class WorkflowExecutorWorker {
     logger.info('Workflow executor worker started', {
       concurrency: this.CONCURRENCY,
     });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7299/ingest/bd0f3255-cb97-4c4f-8cc3-98b58e5f32d9', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'f1222c',
+      },
+      body: JSON.stringify({
+        sessionId: 'f1222c',
+        runId: 'initial',
+        hypothesisId: 'H2',
+        location: 'WorkflowExecutorWorker.ts:82',
+        message: 'Workflow executor worker started',
+        data: {
+          concurrency: this.CONCURRENCY,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
   }
 
   /**
@@ -112,6 +133,31 @@ export class WorkflowExecutorWorker {
       runId,
       triggerType,
     });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7299/ingest/bd0f3255-cb97-4c4f-8cc3-98b58e5f32d9', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': 'f1222c',
+      },
+      body: JSON.stringify({
+        sessionId: 'f1222c',
+        runId: 'initial',
+        hypothesisId: 'H3',
+        location: 'WorkflowExecutorWorker.ts:109',
+        message: 'Processing workflow execution job (entry)',
+        data: {
+          jobId: job.id,
+          workflowId,
+          workspaceId,
+          triggerType,
+          runId,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     // Acquire distributed lock to prevent concurrent execution of same workflow run
     const { distributedLockService } = await import('../services/DistributedLockService');

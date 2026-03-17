@@ -5,8 +5,10 @@ import { CompetitorCard } from '@/components/analytics/CompetitorCard';
 import { CompetitorBenchmarkChart } from '@/components/analytics/CompetitorBenchmarkChart';
 import { CompetitorGrowthChart } from '@/components/analytics/CompetitorGrowthChart';
 import { AddCompetitorModal } from '@/components/analytics/AddCompetitorModal';
+import { useWorkspaceStore } from '@/store/workspace.store';
 
 export function CompetitorPage() {
+  const { currentWorkspaceId } = useWorkspaceStore();
   const [competitors, setCompetitors] = useState<CompetitorAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -14,8 +16,10 @@ export function CompetitorPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadCompetitors();
-  }, []);
+    if (currentWorkspaceId) {
+      loadCompetitors();
+    }
+  }, [currentWorkspaceId]);
 
   const loadCompetitors = async () => {
     try {

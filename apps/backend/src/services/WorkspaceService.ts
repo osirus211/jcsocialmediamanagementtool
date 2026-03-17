@@ -13,8 +13,77 @@ import { workspacePermissionService, Permission } from './WorkspacePermissionSer
 import { emailService } from './EmailService';
 import { logger } from '../utils/logger';
 import { isValidTimezone, validateTimezoneWithFallback } from '../utils/timezone.utils';
+import { redisClient } from '../utils/redisClient';
 
 export class WorkspaceService {
+  private readonly CACHE_TTL = {
+    WORKSPACE: 5 * 60, // 5 minutes
+    MEMBERS: 2 * 60,   // 2 minutes
+    USER_WORKSPACES: 5 * 60, // 5 minutes
+  };
+
+  /**
+   * Get from cache with fallback to database
+   */
+  private async getFromCache<T>(
+    key: string,
+    fallback: () => Promise<T>,
+    ttl: number
+  ): Promise<T> {
+    try {
+      const client = redisClient.getClient();
+      const cached = await client.get(key);
+      
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      logger.warn('Redis get failed, falling back to database', { key, error: error.message });
+    }
+
+    // Fallback to database
+    const result = await fallback();
+    
+    // Try to cache the result
+    try {
+      const client = redisClient.getClient();
+      await client.setex(key, ttl, JSON.stringify(result));
+    } catch (error) {
+      logger.warn('Redis set failed', { key, error: error.message });
+    }
+
+    return result;
+  }
+
+  /**
+   * Invalidate cache keys
+   */
+  private async invalidateCache(keys: string[]): Promise<void> {
+    try {
+      const client = redisClient.getClient();
+      if (keys.length > 0) {
+        await client.del(...keys);
+      }
+    } catch (error) {
+      logger.warn('Redis cache invalidation failed', { keys, error: error.message });
+    }
+  }
+
+  /**
+   * Get cache keys for workspace-related data
+   */
+  private getCacheKeys(workspaceId: mongoose.Types.ObjectId, userId?: mongoose.Types.ObjectId) {
+    const keys = [
+      `workspace:${workspaceId}`,
+      `workspace:${workspaceId}:members`
+    ];
+    
+    if (userId) {
+      keys.push(`user:${userId}:workspaces`);
+    }
+    
+    return keys;
+  }
   /**
    * Create a new workspace
    */
@@ -34,9 +103,13 @@ export class WorkspaceService {
 
     try {
       // Check if slug is already taken
-      const existingWorkspace = await Workspace.findOne({ slug, isActive: true });
+      const existingWorkspace = await Workspace.findOne({ 
+        slug, 
+        isActive: true, 
+        deletedAt: null 
+      }).lean();
       if (existingWorkspace) {
-        throw new Error('Workspace slug is already taken');
+        throw new Error('Unable to create workspace with the provided details');
       }
 
       // Create workspace
@@ -80,6 +153,10 @@ export class WorkspaceService {
       });
 
       await session.commitTransaction();
+      
+      // Invalidate user's workspace cache
+      await this.invalidateCache([`user:${ownerId}:workspaces`]);
+      
       logger.info(`Workspace created: ${workspace._id}`);
       return workspace;
     } catch (error) {
@@ -92,27 +169,42 @@ export class WorkspaceService {
   }
 
   /**
-   * Get workspace by ID
+   * Get workspace by ID with caching
    */
   async getWorkspace(workspaceId: mongoose.Types.ObjectId): Promise<IWorkspace | null> {
-    return Workspace.findOne({ _id: workspaceId, isActive: true });
+    const cacheKey = `workspace:${workspaceId}`;
+    
+    return this.getFromCache(
+      cacheKey,
+      () => Workspace.findOne({ _id: workspaceId, isActive: true, deletedAt: null }).lean(),
+      this.CACHE_TTL.WORKSPACE
+    ) as unknown as Promise<IWorkspace | null>;
   }
 
   /**
-   * Get user's workspaces
+   * Get user's workspaces with caching
    */
   async getUserWorkspaces(userId: mongoose.Types.ObjectId): Promise<IWorkspace[]> {
-    const memberships = await WorkspaceMember.find({
-      userId,
-      isActive: true,
-    }).select('workspaceId');
+    const cacheKey = `user:${userId}:workspaces`;
+    
+    return this.getFromCache(
+      cacheKey,
+      async () => {
+        const memberships = await WorkspaceMember.find({
+          userId,
+          isActive: true,
+        }).select('workspaceId').lean();
 
-    const workspaceIds = memberships.map((m) => m.workspaceId);
+        const workspaceIds = memberships.map((m) => m.workspaceId);
 
-    return Workspace.find({
-      _id: { $in: workspaceIds },
-      isActive: true,
-    }).sort({ updatedAt: -1 });
+        return Workspace.find({
+          _id: { $in: workspaceIds },
+          isActive: true,
+          deletedAt: null,
+        }).sort({ updatedAt: -1 }).lean();
+      },
+      this.CACHE_TTL.USER_WORKSPACES
+    ) as unknown as Promise<IWorkspace[]>;
   }
 
   /**
@@ -136,10 +228,11 @@ export class WorkspaceService {
       const existingWorkspace = await Workspace.findOne({ 
         slug: updates.slug.toLowerCase(), 
         isActive: true,
+        deletedAt: null,
         _id: { $ne: workspaceId }
-      });
+      }).lean();
       if (existingWorkspace) {
-        throw new Error('Workspace slug is already taken');
+        throw new Error('Unable to update workspace with the provided details');
       }
       updates.slug = updates.slug.toLowerCase();
     }
@@ -167,8 +260,38 @@ export class WorkspaceService {
       details: updates,
     });
 
+    // Invalidate workspace cache
+    await this.invalidateCache([`workspace:${workspaceId}`]);
+
     logger.info(`Workspace updated: ${workspaceId}`);
     return workspace;
+  }
+
+  /**
+   * Generate deletion confirmation token
+   */
+  async generateDeleteToken(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+  }): Promise<string> {
+    const { workspaceId, userId } = params;
+
+    // Check permission (only owner can generate delete token)
+    const member = await this.getMember(workspaceId, userId);
+    if (!member || member.role !== MemberRole.OWNER) {
+      throw new Error('Only workspace owner can generate delete token');
+    }
+
+    // Generate token
+    const crypto = require('crypto');
+    const confirmToken = crypto.randomBytes(32).toString('hex');
+    
+    // Store token in Redis with 15-minute expiry
+    const redis = require('../utils/redis');
+    const tokenKey = `delete_token:${workspaceId}:${userId}`;
+    await redis.setex(tokenKey, 15 * 60, confirmToken); // 15 minutes
+
+    return confirmToken;
   }
 
   /**
@@ -193,7 +316,10 @@ export class WorkspaceService {
       // Soft delete workspace
       await Workspace.findByIdAndUpdate(
         workspaceId,
-        { isActive: false },
+        { 
+          isActive: false,
+          deletedAt: new Date()
+        },
         { session }
       );
 
@@ -304,6 +430,10 @@ export class WorkspaceService {
       });
 
       await session.commitTransaction();
+      
+      // Invalidate relevant caches
+      await this.invalidateCache(this.getCacheKeys(workspaceId, userId));
+      
       logger.info(`Member invited to workspace: ${workspaceId}`);
       return member;
     } catch (error) {
@@ -316,15 +446,74 @@ export class WorkspaceService {
   }
 
   /**
-   * Remove member from workspace (legacy method - now calls fullyRemoveMember)
+   * Remove member from workspace (async processing)
    */
   async removeMember(params: {
     workspaceId: mongoose.Types.ObjectId;
     removedBy: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
-  }): Promise<void> {
-    // Use the new fully remove method for backward compatibility
-    return this.fullyRemoveMember(params);
+  }): Promise<{ jobId: string }> {
+    const { workspaceId, removedBy, userId } = params;
+
+    // Check permission
+    const remover = await this.getMember(workspaceId, removedBy);
+    if (!remover || !workspacePermissionService.hasPermission(remover.role, Permission.REMOVE_MEMBER)) {
+      throw new Error('Insufficient permissions to remove members');
+    }
+
+    // Cannot remove owner
+    const member = await WorkspaceMember.findOne({
+      workspaceId,
+      userId,
+    });
+
+    if (!member) {
+      throw new Error('Member not found');
+    }
+
+    if (member.role === MemberRole.OWNER) {
+      throw new Error('Cannot remove workspace owner');
+    }
+
+    // Cannot remove yourself
+    if (userId.toString() === removedBy.toString()) {
+      throw new Error('Cannot remove yourself. Use leave workspace instead.');
+    }
+
+    // Immediately deactivate member
+    await WorkspaceMember.findByIdAndUpdate(member._id, { isActive: false });
+
+    // Update workspace usage if member was active
+    if (member.isActive) {
+      await Workspace.findByIdAndUpdate(
+        workspaceId,
+        { $inc: { 'usage.currentMembers': -1 } }
+      );
+    }
+
+    // Invalidate relevant caches
+    await this.invalidateCache(this.getCacheKeys(workspaceId, userId));
+
+    // Queue background cleanup job
+    const { backgroundJobService, JobType } = await import('./BackgroundJobService');
+    const jobId = await backgroundJobService.addJob(JobType.WORKSPACE_MEMBER_CLEANUP, {
+      workspaceId: workspaceId.toString(),
+      userId: userId.toString(),
+      removedAt: new Date(),
+    });
+
+    // Log immediate activity
+    await this.logActivity({
+      workspaceId,
+      userId: removedBy,
+      action: ActivityAction.MEMBER_REMOVED,
+      resourceType: 'User',
+      resourceId: userId,
+      details: { action: 'deactivated_immediately', jobId },
+    });
+
+    logger.info(`Member removal initiated: ${workspaceId}, job: ${jobId}`);
+    return { jobId };
   }
 
   /**
@@ -689,21 +878,115 @@ export class WorkspaceService {
   }
 
   /**
-   * Get workspace members (including deactivated ones)
+   * Get workspace members with pagination and filtering
    */
-  async getMembers(workspaceId: mongoose.Types.ObjectId, includeDeactivated: boolean = true): Promise<IWorkspaceMember[]> {
+  async getMembers(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: MemberRole;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    isActive?: boolean;
+    includeDeactivated?: boolean;
+  }): Promise<{
+    members: IWorkspaceMember[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
+    const {
+      workspaceId,
+      page = 1,
+      limit = 25,
+      search,
+      role,
+      sortBy = 'joinedAt',
+      sortOrder = 'asc',
+      isActive,
+      includeDeactivated = true
+    } = params;
+
+    // Enforce pagination limits
+    const effectivePage = Math.max(1, page);
+    const effectiveLimit = Math.min(Math.max(1, limit), 100);
+    const skip = (effectivePage - 1) * effectiveLimit;
+
+    // Build query
     const query: any = { workspaceId };
-    
-    if (!includeDeactivated) {
+
+    // Active/inactive filter
+    if (isActive !== undefined) {
+      query.isActive = isActive;
+    } else if (!includeDeactivated) {
       query.isActive = true;
     }
 
-    return WorkspaceMember.find(query)
+    // Role filter
+    if (role) {
+      query.role = role;
+    }
+
+    // Search filter (case-insensitive)
+    if (search) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { 'userId.firstName': searchRegex },
+        { 'userId.lastName': searchRegex },
+        { 'userId.email': searchRegex }
+      ];
+    }
+
+    // Build sort object
+    const sortObj: any = {};
+    if (sortBy === 'name') {
+      sortObj['userId.firstName'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'email') {
+      sortObj['userId.email'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'role') {
+      sortObj.role = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'joinedAt') {
+      sortObj.joinedAt = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sortObj.createdAt = sortOrder === 'desc' ? -1 : 1;
+    }
+
+    // Get total count for pagination
+    const total = await WorkspaceMember.countDocuments(query);
+
+    // Get members with population
+    const members = await WorkspaceMember.find(query)
       .populate('userId', 'firstName lastName email avatar')
       .populate('invitedBy', 'firstName lastName email')
       .populate('deactivatedBy', 'firstName lastName email')
       .populate('reactivatedBy', 'firstName lastName email')
-      .sort({ role: 1, joinedAt: 1 });
+      .sort(sortObj)
+      .skip(skip)
+      .limit(effectiveLimit)
+      .lean() as unknown as IWorkspaceMember[];
+
+    // Calculate pagination metadata
+    const pages = Math.ceil(total / effectiveLimit);
+    const hasNext = effectivePage < pages;
+    const hasPrev = effectivePage > 1;
+
+    return {
+      members,
+      pagination: {
+        page: effectivePage,
+        limit: effectiveLimit,
+        total,
+        pages,
+        hasNext,
+        hasPrev
+      }
+    };
   }
 
   /**
@@ -717,7 +1000,7 @@ export class WorkspaceService {
       workspaceId,
       userId,
       isActive: true,
-    });
+    }).lean() as unknown as Promise<IWorkspaceMember | null>;
   }
 
   /**
@@ -763,6 +1046,23 @@ export class WorkspaceService {
   }
 
   /**
+   * Log activity (public method for external use)
+   */
+  async logActivityPublic(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+    action: ActivityAction;
+    resourceType?: string;
+    resourceId?: mongoose.Types.ObjectId;
+    details?: Record<string, any>;
+    ipAddress?: string;
+    userAgent?: string;
+    session?: mongoose.ClientSession;
+  }): Promise<void> {
+    return this.logActivity(params);
+  }
+
+  /**
    * Get activity logs
    */
   async getActivityLogs(params: {
@@ -770,10 +1070,30 @@ export class WorkspaceService {
     limit?: number;
     skip?: number;
     action?: ActivityAction;
+    startDate?: Date;
+    endDate?: Date;
   }): Promise<IWorkspaceActivityLog[]> {
-    const { workspaceId, limit = 50, skip = 0, action } = params;
+    const { workspaceId, limit = 50, skip = 0, action, startDate, endDate } = params;
 
-    const query: any = { workspaceId };
+    // Enforce date range limits
+    const now = new Date();
+    const maxStartDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 days ago
+    const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+
+    const effectiveStartDate = startDate ? new Date(Math.max(startDate.getTime(), maxStartDate.getTime())) : defaultStartDate;
+    const effectiveEndDate = endDate || now;
+
+    // Enforce pagination limits
+    const effectiveLimit = Math.min(limit, 200);
+
+    const query: any = { 
+      workspaceId,
+      createdAt: {
+        $gte: effectiveStartDate,
+        $lte: effectiveEndDate
+      }
+    };
+    
     if (action) {
       query.action = action;
     }
@@ -781,8 +1101,8 @@ export class WorkspaceService {
     return WorkspaceActivityLog.find(query)
       .populate('userId', 'name email')
       .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip(skip);
+      .limit(effectiveLimit)
+      .lean() as unknown as Promise<IWorkspaceActivityLog[]>;
   }
 
   /**
@@ -956,8 +1276,8 @@ export class WorkspaceService {
       throw new Error('Invitation not found or already processed');
     }
 
-    // Update expiry date (7 days from now)
-    invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Update expiry date (72 hours from now)
+    invitation.expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     invitation.status = InvitationStatus.PENDING;
     await invitation.save();
 
@@ -1302,8 +1622,115 @@ export class WorkspaceService {
   }
 
   /**
-   * Get invitation statistics
+   * Bulk update member roles
    */
+  async bulkUpdateMemberRoles(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    changedBy: mongoose.Types.ObjectId;
+    updates: Array<{ userId: mongoose.Types.ObjectId; newRole: MemberRole }>;
+  }): Promise<{ updated: number; failed: Array<{ userId: string; reason: string }> }> {
+    const { workspaceId, changedBy, updates } = params;
+
+    // Validate max 50 members per operation
+    if (updates.length > 50) {
+      throw new Error('Cannot update more than 50 members at once');
+    }
+
+    // Check permission
+    const changer = await this.getMember(workspaceId, changedBy);
+    if (!changer || !workspacePermissionService.hasPermission(changer.role, Permission.MANAGE_TEAM)) {
+      throw new Error('Insufficient permissions to bulk update member roles');
+    }
+
+    // Validate all userIds exist and can be changed
+    const userIds = updates.map(u => u.userId);
+    const members = await WorkspaceMember.find({
+      workspaceId,
+      userId: { $in: userIds },
+      isActive: true
+    });
+
+    const memberMap = new Map(members.map(m => [m.userId.toString(), m]));
+    const validUpdates: Array<{ member: IWorkspaceMember; newRole: MemberRole }> = [];
+    const failed: Array<{ userId: string; reason: string }> = [];
+
+    // Validate each update
+    for (const update of updates) {
+      const member = memberMap.get(update.userId.toString());
+      
+      if (!member) {
+        failed.push({ userId: update.userId.toString(), reason: 'Member not found' });
+        continue;
+      }
+
+      // Validate role change
+      const validation = workspacePermissionService.canChangeRole({
+        currentUserRole: changer.role,
+        targetUserRole: member.role,
+        newRole: update.newRole,
+      });
+
+      if (!validation.allowed) {
+        failed.push({ 
+          userId: update.userId.toString(), 
+          reason: validation.reason || 'Cannot change role' 
+        });
+        continue;
+      }
+
+      validUpdates.push({ member, newRole: update.newRole });
+    }
+
+    if (validUpdates.length === 0) {
+      return { updated: 0, failed };
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Perform bulk update
+      const bulkOps = validUpdates.map(({ member, newRole }) => ({
+        updateOne: {
+          filter: { _id: member._id },
+          update: { $set: { role: newRole } }
+        }
+      }));
+
+      const result = await WorkspaceMember.bulkWrite(bulkOps, { session });
+
+      // Batch insert activity logs
+      const activityLogs = validUpdates.map(({ member, newRole }) => ({
+        workspaceId,
+        userId: changedBy,
+        action: ActivityAction.MEMBER_ROLE_CHANGED,
+        resourceType: 'User',
+        resourceId: member.userId,
+        details: { oldRole: member.role, newRole, bulkUpdate: true },
+        createdAt: new Date()
+      }));
+
+      await WorkspaceActivityLog.insertMany(activityLogs, { session });
+
+      await session.commitTransaction();
+
+      // Invalidate relevant caches
+      await this.invalidateCache([
+        `workspace:${workspaceId}:members`,
+        ...validUpdates.map(({ member }) => `user:${member.userId}:workspaces`)
+      ]);
+
+      logger.info(`Bulk role update completed: ${result.modifiedCount} members updated`);
+      
+      return { updated: result.modifiedCount, failed };
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Failed to bulk update member roles:', error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
   async getInvitationStats(params: {
     workspaceId: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;

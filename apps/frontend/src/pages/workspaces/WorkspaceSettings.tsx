@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import React from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { useAuthStore } from '@/store/auth.store';
 import { WorkspaceRole, WorkspaceMember, MemberStatus } from '@/types/workspace.types';
@@ -13,6 +15,7 @@ import { InviteMemberModal } from '@/components/workspace/InviteMemberModal';
 import { MemberRow } from '@/components/workspace/MemberRow';
 import { TimezoneSelector } from '@/components/ui/TimezoneSelector';
 import { TimezoneSettings } from '@/components/settings/TimezoneSettings';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatTimeWithTimezone, getUserTimezone } from '@/utils/timezones';
 
 /**
@@ -29,6 +32,7 @@ import { formatTimeWithTimezone, getUserTimezone } from '@/utils/timezones';
 export const WorkspaceSettingsPage = () => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthStore();
 
   const {
@@ -47,6 +51,7 @@ export const WorkspaceSettingsPage = () => {
     removeMember,
     updateMemberRole,
     leaveWorkspace,
+    setCurrentWorkspace,
   } = useWorkspaceStore();
 
   const [activeTab, setActiveTab] = useState<'general' | 'members' | 'queue'>('general');
@@ -58,16 +63,71 @@ export const WorkspaceSettingsPage = () => {
   const [requireApproval, setRequireApproval] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMemberForPermissions, setSelectedMemberForPermissions] = useState<WorkspaceMember | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [showTransferOwnershipModal, setShowTransferOwnershipModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
   
-  // Member management state
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
-  const [memberRoleFilter, setMemberRoleFilter] = useState<'all' | WorkspaceRole>('all');
-  const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'deactivated'>('all');
+  // Local members state for optimistic updates
+  const [localMembers, setLocalMembers] = useState<WorkspaceMember[]>([]);
+  
+  // Use local members if available, otherwise fall back to store members
+  const membersToUse = localMembers.length > 0 ? localMembers : members;
+  
+  // Member management state - initialize from URL params
+  const [memberSearchQuery, setMemberSearchQuery] = useState(searchParams.get('search') || '');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchParams.get('search') || '');
+  const [memberRoleFilter, setMemberRoleFilter] = useState<'all' | WorkspaceRole>(
+    (searchParams.get('role') as WorkspaceRole) || 'all'
+  );
+  const [memberStatusFilter, setMemberStatusFilter] = useState<'all' | 'active' | 'deactivated'>(
+    (searchParams.get('active') === 'false' ? 'deactivated' : searchParams.get('active') === 'true' ? 'active' : 'all')
+  );
+
+  // Update URL params when filters change
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === '' || value === 'all' || value === 'true') {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
+    
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Update URL when search query changes (debounced)
+  useEffect(() => {
+    updateUrlParams({ search: debouncedSearchQuery });
+  }, [debouncedSearchQuery, updateUrlParams]);
+
+  // Update URL when role filter changes
+  const handleRoleFilterChange = useCallback((role: 'all' | WorkspaceRole) => {
+    setMemberRoleFilter(role);
+    updateUrlParams({ role: role === 'all' ? null : role });
+  }, [updateUrlParams]);
+
+  // Update URL when status filter changes
+  const handleStatusFilterChange = useCallback((status: 'all' | 'active' | 'deactivated') => {
+    setMemberStatusFilter(status);
+    updateUrlParams({ 
+      active: status === 'all' ? null : status === 'active' ? 'true' : 'false' 
+    });
+  }, [updateUrlParams]);
+
+  // Debounce search query (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(memberSearchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [memberSearchQuery]);
 
   const workspace = workspaces.find((w) => w._id === workspaceId) || currentWorkspace;
 
@@ -77,6 +137,11 @@ export const WorkspaceSettingsPage = () => {
       fetchMembers(workspaceId);
     }
   }, [workspaceId, fetchWorkspaceById, fetchMembers]);
+
+  // Update local members when store members change
+  useEffect(() => {
+    setLocalMembers(members);
+  }, [members]);
 
   // Fetch pending invites when admin status is determined
   useEffect(() => {
@@ -132,26 +197,47 @@ export const WorkspaceSettingsPage = () => {
 
   const handleUpdateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return; // Prevent double submit
+    
     setError('');
     setSuccess('');
+    setIsSubmitting(true);
 
-    if (!workspaceId || !workspace) return;
+    if (!workspaceId || !workspace) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Store original workspace for rollback
+    const originalWorkspace = workspace;
+    
+    // Prepare optimistic updates
+    const optimisticUpdates = {
+      name: name.trim(),
+      slug: slug.trim(),
+      description: description.trim() || undefined,
+      settings: {
+        ...workspace.settings,
+        timezone,
+        industry: industry || undefined,
+        requireApproval,
+      },
+    };
+
+    // Optimistically update the workspace in the store
+    const updatedWorkspace = { ...workspace, ...optimisticUpdates };
+    setCurrentWorkspace(updatedWorkspace);
 
     try {
-      await updateWorkspace(workspaceId, {
-        name: name.trim(),
-        slug: slug.trim(),
-        description: description.trim() || undefined,
-        settings: {
-          ...workspace.settings,
-          timezone,
-          industry: industry || undefined,
-          requireApproval,
-        },
-      });
+      await updateWorkspace(workspaceId, optimisticUpdates);
       setSuccess('Workspace updated successfully');
+      setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
+      // Rollback on error
+      setCurrentWorkspace(originalWorkspace);
       setError(error.response?.data?.message || 'Failed to update workspace');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -223,43 +309,80 @@ export const WorkspaceSettingsPage = () => {
     }
   };
 
-  const handleUpdateMemberRole = async (member: WorkspaceMember, newRole: WorkspaceRole) => {
+  const handleUpdateMemberRole = useCallback(async (member: WorkspaceMember, newRole: WorkspaceRole) => {
     if (!workspaceId) return;
 
     const memberUserId = typeof member.userId === 'string' ? member.userId : member.userId._id;
+    
+    // Store previous state for rollback
+    const previousRole = member.role;
+    
+    // Optimistically update the member's role in local state
+    setLocalMembers(prevMembers => 
+      prevMembers.map(m => 
+        m._id === member._id ? { ...m, role: newRole } : m
+      )
+    );
 
     try {
       await updateMemberRole(workspaceId, memberUserId, { role: newRole });
     } catch (error: any) {
+      // Rollback on error
+      setLocalMembers(prevMembers => 
+        prevMembers.map(m => 
+          m._id === member._id ? { ...m, role: previousRole } : m
+        )
+      );
       setError(error.response?.data?.message || 'Failed to update member role');
     }
-  };
+  }, [workspaceId, updateMemberRole]);
+
+  // Optimistic member removal
+  const handleOptimisticMemberRemoval = useCallback((member: WorkspaceMember) => {
+    const previousMembers = localMembers;
+    
+    // Optimistically remove member from local state
+    setLocalMembers(prevMembers => 
+      prevMembers.filter(m => m._id !== member._id)
+    );
+
+    // Return rollback function in case of error
+    return () => {
+      setLocalMembers(previousMembers);
+      setError('Failed to remove member. Please try again.');
+    };
+  }, [localMembers]);
 
   // Filter members based on search and filters
-  const filteredMembers = members.filter((member) => {
-    const memberUser = typeof member.userId === 'string' ? null : member.userId;
-    const memberName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : '';
-    const memberEmail = memberUser?.email || '';
-    
-    // Search filter
-    const searchMatch = memberSearchQuery === '' || 
-      memberName.toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
-      memberEmail.toLowerCase().includes(memberSearchQuery.toLowerCase());
-    
-    // Role filter
-    const roleMatch = memberRoleFilter === 'all' || member.role === memberRoleFilter;
-    
-    // Status filter
-    const statusMatch = memberStatusFilter === 'all' || 
-      (memberStatusFilter === 'active' && member.isActive) ||
-      (memberStatusFilter === 'deactivated' && !member.isActive);
-    
-    return searchMatch && roleMatch && statusMatch;
-  });
+  const filteredMembers = useMemo(() => {
+    return membersToUse.filter((member) => {
+      const memberUser = typeof member.userId === 'string' ? null : member.userId;
+      const memberName = memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : '';
+      const memberEmail = memberUser?.email || '';
+      
+      // Search filter
+      const searchMatch = debouncedSearchQuery === '' || 
+        memberName.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        memberEmail.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+      
+      // Role filter
+      const roleMatch = memberRoleFilter === 'all' || member.role === memberRoleFilter;
+      
+      // Status filter
+      const statusMatch = memberStatusFilter === 'all' || 
+        (memberStatusFilter === 'active' && member.isActive) ||
+        (memberStatusFilter === 'deactivated' && !member.isActive);
+      
+      return searchMatch && roleMatch && statusMatch;
+    });
+  }, [membersToUse, debouncedSearchQuery, memberRoleFilter, memberStatusFilter]);
 
   // Separate active and deactivated members
-  const activeMembers = filteredMembers.filter(m => m.isActive);
-  const deactivatedMembers = filteredMembers.filter(m => !m.isActive);
+  const activeMembers = useMemo(() => filteredMembers.filter(m => m.isActive), [filteredMembers]);
+  const deactivatedMembers = useMemo(() => filteredMembers.filter(m => !m.isActive), [filteredMembers]);
+
+  // Determine if we should use virtualization (>50 members)
+  const shouldVirtualize = filteredMembers.length > 50;
 
   if (!workspace) {
     return (
@@ -510,10 +633,17 @@ export const WorkspaceSettingsPage = () => {
                 {isAdmin && (
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                    disabled={isLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    disabled={isSubmitting}
                   >
-                    Save Changes
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
                   </button>
                 )}
               </form>
@@ -645,7 +775,7 @@ export const WorkspaceSettingsPage = () => {
                 {/* Role Filter */}
                 <select
                   value={memberRoleFilter}
-                  onChange={(e) => setMemberRoleFilter(e.target.value as any)}
+                  onChange={(e) => handleRoleFilterChange(e.target.value as any)}
                   className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="all">All Roles</option>
@@ -658,7 +788,7 @@ export const WorkspaceSettingsPage = () => {
                 {/* Status Filter */}
                 <select
                   value={memberStatusFilter}
-                  onChange={(e) => setMemberStatusFilter(e.target.value as any)}
+                  onChange={(e) => handleStatusFilterChange(e.target.value as any)}
                   className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="all">All Status</option>
@@ -671,8 +801,19 @@ export const WorkspaceSettingsPage = () => {
             {/* Members List */}
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {!membersLoaded ? (
-                <div className="p-6 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                // Loading skeleton for member list
+                <div className="space-y-4 p-6">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="flex items-center space-x-4 animate-pulse">
+                      <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+                      </div>
+                      <div className="w-20 h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  ))}
                 </div>
               ) : filteredMembers.length === 0 ? (
                 <div className="p-6 text-center text-gray-500 dark:text-gray-400">
@@ -681,6 +822,17 @@ export const WorkspaceSettingsPage = () => {
                     : 'No members found'
                   }
                 </div>
+              ) : shouldVirtualize ? (
+                <VirtualizedMemberList
+                  activeMembers={activeMembers}
+                  deactivatedMembers={deactivatedMembers}
+                  workspaceId={workspaceId!}
+                  isOwner={isOwner}
+                  isAdmin={isAdmin}
+                  onRoleChange={handleUpdateMemberRole}
+                  onRemove={handleOptimisticMemberRemoval}
+                  memberStatusFilter={memberStatusFilter}
+                />
               ) : (
                 <>
                   {/* Active Members */}
@@ -701,6 +853,7 @@ export const WorkspaceSettingsPage = () => {
                           isOwner={isOwner}
                           isAdmin={isAdmin}
                           onRoleChange={handleUpdateMemberRole}
+                          onRemove={handleOptimisticMemberRemoval}
                         />
                       ))}
                     </>
@@ -722,6 +875,7 @@ export const WorkspaceSettingsPage = () => {
                           isOwner={isOwner}
                           isAdmin={isAdmin}
                           onRoleChange={handleUpdateMemberRole}
+                          onRemove={handleOptimisticMemberRemoval}
                         />
                       ))}
                     </>
@@ -839,6 +993,140 @@ export const WorkspaceSettingsPage = () => {
         isOpen={showInviteMemberModal}
         onClose={() => setShowInviteMemberModal(false)}
       />
+    </div>
+  );
+};
+
+/**
+ * Virtualized Member List Component
+ * Used when member count > 50 for performance
+ */
+interface VirtualizedMemberListProps {
+  activeMembers: WorkspaceMember[];
+  deactivatedMembers: WorkspaceMember[];
+  workspaceId: string;
+  isOwner: boolean;
+  isAdmin: boolean;
+  onRoleChange: (member: WorkspaceMember, newRole: WorkspaceRole) => Promise<void>;
+  onRemove?: (member: WorkspaceMember) => () => void;
+  memberStatusFilter: 'all' | 'active' | 'deactivated';
+}
+
+const VirtualizedMemberList: React.FC<VirtualizedMemberListProps> = ({
+  activeMembers,
+  deactivatedMembers,
+  workspaceId,
+  isOwner,
+  isAdmin,
+  onRoleChange,
+  onRemove,
+  memberStatusFilter
+}) => {
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  // Combine members with section headers
+  const items = useMemo(() => {
+    const result: Array<{ type: 'header' | 'member'; data: any; id: string }> = [];
+
+    // Add active members section
+    if (activeMembers.length > 0) {
+      if (deactivatedMembers.length > 0 || memberStatusFilter === 'all') {
+        result.push({
+          type: 'header',
+          data: { title: `Active Members (${activeMembers.length})` },
+          id: 'active-header'
+        });
+      }
+      activeMembers.forEach(member => {
+        result.push({
+          type: 'member',
+          data: member,
+          id: `active-${member._id}`
+        });
+      });
+    }
+
+    // Add deactivated members section
+    if (deactivatedMembers.length > 0 && (memberStatusFilter === 'all' || memberStatusFilter === 'deactivated')) {
+      result.push({
+        type: 'header',
+        data: { title: `Deactivated Members (${deactivatedMembers.length})` },
+        id: 'deactivated-header'
+      });
+      deactivatedMembers.forEach(member => {
+        result.push({
+          type: 'member',
+          data: member,
+          id: `deactivated-${member._id}`
+        });
+      });
+    }
+
+    return result;
+  }, [activeMembers, deactivatedMembers, memberStatusFilter]);
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => {
+      const item = items[index];
+      return item.type === 'header' ? 48 : 80; // Headers are smaller than member rows
+    },
+    overscan: 5,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className="h-96 overflow-auto"
+      style={{
+        contain: 'strict',
+      }}
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const item = items[virtualItem.index];
+          
+          return (
+            <div
+              key={virtualItem.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualItem.size}px`,
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              {item.type === 'header' ? (
+                <div className="px-6 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                    {item.data.title}
+                  </h3>
+                </div>
+              ) : (
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <MemberRow
+                    member={item.data}
+                    workspaceId={workspaceId}
+                    isOwner={isOwner}
+                    isAdmin={isAdmin}
+                    onRoleChange={onRoleChange}
+                    onRemove={onRemove}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

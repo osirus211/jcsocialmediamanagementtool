@@ -80,11 +80,16 @@ export const requireWorkspace = async (
     });
 
     if (!membership || !membership.workspaceId) {
+      // Log non-member access attempt to Winston security log
       logger.warn('Unauthorized workspace access attempt', {
         userId: req.user.userId,
         workspaceId: workspaceId.toString(),
         ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        endpoint: req.path,
+        method: req.method,
         reason: !membership ? 'No membership found' : 'Null workspace in membership',
+        securityEvent: true
       });
       logger.error('RUNTIME_TRACE TENANT_FAILED', { timestamp: new Date().toISOString() });
       throw new ForbiddenError('You do not have access to this workspace');
@@ -257,13 +262,34 @@ export const verifyWorkspaceOwnership = async (
  * @param permission - The permission required to access the route
  */
 export const requirePermission = (permission: Permission) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.workspace) {
         throw new UnauthorizedError('Workspace context required');
       }
 
       if (!workspacePermissionService.hasPermission(req.workspace.role, permission)) {
+        // Log failed permission check to WorkspaceActivityLog
+        try {
+          const { workspaceService } = await import('../services/WorkspaceService');
+          await workspaceService.logActivityPublic({
+            workspaceId: req.workspace.workspaceId,
+            userId: new mongoose.Types.ObjectId(req.user.userId),
+            action: 'LOGIN_FAILED' as any, // Using existing action for security events
+            details: {
+              action: 'permission_denied',
+              requiredPermission: permission,
+              userRole: req.workspace.role,
+              endpoint: req.path,
+              method: req.method
+            },
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+        } catch (logError) {
+          logger.error('Failed to log permission denial:', logError);
+        }
+
         logger.warn('Insufficient workspace permissions', {
           userId: req.user?.userId,
           workspaceId: req.workspace.workspaceId.toString(),

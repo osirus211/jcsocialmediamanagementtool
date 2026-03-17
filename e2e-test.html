@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>E2E Onboarding Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { margin: 5px; padding: 10px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Onboarding E2E Debug Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Backend Health Check</h2>
+        <button onclick="testHealth()">Test Backend Health</button>
+        <div id="health-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. User Registration</h2>
+        <button onclick="testRegistration()">Test Registration</button>
+        <div id="registration-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Onboarding Progress</h2>
+        <button onclick="testProgress()">Test Progress</button>
+        <div id="progress-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Step Update</h2>
+        <button onclick="testStepUpdate()">Test Step Update</button>
+        <div id="step-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Frontend App</h2>
+        <p>Frontend is running at: <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+        <p>Try accessing the onboarding page directly: <a href="http://localhost:5173/onboarding" target="_blank">http://localhost:5173/onboarding</a></p>
+    </div>
+
+    <script>
+        let authToken = null;
+        let csrfToken = null;
+
+        async function testHealth() {
+            const result = document.getElementById('health-result');
+            try {
+                const response = await fetch('http://localhost:5000/health');
+                const data = await response.json();
+                result.innerHTML = `<div class="success">✅ Backend Health: ${data.status}</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Health check failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testRegistration() {
+            const result = document.getElementById('registration-result');
+            try {
+                const email = `test-${Date.now()}@example.com`;
+                const response = await fetch('http://localhost:5000/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: 'TestPassword123!',
+                        firstName: 'Test',
+                        lastName: 'User'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.accessToken;
+                    result.innerHTML = `<div class="success">✅ Registration successful</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<div class="error">❌ Registration failed: ${data.message}</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Registration error: ${error.message}</div>`;
+            }
+        }
+
+        async function testProgress() {
+            const result = document.getElementById('progress-result');
+            if (!authToken) {
+                result.innerHTML = '<div class="error">❌ Please register first to get auth token</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:5000/api/v1/onboarding/progress', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `<div class="success">✅ Progress fetched successfully</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<div class="error">❌ Progress failed: ${data.message}</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Progress error: ${error.message}</div>`;
+            }
+        }
+
+        async function testStepUpdate() {
+            const result = document.getElementById('step-result');
+            if (!authToken) {
+                result.innerHTML = '<div class="error">❌ Please register first to get auth token</div>';
+                return;
+            }
+
+            try {
+                // First get CSRF token
+                const csrfResponse = await fetch('http://localhost:5000/api/v1/auth/csrf-token');
+                const csrfData = await csrfResponse.json();
+                csrfToken = csrfData.csrfToken;
+
+                // Then try to update step
+                const response = await fetch('http://localhost:5000/api/v1/onboarding/step', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json',
+                        'x-csrf-token': csrfToken
+                    },
+                    body: JSON.stringify({ step: 1 })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.innerHTML = `<div class="success">✅ Step updated successfully</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    result.innerHTML = `<div class="error">❌ Step update failed: ${data.message}</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Step update error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

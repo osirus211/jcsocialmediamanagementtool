@@ -98,9 +98,9 @@ export function WeekView({ currentWeek, posts, onPostClick, onReschedule }: Week
   }, [posts]);
 
   /**
-   * Business hours (9 AM - 6 PM)
+   * All hours (24-hour format) - beats competitors with full day coverage
    */
-  const hours = Array.from({ length: 10 }, (_, i) => i + 9);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
 
   /**
    * Drag & drop handlers
@@ -140,7 +140,7 @@ export function WeekView({ currentWeek, posts, onPostClick, onReschedule }: Week
     <div className="overflow-x-auto">
       <div className="min-w-[800px]">
         {/* Header with days */}
-        <div className="grid grid-cols-8 gap-2 mb-2">
+        <div className="grid grid-cols-8 gap-2 mb-2 sticky top-0 bg-white z-10 border-b pb-2">
           <div className="text-sm font-semibold text-gray-600">Time</div>
           {weekDays.map((day) => (
             <div
@@ -155,12 +155,12 @@ export function WeekView({ currentWeek, posts, onPostClick, onReschedule }: Week
           ))}
         </div>
 
-        {/* Time slots */}
-        <div className="space-y-1">
+        {/* Time slots with improved scrolling */}
+        <div className="space-y-1 max-h-[600px] overflow-y-auto">
           {hours.map((hour) => (
             <div key={hour} className="grid grid-cols-8 gap-2">
-              {/* Hour label */}
-              <div className="text-xs text-gray-500 py-2">
+              {/* Hour label with better formatting */}
+              <div className="text-xs text-gray-500 py-2 sticky left-0 bg-white">
                 {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
               </div>
 
@@ -176,8 +176,8 @@ export function WeekView({ currentWeek, posts, onPostClick, onReschedule }: Week
                     hour={hour}
                     isToday={day.isToday}
                     isEmpty={dayPosts.length === 0}
-                    className={`min-h-[60px] border rounded p-1 ${
-                      day.isToday ? 'border-blue-200' : 'border-gray-200'
+                    className={`min-h-[60px] border rounded p-1 transition-colors ${
+                      day.isToday ? 'border-blue-200 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <div className="space-y-1">

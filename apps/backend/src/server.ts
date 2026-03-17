@@ -186,17 +186,23 @@ const startServer = async () => {
     // Connect to Redis (SINGLE CONNECTION POINT)
     let redisConnected = false;
     
-    try {
-      console.log('📦 Connecting to Redis...');
-      logger.info('📦 Connecting to Redis...');
-      await connectRedis();
-      redisConnected = true;
-      console.log('✅ Redis connected successfully');
-      logger.info('✅ Redis connected successfully');
-    } catch (error) {
-      console.log('❌ Redis connection failed:', error);
-      logger.error('❌ Redis connection failed:', error);
-      logger.warn('Continuing without Redis (rate limiting will use memory store)');
+    // Check if Redis is disabled via environment variable
+    if (process.env.REDIS_DISABLED === 'true') {
+      console.log('⏸️  Redis connection skipped (REDIS_DISABLED=true)');
+      logger.warn('⏸️  Redis connection skipped (REDIS_DISABLED=true)');
+    } else {
+      try {
+        console.log('📦 Connecting to Redis...');
+        logger.info('📦 Connecting to Redis...');
+        await connectRedis();
+        redisConnected = true;
+        console.log('✅ Redis connected successfully');
+        logger.info('✅ Redis connected successfully');
+      } catch (error) {
+        console.log('❌ Redis connection failed:', error);
+        logger.error('❌ Redis connection failed:', error);
+        logger.warn('Continuing without Redis (rate limiting will use memory store)');
+      }
     }
 
     
@@ -821,9 +827,10 @@ const startServer = async () => {
       console.log('🔧 Redis recovery service registration skipped (Redis not connected)');
     }
 
+    console.log('🚀 Finalizing Express server setup...');
     console.log('🚀 Starting Express server on port', PORT);
     // Start Express server
-    serverInstance = app.listen(PORT, () => {
+    serverInstance = app.listen(PORT as number, '0.0.0.0', () => {
       console.log(`✅ Server running on port ${PORT}`);
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📍 Environment: ${config.env}`);

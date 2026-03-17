@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
-import { Calendar, List, Plus, Sparkles } from 'lucide-react';
+import { Calendar, List, Grid, Plus, Sparkles, Search, X } from 'lucide-react';
 import { CalendarAutoFillModal } from './CalendarAutoFillModal';
 import { TimezoneIndicator } from './TimezoneIndicator';
 
-type ViewMode = 'month' | 'week';
+type ViewMode = 'month' | 'week' | 'list';
 
 interface WorkspaceMember {
   _id: string;
@@ -23,6 +23,8 @@ interface CalendarHeaderProps {
   selectedMemberIds: string[];
   onFilterByMembers: (memberIds: string[]) => void;
   postCount: number;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 /**
@@ -44,10 +46,13 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   selectedMemberIds,
   onFilterByMembers,
   postCount,
+  searchQuery = '',
+  onSearchChange,
 }) => {
   const navigate = useNavigate();
   const { members } = useWorkspaceStore();
   const [showAutoFillModal, setShowAutoFillModal] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const handleMemberToggle = (memberId: string) => {
     if (selectedMemberIds.includes(memberId)) {
@@ -76,32 +81,78 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       <TimezoneIndicator />
       
       <div className="bg-white border-b border-gray-200 px-6 py-4">
-      {/* Top row: View mode switcher and New Post button */}
+      {/* Top row: View mode switcher, search, and New Post button */}
       <div className="flex items-center justify-between mb-4">
-        {/* View mode switcher */}
-        <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => onViewModeChange('month')}
-            className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'month'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Calendar className="w-4 h-4 mr-1.5" />
-            Month
-          </button>
-          <button
-            onClick={() => onViewModeChange('week')}
-            className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'week'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <List className="w-4 h-4 mr-1.5" />
-            Week
-          </button>
+        {/* Left side: View mode switcher and search */}
+        <div className="flex items-center space-x-4">
+          {/* View mode switcher */}
+          <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => onViewModeChange('month')}
+              className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'month'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              aria-label="Month view"
+            >
+              <Calendar className="w-4 h-4 mr-1.5" />
+              Month
+            </button>
+            <button
+              onClick={() => onViewModeChange('week')}
+              className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'week'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              aria-label="Week view"
+            >
+              <Grid className="w-4 h-4 mr-1.5" />
+              Week
+            </button>
+            <button
+              onClick={() => onViewModeChange('list')}
+              className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              aria-label="List view"
+            >
+              <List className="w-4 h-4 mr-1.5" />
+              List
+            </button>
+          </div>
+
+          {/* Search bar */}
+          {onSearchChange && (
+            <div className={`relative transition-all duration-200 ${
+              isSearchFocused ? 'w-80' : 'w-64'
+            }`}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search posts..."
+                  value={searchQuery}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setIsSearchFocused(false)}
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => onSearchChange('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3 h-3 text-gray-400" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}

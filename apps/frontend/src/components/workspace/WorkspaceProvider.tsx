@@ -18,6 +18,11 @@ interface WorkspaceProviderProps {
  * 5. Fallback to first workspace if invalid
  * 6. Redirect to create if no workspaces
  * 
+ * FE-3: Background refresh integration:
+ * - Starts background refresh after successful restoration
+ * - Handles tab visibility changes for stale data refresh
+ * - Cleans up intervals on unmount
+ * 
  * Security:
  * - Never trusts stored workspace blindly
  * - Validates membership on every restore
@@ -31,6 +36,9 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
     workspaces,
     currentWorkspace,
     workspacesLoaded,
+    startBackgroundRefresh,
+    stopBackgroundRefresh,
+    refreshIfStale,
   } = useWorkspaceStore();
 
   const [isRestoring, setIsRestoring] = useState(true);
@@ -41,6 +49,22 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
   
   // Track if initialization is in progress to prevent duplicates
   const initializationInProgressRef = useRef(false);
+
+  // FE-3: Handle tab visibility changes for stale data refresh
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isAuthenticated && workspacesLoaded) {
+        // Tab became visible - refresh if stale (>2 minutes old)
+        refreshIfStale();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated, workspacesLoaded, refreshIfStale]);
 
   useEffect(() => {
     const initializeWorkspace = async () => {
@@ -53,6 +77,8 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
       if (!isAuthenticated) {
         setIsRestoring(false);
         setRestorationAttempted(true);
+        // FE-3: Stop background refresh when not authenticated
+        stopBackgroundRefresh();
         return;
       }
 
@@ -66,7 +92,6 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
 
       try {
         setIsRestoring(true);
-        setRestorationAttempted(true);
 
         // Create AbortController for this initialization attempt only
         if (abortControllerRef.current) {
@@ -77,6 +102,9 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
         // Get the restoreWorkspace function from the store and call it
         const { restoreWorkspace } = useWorkspaceStore.getState();
         await restoreWorkspace(abortControllerRef.current.signal);
+
+        // Mark as attempted ONLY after success or real error
+        setRestorationAttempted(true);
 
         // Check if user has any workspaces
         const { workspaces: updatedWorkspaces, currentWorkspace: current } =
@@ -92,13 +120,20 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
           const firstWorkspace = updatedWorkspaces[0];
           useWorkspaceStore.getState().setCurrentWorkspace(firstWorkspace);
         }
+
+        // FE-3: Start background refresh after successful restoration
+        if (updatedWorkspaces.length > 0) {
+          startBackgroundRefresh();
+        }
       } catch (error) {
         // Check if the error is due to cancellation
         if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Request was cancelled' || error.message === 'canceled')) {
-          console.log('Workspace restoration was cancelled');
+          console.log('Workspace restoration was cancelled, will retry if needed');
           return;
         }
         
+        // Mark as attempted if it's a real error
+        setRestorationAttempted(true);
         console.error('Workspace restoration error:', error);
         
         // Check if we have workspaces loaded despite the error
@@ -112,6 +147,8 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
           // We have workspaces but restoration failed, use first one
           const firstWorkspace = fallbackWorkspaces[0];
           useWorkspaceStore.getState().setCurrentWorkspace(firstWorkspace);
+          // FE-3: Start background refresh even after partial failure
+          startBackgroundRefresh();
         } else {
           // Complete failure, redirect to error or create page
           console.error('Complete workspace restoration failure');
@@ -125,15 +162,17 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
 
     initializeWorkspace();
 
-    // Cleanup function to cancel in-flight requests
+    // Cleanup function to cancel in-flight requests and stop background refresh
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
       initializationInProgressRef.current = false;
+      // FE-3: Stop background refresh on unmount
+      stopBackgroundRefresh();
     };
-  }, [authChecked, isAuthenticated, navigate]); // Removed unstable dependencies
+  }, [authChecked, isAuthenticated, navigate, startBackgroundRefresh, stopBackgroundRefresh]); // Added background refresh dependencies
 
   // Show loading gate while restoring
   // Prevents UI flicker and ensures workspace is ready before rendering

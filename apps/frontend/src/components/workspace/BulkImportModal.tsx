@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { WorkspaceRole } from '@/types/workspace.types';
 
@@ -17,11 +17,11 @@ interface BulkImportModalProps {
  * - Validation and preview
  * - Batch processing
  */
-export const BulkImportModal = ({
+export const BulkImportModal = memo<BulkImportModalProps>(({
   workspaceId,
   isOpen,
   onClose,
-}: BulkImportModalProps) => {
+}) => {
   const { inviteMember } = useWorkspaceStore();
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,7 +31,7 @@ export const BulkImportModal = ({
   } | null>(null);
   const [error, setError] = useState('');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
@@ -46,9 +46,9 @@ export const BulkImportModal = ({
       setError('');
       setResults(null);
     }
-  };
+  }, []);
 
-  const downloadTemplate = () => {
+  const downloadTemplate = useCallback(() => {
     const csvContent = 'email,role\nexample@company.com,member\nadmin@company.com,admin\nviewer@company.com,viewer';
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -59,7 +59,7 @@ export const BulkImportModal = ({
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-  };
+  }, []);
 
   const parseCSV = (text: string): Array<{ email: string; role: WorkspaceRole }> => {
     const lines = text.split('\n').filter(line => line.trim());
@@ -98,7 +98,7 @@ export const BulkImportModal = ({
     return members;
   };
 
-  const handleImport = async () => {
+  const handleImport = useCallback(async () => {
     if (!file) return;
     
     setIsProcessing(true);
@@ -155,15 +155,15 @@ export const BulkImportModal = ({
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [file, inviteMember, workspaceId]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setFile(null);
     setResults(null);
     setError('');
     setIsProcessing(false);
     onClose();
-  };
+  }, [onClose]);
 
   if (!isOpen) return null;
 
@@ -327,4 +327,6 @@ export const BulkImportModal = ({
       </div>
     </div>
   );
-};
+});
+
+BulkImportModal.displayName = 'BulkImportModal';

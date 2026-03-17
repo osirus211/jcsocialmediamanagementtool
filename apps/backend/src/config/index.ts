@@ -149,6 +149,12 @@ const envSchema = z.object({
   // Email
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().default('noreply@example.com'),
+  EMAIL_PROVIDER: z.enum(['smtp', 'resend']).default('resend'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().transform(Number).optional(),
+  SMTP_SECURE: z.string().transform(val => val === 'true').optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
   APP_URL: z.string().url().optional(),
 
   // Frontend
@@ -313,7 +319,29 @@ const envSchema = z.object({
 // Validate environment variables FIRST (before any other imports or checks)
 const validateEnv = () => {
   try {
-    return envSchema.parse(process.env);
+    const env = envSchema.parse(process.env);
+    
+    // Runtime JWT secret validation
+    if (env.NODE_ENV === 'production') {
+      if (env.JWT_SECRET.match(/test|demo|example|default|secret|password|123/i)) {
+        console.error('❌ FATAL: JWT_SECRET contains weak patterns in production');
+        console.error('❌ JWT secret must be cryptographically secure in production');
+        process.exit(1);
+      }
+      
+      if (env.JWT_REFRESH_SECRET.match(/test|demo|example|default|secret|password|123/i)) {
+        console.error('❌ FATAL: JWT_REFRESH_SECRET contains weak patterns in production');
+        console.error('❌ JWT refresh secret must be cryptographically secure in production');
+        process.exit(1);
+      }
+      
+      if (env.JWT_SECRET === env.JWT_REFRESH_SECRET) {
+        console.error('❌ FATAL: JWT_SECRET and JWT_REFRESH_SECRET must be different in production');
+        process.exit(1);
+      }
+    }
+    
+    return env;
   } catch (error) {
     if (error instanceof z.ZodError) {
       const missingVars = error.errors.map((err) => `${err.path.join('.')}: ${err.message}`);
@@ -523,8 +551,16 @@ export const config = {
   },
 
   email: {
+    provider: env.EMAIL_PROVIDER as 'smtp' | 'resend',
     resendApiKey: env.RESEND_API_KEY,
     fromEmail: env.EMAIL_FROM,
+    smtp: {
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+    },
   },
 
   cors: {

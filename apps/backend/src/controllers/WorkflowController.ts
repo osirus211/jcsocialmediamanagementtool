@@ -22,9 +22,16 @@ export class WorkflowController {
    */
   async createWorkflow(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.debug('[DEBUG] POST /api/v1/workflows - createWorkflow called', {
+        body: req.body,
+        user: (req as any).user?.id || 'unauthenticated',
+        headers: { 'content-type': req.headers['content-type'] },
+      });
+
       // Validate request
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        logger.debug('[DEBUG] createWorkflow - validation failed', { errors: errors.array() });
         sendValidationError(res, errors.array().map(err => ({
           field: err.type === 'field' ? (err as any).path : undefined,
           message: err.msg,
@@ -69,9 +76,15 @@ export class WorkflowController {
    */
   async getWorkflows(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.debug('[DEBUG] GET /api/v1/workflows - getWorkflows called', {
+        query: req.query,
+        user: (req as any).user?.id || 'unauthenticated',
+      });
+
       // Validate request
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        logger.debug('[DEBUG] getWorkflows - validation failed', { errors: errors.array() });
         sendValidationError(res, errors.array().map(err => ({
           field: err.type === 'field' ? (err as any).path : undefined,
           message: err.msg,
@@ -125,10 +138,17 @@ export class WorkflowController {
    */
   async getWorkflowById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.debug('[DEBUG] GET /api/v1/workflows/:id - getWorkflowById called', {
+        params: req.params,
+        query: req.query,
+        user: (req as any).user?.id || 'unauthenticated',
+      });
+
       const { id } = req.params;
       const { workspaceId } = req.query;
 
       if (!workspaceId) {
+        logger.debug('[DEBUG] getWorkflowById - missing workspaceId');
         sendValidationError(res, [{ field: 'workspaceId', message: 'workspaceId is required' }]);
         return;
       }
@@ -158,9 +178,16 @@ export class WorkflowController {
    */
   async updateWorkflow(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.debug('[DEBUG] PUT /api/v1/workflows/:id - updateWorkflow called', {
+        params: req.params,
+        body: req.body,
+        user: (req as any).user?.id || 'unauthenticated',
+      });
+
       // Validate request
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        logger.debug('[DEBUG] updateWorkflow - validation failed', { errors: errors.array() });
         sendValidationError(res, errors.array().map(err => ({
           field: err.type === 'field' ? (err as any).path : undefined,
           message: err.msg,
@@ -207,10 +234,17 @@ export class WorkflowController {
    */
   async deleteWorkflow(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.debug('[DEBUG] DELETE /api/v1/workflows/:id - deleteWorkflow called', {
+        params: req.params,
+        query: req.query,
+        user: (req as any).user?.id || 'unauthenticated',
+      });
+
       const { id } = req.params;
       const { workspaceId } = req.query;
 
       if (!workspaceId) {
+        logger.debug('[DEBUG] deleteWorkflow - missing workspaceId');
         sendValidationError(res, [{ field: 'workspaceId', message: 'workspaceId is required' }]);
         return;
       }
@@ -245,10 +279,17 @@ export class WorkflowController {
    */
   async getWorkflowExecutions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.debug('[DEBUG] GET /api/v1/workflows/:id/executions - getWorkflowExecutions called', {
+        params: req.params,
+        query: req.query,
+        user: (req as any).user?.id || 'unauthenticated',
+      });
+
       const { id } = req.params;
       const { workspaceId, page, limit } = req.query;
 
       if (!workspaceId) {
+        logger.debug('[DEBUG] getWorkflowExecutions - missing workspaceId');
         sendValidationError(res, [{ field: 'workspaceId', message: 'workspaceId is required' }]);
         return;
       }

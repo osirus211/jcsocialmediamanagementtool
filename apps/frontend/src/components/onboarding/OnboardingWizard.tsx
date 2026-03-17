@@ -67,6 +67,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       if (nextStep >= 5) {
         // Complete onboarding
         await completeOnboarding();
+        // Sync auth store to update user.onboardingCompleted
+        const authStore = useAuthStore.getState();
+        await authStore.fetchMe();
+        
         onComplete?.();
         navigate('/');
       } else {
@@ -101,6 +105,11 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     try {
       setIsTransitioning(true);
       await skipOnboarding();
+      
+      // Sync auth store to update user.onboardingCompleted
+      const authStore = useAuthStore.getState();
+      await authStore.fetchMe();
+
       onComplete?.();
       navigate('/');
     } catch (error) {
@@ -149,10 +158,24 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       case ONBOARDING_STEPS.INVITE_TEAM:
         return <InviteTeamStep onNext={handleNext} onBack={handleBack} />;
       case ONBOARDING_STEPS.COMPLETE:
-        return <CompleteStep onComplete={() => {
-          onComplete?.();
-          navigate('/');
+        return <CompleteStep onComplete={async () => {
+          try {
+            setIsTransitioning(true);
+            await completeOnboarding();
+            
+            // Sync auth store
+            const authStore = useAuthStore.getState();
+            await authStore.fetchMe();
+            
+            onComplete?.();
+            navigate('/');
+          } catch (error) {
+            logger.error('Failed to complete onboarding from summary', { error });
+          } finally {
+            setIsTransitioning(false);
+          }
         }} />;
+
       default:
         return <WelcomeStep onNext={handleNext} />;
     }

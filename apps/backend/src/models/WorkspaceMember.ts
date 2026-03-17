@@ -14,6 +14,13 @@ export enum MemberRole {
   MEMBER = 'member', // Add missing MEMBER role
 }
 
+export enum MemberStatus {
+  ACTIVE = 'active',
+  DEACTIVATED = 'deactivated',
+  PENDING = 'pending',
+  SUSPENDED = 'suspended',
+}
+
 // Alias for compatibility
 export const WorkspaceRole = MemberRole;
 
@@ -92,7 +99,9 @@ const WorkspaceMemberSchema = new Schema<IWorkspaceMember>(
 
 // Compound indexes
 WorkspaceMemberSchema.index({ workspaceId: 1, userId: 1 }, { unique: true });
-WorkspaceMemberSchema.index({ workspaceId: 1, role: 1, isActive: 1 });
+WorkspaceMemberSchema.index({ workspaceId: 1, userId: 1, isActive: 1 });
+WorkspaceMemberSchema.index({ workspaceId: 1, role: 1 });
+WorkspaceMemberSchema.index({ workspaceId: 1, isActive: 1, createdAt: -1 });
 WorkspaceMemberSchema.index({ userId: 1, isActive: 1 });
 
 // Update last activity timestamp

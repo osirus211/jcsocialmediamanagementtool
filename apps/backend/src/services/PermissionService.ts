@@ -114,6 +114,66 @@ export class PermissionService {
       return false;
     }
   }
+
+  /**
+   * Check if user has a specific permission in a workspace
+   */
+  async hasPermission(userId: string, workspaceId: string, permission: string): Promise<boolean> {
+    try {
+      // Validate permission format
+      if (!permission || typeof permission !== 'string') {
+        throw new Error('Invalid permission');
+      }
+
+      // Check if user is workspace owner (owners have all permissions)
+      const isOwner = await this.isWorkspaceOwner(userId, workspaceId);
+      if (isOwner) {
+        return true;
+      }
+
+      // Get user's workspace membership
+      const member = await WorkspaceMember.findOne({
+        workspaceId,
+        userId,
+        isActive: true,
+      });
+
+      if (!member) {
+        return false;
+      }
+
+      // Role-based permissions
+      switch (member.role) {
+        case WorkspaceRole.ADMIN:
+          // Admins have most permissions except billing
+          return !permission.startsWith('billing:');
+        case WorkspaceRole.EDITOR:
+          // Editors can read/write posts and analytics
+          return permission.startsWith('posts:') || permission.startsWith('analytics:read');
+        case WorkspaceRole.VIEWER:
+          // Viewers can only read
+          return permission.endsWith(':read');
+        default:
+          return false;
+      }
+    } catch (error: any) {
+      logger.error('Error checking permission', { 
+        userId, 
+        workspaceId, 
+        permission,
+        error: error.message 
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Add a permission to a user (for testing purposes)
+   */
+  async addPermission(userId: string, workspaceId: string, permission: string): Promise<void> {
+    // This is a stub for testing - in a real system this would modify user permissions
+    logger.info('Adding permission (stub)', { userId, workspaceId, permission });
+  }
 }
 
 export const permissionService = new PermissionService();

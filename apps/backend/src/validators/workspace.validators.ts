@@ -1,5 +1,17 @@
 import { z } from 'zod';
 import { WorkspaceRole } from '../models/WorkspaceMember';
+import sanitizeHtml from 'sanitize-html';
+
+/**
+ * Sanitize input to prevent XSS attacks
+ */
+const sanitizeString = (value: string): string => {
+  return sanitizeHtml(value, {
+    allowedTags: [],
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard'
+  }).trim();
+};
 
 /**
  * Create workspace validation schema
@@ -10,7 +22,7 @@ export const createWorkspaceSchema = z.object({
       .string()
       .min(1, 'Workspace name is required')
       .max(100, 'Workspace name cannot exceed 100 characters')
-      .trim(),
+      .transform(sanitizeString),
     slug: z
       .string()
       .min(3, 'Workspace slug must be at least 3 characters')
@@ -19,11 +31,11 @@ export const createWorkspaceSchema = z.object({
         /^[a-z0-9-]+$/,
         'Workspace slug can only contain lowercase letters, numbers, and hyphens'
       )
-      .trim(),
+      .transform(sanitizeString),
     description: z
       .string()
       .max(500, 'Description cannot exceed 500 characters')
-      .trim()
+      .transform(sanitizeString)
       .optional(),
     timezone: z
       .string()
@@ -44,7 +56,7 @@ export const updateWorkspaceSchema = z.object({
       .string()
       .min(1, 'Workspace name is required')
       .max(100, 'Workspace name cannot exceed 100 characters')
-      .trim()
+      .transform(sanitizeString)
       .optional(),
     slug: z
       .string()
@@ -54,12 +66,12 @@ export const updateWorkspaceSchema = z.object({
         /^[a-z0-9-]+$/,
         'Workspace slug can only contain lowercase letters, numbers, and hyphens'
       )
-      .trim()
+      .transform(sanitizeString)
       .optional(),
     description: z
       .string()
       .max(500, 'Description cannot exceed 500 characters')
-      .trim()
+      .transform(sanitizeString)
       .optional(),
     settings: z.object({
       requireApproval: z.boolean().optional(),

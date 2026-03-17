@@ -1,19 +1,24 @@
 import { useState } from 'react';
 import { WorkspaceMember } from '@/types/workspace.types';
 import { useWorkspaceStore } from '@/store/workspace.store';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface RemoveMemberModalProps {
   member: WorkspaceMember;
   workspaceId: string;
   isOpen: boolean;
   onClose: () => void;
+  onRemove?: (member: WorkspaceMember) => void;
 }
 
-export const RemoveMemberModal = ({ member, workspaceId, isOpen, onClose }: RemoveMemberModalProps) => {
+export const RemoveMemberModal = ({ member, workspaceId, isOpen, onClose, onRemove }: RemoveMemberModalProps) => {
   const { removeMember } = useWorkspaceStore();
   const [confirmationText, setConfirmationText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Focus trap for accessibility
+  const focusTrapRef = useFocusTrap(isOpen);
 
   const memberUser = typeof member.userId === 'string' ? null : member.userId;
   const memberUserId = typeof member.userId === 'string' ? member.userId : member.userId._id;
@@ -29,6 +34,9 @@ export const RemoveMemberModal = ({ member, workspaceId, isOpen, onClose }: Remo
     setIsLoading(true);
     setError('');
 
+    // Call optimistic update callback if provided
+    onRemove?.(member);
+
     try {
       await removeMember(workspaceId, memberUserId);
       onClose();
@@ -43,7 +51,14 @@ export const RemoveMemberModal = ({ member, workspaceId, isOpen, onClose }: Remo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div 
+        ref={focusTrapRef}
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="remove-member-title"
+        aria-describedby="remove-member-description"
+      >
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
@@ -53,10 +68,10 @@ export const RemoveMemberModal = ({ member, workspaceId, isOpen, onClose }: Remo
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white" id="remove-member-title">
                 Remove Member
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400" id="remove-member-description">
                 This action cannot be undone
               </p>
             </div>
@@ -124,6 +139,7 @@ export const RemoveMemberModal = ({ member, workspaceId, isOpen, onClose }: Remo
               onClick={onClose}
               className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               disabled={isLoading}
+              autoFocus
             >
               Cancel
             </button>

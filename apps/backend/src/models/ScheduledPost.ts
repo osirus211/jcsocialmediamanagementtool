@@ -59,8 +59,13 @@ export interface IScheduledPost extends Document {
   publishedAt?: Date;
   failedAt?: Date;
   failureReason?: string;
+  errorMessage?: string; // Added missing property
   platformPostId?: string;
   metadata?: Record<string, any>;
+  
+  // Queue and versioning
+  queueJobId?: string; // Added missing property
+  version?: number; // Added missing property for optimistic locking
   
   // Content organization
   categoryId?: mongoose.Types.ObjectId;
@@ -166,6 +171,9 @@ const ScheduledPostSchema = new Schema<IScheduledPost>(
     failureReason: {
       type: String,
     },
+    errorMessage: {
+      type: String,
+    },
     platformPostId: {
       type: String,
       index: true,
@@ -173,6 +181,16 @@ const ScheduledPostSchema = new Schema<IScheduledPost>(
     metadata: {
       type: Schema.Types.Mixed,
       default: {},
+    },
+    
+    // Queue and versioning
+    queueJobId: {
+      type: String,
+      index: true,
+    },
+    version: {
+      type: Number,
+      default: 1,
     },
     categoryId: {
       type: Schema.Types.ObjectId,

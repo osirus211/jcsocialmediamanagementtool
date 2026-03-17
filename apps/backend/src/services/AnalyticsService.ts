@@ -67,7 +67,7 @@ export class AnalyticsService {
         shares: snapshot.shares,
         clicks: snapshot.clicks,
         saves: snapshot.saves || 0,
-        recordedAt: new Date(),
+        collectedAt: new Date(),
       });
 
       await analytics.save();
@@ -96,7 +96,7 @@ export class AnalyticsService {
     try {
       // Get latest analytics
       const latest = await PostAnalytics.findOne({ workspaceId, postId })
-        .sort({ recordedAt: -1 });
+        .sort({ collectedAt: -1 });
 
       if (!latest) {
         throw new Error('No analytics found for post');
@@ -130,59 +130,75 @@ export class AnalyticsService {
     endDate?: Date
   ): Promise<OverviewMetrics> {
     try {
-      const matchStage: any = { workspaceId: new mongoose.Types.ObjectId(workspaceId) };
-      
-      if (startDate || endDate) {
-        matchStage.recordedAt = {};
-        if (startDate) matchStage.recordedAt.$gte = startDate;
-        if (endDate) matchStage.recordedAt.$lte = endDate;
-      }
-
-      // Get latest analytics for each post
-      const latestAnalytics = await PostAnalytics.aggregate([
-        { $match: matchStage },
-        { $sort: { postId: 1, recordedAt: -1 } },
-        {
-          $group: {
-            _id: '$postId',
-            latest: { $first: '$$ROOT' },
-          },
-        },
-        { $replaceRoot: { newRoot: '$latest' } },
-      ]);
-
-      // Calculate totals
-      const totalImpressions = latestAnalytics.reduce((sum, a) => sum + a.impressions, 0);
-      const totalEngagement = latestAnalytics.reduce(
-        (sum, a) => sum + a.likes + a.comments + a.shares + a.clicks + a.saves,
-        0
-      );
-      const engagementRate = totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0;
-
-      // Find best performing post
-      const bestPerforming = latestAnalytics.reduce((best, current) => {
-        const currentEngagement = current.likes + current.comments + current.shares + current.clicks + current.saves;
-        const bestEngagement = best ? best.likes + best.comments + best.shares + best.clicks + best.saves : 0;
-        return currentEngagement > bestEngagement ? current : best;
-      }, null as any);
+      // Get base metrics for the current period
+      const currentMetrics = await this.getBaseMetrics(workspaceId, startDate, endDate);
 
       // Calculate growth (compare with previous period)
       const growth = await this.calculateGrowth(workspaceId, startDate, endDate);
 
       return {
-        totalImpressions,
-        totalEngagement,
-        engagementRate,
-        totalPosts: latestAnalytics.length,
-        bestPerformingPost: bestPerforming,
-        followerGrowth: 0, // TODO: Implement follower growth calculation
-        postsPublished: latestAnalytics.length,
+        ...currentMetrics,
         growth,
       };
     } catch (error: any) {
       logger.error('Get overview metrics error:', error);
       throw new Error(`Failed to get overview metrics: ${error.message}`);
     }
+  }
+
+  /**
+   * Get base metrics without growth (to avoid recursion)
+   */
+  private static async getBaseMetrics(
+    workspaceId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<Omit<OverviewMetrics, 'growth'>> {
+    const matchStage: any = { workspaceId: new mongoose.Types.ObjectId(workspaceId) };
+    
+    if (startDate || endDate) {
+      matchStage.collectedAt = {};
+      if (startDate) matchStage.collectedAt.$gte = startDate;
+      if (endDate) matchStage.collectedAt.$lte = endDate;
+    }
+
+    // Get latest analytics for each post
+    const latestAnalytics = await PostAnalytics.aggregate([
+      { $match: matchStage },
+      { $sort: { postId: 1, collectedAt: -1 } },
+      {
+        $group: {
+          _id: '$postId',
+          latest: { $first: '$$ROOT' },
+        },
+      },
+      { $replaceRoot: { newRoot: '$latest' } },
+    ]);
+
+    // Calculate totals
+    const totalImpressions = latestAnalytics.reduce((sum, a) => sum + a.impressions, 0);
+    const totalEngagement = latestAnalytics.reduce(
+      (sum, a) => sum + (a.likes || 0) + (a.comments || 0) + (a.shares || 0) + (a.clicks || 0) + (a.saves || 0),
+      0
+    );
+    const engagementRate = totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0;
+
+    // Find best performing post
+    const bestPerforming = latestAnalytics.reduce((best, current) => {
+      const currentEngagement = (current.likes || 0) + (current.comments || 0) + (current.shares || 0) + (current.clicks || 0) + (current.saves || 0);
+      const bestEngagement = best ? (best.likes || 0) + (best.comments || 0) + (best.shares || 0) + (best.clicks || 0) + (best.saves || 0) : 0;
+      return currentEngagement > bestEngagement ? current : best;
+    }, null as any);
+
+    return {
+      totalImpressions,
+      totalEngagement,
+      engagementRate,
+      totalPosts: latestAnalytics.length,
+      bestPerformingPost: bestPerforming,
+      followerGrowth: 0,
+      postsPublished: latestAnalytics.length,
+    };
   }
 
   /**
@@ -197,14 +213,14 @@ export class AnalyticsService {
       const matchStage: any = { workspaceId: new mongoose.Types.ObjectId(workspaceId) };
       
       if (startDate || endDate) {
-        matchStage.recordedAt = {};
-        if (startDate) matchStage.recordedAt.$gte = startDate;
-        if (endDate) matchStage.recordedAt.$lte = endDate;
+        matchStage.collectedAt = {};
+        if (startDate) matchStage.collectedAt.$gte = startDate;
+        if (endDate) matchStage.collectedAt.$lte = endDate;
       }
 
       const platformMetrics = await PostAnalytics.aggregate([
         { $match: matchStage },
-        { $sort: { postId: 1, recordedAt: -1 } },
+        { $sort: { postId: 1, collectedAt: -1 } },
         {
           $group: {
             _id: { postId: '$postId', platform: '$platform' },
@@ -281,20 +297,20 @@ export class AnalyticsService {
         {
           $match: {
             workspaceId: new mongoose.Types.ObjectId(workspaceId),
-            recordedAt: { $gte: startDate, $lte: endDate },
+            collectedAt: { $gte: startDate, $lte: endDate },
           },
         },
-        { $sort: { postId: 1, recordedAt: -1 } },
+        { $sort: { postId: 1, collectedAt: -1 } },
         {
           $group: {
-            _id: { postId: '$postId', date: { $dateToString: { format: groupByFormat, date: '$recordedAt' } } },
+            _id: { postId: '$postId', date: { $dateToString: { format: groupByFormat, date: '$collectedAt' } } },
             latest: { $first: '$$ROOT' },
           },
         },
         { $replaceRoot: { newRoot: '$latest' } },
         {
           $group: {
-            _id: { $dateToString: { format: groupByFormat, date: '$recordedAt' } },
+            _id: { $dateToString: { format: groupByFormat, date: '$collectedAt' } },
             impressions: { $sum: '$impressions' },
             likes: { $sum: '$likes' },
             comments: { $sum: '$comments' },
@@ -349,7 +365,7 @@ export class AnalyticsService {
   ): Promise<IPostAnalytics[]> {
     try {
       return await PostAnalytics.find({ workspaceId, postId })
-        .sort({ recordedAt: 1 })
+        .sort({ collectedAt: 1 })
         .exec();
     } catch (error: any) {
       logger.error('Get post analytics error:', error);
@@ -375,10 +391,10 @@ export class AnalyticsService {
       const previousEnd = startDate;
 
       // Current period metrics
-      const currentMetrics = await this.getOverviewMetrics(workspaceId, startDate, endDate);
+      const currentMetrics = await this.getBaseMetrics(workspaceId, startDate, endDate);
       
       // Previous period metrics
-      const previousMetrics = await this.getOverviewMetrics(workspaceId, previousStart, previousEnd);
+      const previousMetrics = await this.getBaseMetrics(workspaceId, previousStart, previousEnd);
 
       const impressionsGrowth = previousMetrics.totalImpressions > 0
         ? ((currentMetrics.totalImpressions - previousMetrics.totalImpressions) / previousMetrics.totalImpressions) * 100

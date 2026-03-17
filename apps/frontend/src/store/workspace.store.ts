@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, setWorkspaceIdForInterceptor } from '@/lib/api-client';
 import {
   Workspace,
   WorkspaceMember,
@@ -14,8 +14,8 @@ import {
   MembersResponse,
 } from '@/types/workspace.types';
 
-// Global request tracking for deduplication
-const activeRequests = new Map<string, Promise<any>>();
+// Global request tracking for deduplication and AbortController management
+const activeRequests = new Map<string, RequestTracker>();
 
 interface RequestTracker {
   promise: Promise<any>;
@@ -35,6 +35,15 @@ interface WorkspaceState {
   membersLoaded: boolean;
   pendingInvites: any[];
   pendingInvitesLoaded: boolean;
+  
+  // FE-3: Background refresh state
+  lastFetchedAt: number | null; // Timestamp of last successful fetch
+  isStale: boolean; // Whether data is considered stale (>5 minutes old)
+  backgroundRefreshInterval: NodeJS.Timeout | null; // Background refresh timer
+  
+  // GAP 11: Rate limit state
+  rateLimitedUntil: number | null; // Timestamp when rate limit expires
+  retryAfterSeconds: number | null; // Seconds remaining for rate limit
 }
 
 interface WorkspaceActions {
@@ -51,6 +60,18 @@ interface WorkspaceActions {
   setPendingInvites: (invites: any[]) => void;
   setPendingInvitesLoaded: (loaded: boolean) => void;
 
+  // FE-3: Background refresh actions
+  setLastFetchedAt: (timestamp: number | null) => void;
+  setIsStale: (isStale: boolean) => void;
+  startBackgroundRefresh: () => void;
+  stopBackgroundRefresh: () => void;
+  refreshIfStale: () => Promise<void>;
+  
+  // GAP 11: Rate limit actions
+  setRateLimitedUntil: (timestamp: number | null) => void;
+  setRetryAfterSeconds: (seconds: number | null) => void;
+  handleRateLimitError: (error: any) => void;
+
   // Async actions
   fetchWorkspaces: (signal?: AbortSignal) => Promise<void>;
   fetchWorkspaceById: (workspaceId: string) => Promise<Workspace>;
@@ -63,6 +84,7 @@ interface WorkspaceActions {
   fetchMembers: (workspaceId: string) => Promise<void>;
   fetchPendingInvites: (workspaceId: string, params?: { status?: string; search?: string; role?: string }) => Promise<void>;
   inviteMember: (workspaceId: string, input: InviteMemberInput) => Promise<WorkspaceMember>;
+  sendEmailInvitation: (workspaceId: string, input: InviteMemberInput) => Promise<any>;
   removeMember: (workspaceId: string, userId: string) => Promise<void>;
   deactivateMember: (workspaceId: string, userId: string) => Promise<void>;
   reactivateMember: (workspaceId: string, userId: string) => Promise<void>;
@@ -105,6 +127,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       membersLoaded: false,
       pendingInvites: [],
       pendingInvitesLoaded: false,
+      
+      // FE-3: Background refresh initial state
+      lastFetchedAt: null,
+      isStale: false,
+      backgroundRefreshInterval: null,
+      
+      // GAP 11: Rate limit initial state
+      rateLimitedUntil: null,
+      retryAfterSeconds: null,
 
       // Setters
       setWorkspaces: (workspaces) => set({ workspaces }),
@@ -141,64 +172,196 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       setPendingInvitesLoaded: (loaded) => set({ pendingInvitesLoaded: loaded }),
 
+      // FE-3: Background refresh setters
+      setLastFetchedAt: (timestamp) => set({ lastFetchedAt: timestamp }),
+      
+      setIsStale: (isStale) => set({ isStale }),
+
+      /**
+       * Start background refresh interval (5 minutes)
+       * Only refreshes if data is stale and no loading in progress
+       */
+      startBackgroundRefresh: () => {
+        // Clear existing interval
+        const { backgroundRefreshInterval } = get();
+        if (backgroundRefreshInterval) {
+          clearInterval(backgroundRefreshInterval);
+        }
+
+        // Set up new interval (5 minutes)
+        const interval = setInterval(async () => {
+          const { lastFetchedAt, isLoading, workspacesLoaded } = get();
+          
+          // Only refresh if data is stale and not currently loading
+          if (!isLoading && workspacesLoaded && lastFetchedAt) {
+            const now = Date.now();
+            const fiveMinutes = 5 * 60 * 1000;
+            
+            if (now - lastFetchedAt > fiveMinutes) {
+              try {
+                // Silent background refresh - don't show loading state
+                await get().fetchWorkspaces();
+              } catch (error) {
+                // Silent failure - keep existing data, no logging in production
+              }
+            }
+          }
+        }, 5 * 60 * 1000); // 5 minutes
+
+        set({ backgroundRefreshInterval: interval });
+      },
+
+      /**
+       * Stop background refresh interval
+       */
+      stopBackgroundRefresh: () => {
+        const { backgroundRefreshInterval } = get();
+        if (backgroundRefreshInterval) {
+          clearInterval(backgroundRefreshInterval);
+          set({ backgroundRefreshInterval: null });
+        }
+      },
+
+      /**
+       * Refresh workspaces if data is stale (>2 minutes on tab focus)
+       */
+      refreshIfStale: async () => {
+        const { lastFetchedAt, isLoading, workspacesLoaded } = get();
+        
+        if (!isLoading && workspacesLoaded && lastFetchedAt) {
+          const now = Date.now();
+          const twoMinutes = 2 * 60 * 1000;
+          
+          if (now - lastFetchedAt > twoMinutes) {
+            try {
+              await get().fetchWorkspaces();
+            } catch (error) {
+              // Silent failure on tab focus refresh
+            }
+          }
+        }
+      },
+
+      // GAP 11: Rate limit setters and handlers
+      setRateLimitedUntil: (timestamp) => set({ rateLimitedUntil: timestamp }),
+      
+      setRetryAfterSeconds: (seconds) => set({ retryAfterSeconds: seconds }),
+
+      /**
+       * Handle 429 rate limit errors with countdown
+       */
+      handleRateLimitError: (error: any) => {
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'] || 
+                           error.response.data?.retryAfter || 
+                           60; // Default to 60 seconds
+          
+          const retryAfterMs = parseInt(retryAfter) * 1000;
+          const rateLimitedUntil = Date.now() + retryAfterMs;
+          
+          set({ 
+            rateLimitedUntil,
+            retryAfterSeconds: parseInt(retryAfter)
+          });
+
+          // Start countdown
+          const countdownInterval = setInterval(() => {
+            const { rateLimitedUntil: currentLimit } = get();
+            if (!currentLimit) {
+              clearInterval(countdownInterval);
+              return;
+            }
+
+            const remaining = Math.max(0, Math.ceil((currentLimit - Date.now()) / 1000));
+            
+            if (remaining <= 0) {
+              set({ rateLimitedUntil: null, retryAfterSeconds: null });
+              clearInterval(countdownInterval);
+            } else {
+              set({ retryAfterSeconds: remaining });
+            }
+          }, 1000);
+        }
+      },
+
       /**
        * Fetch all workspaces for current user
-       * Implements request deduplication to prevent concurrent calls
+       * Implements request deduplication and AbortController management (FE-4)
        */
       fetchWorkspaces: async (signal?: AbortSignal) => {
         const requestKey = 'fetchWorkspaces';
         
-        // Check if there's already a request in progress
-        if (activeRequests.has(requestKey)) {
-          console.log('fetchWorkspaces: Request already in progress, returning existing promise');
-          return activeRequests.get(requestKey);
+        // Check if there's already a request in progress (FE-4: Request coalescing)
+        const existingRequest = activeRequests.get(requestKey);
+        if (existingRequest) {
+          // Return the existing promise for concurrent requests
+          return existingRequest.promise;
         }
 
-        const requestPromise = (async () => {
-          try {
-            set({ isLoading: true });
+        // Create new AbortController if none provided
+        const abortController = signal ? new AbortController() : new AbortController();
+        if (signal) {
+          // Chain the provided signal to our controller
+          signal.addEventListener('abort', () => abortController.abort());
+        }
 
-            const response = await apiClient.get<WorkspacesResponse>('/workspaces', {
-              signal,
-            });
+        const requestTracker: RequestTracker = {
+          promise: (async () => {
+            try {
+              set({ isLoading: true });
 
-            // Check if request was cancelled
-            if (signal?.aborted) {
-              throw new Error('Request was cancelled');
-            }
-
-            set({
-              workspaces: response.workspaces,
-              workspacesLoaded: true,
-              isLoading: false,
-            });
-
-            // If no current workspace, set first one
-            const { currentWorkspaceId, currentWorkspace } = get();
-            if (!currentWorkspace && response.workspaces.length > 0) {
-              const firstWorkspace = response.workspaces[0];
-              set({
-                currentWorkspace: firstWorkspace,
-                currentWorkspaceId: firstWorkspace._id,
+              const response = await apiClient.get<WorkspacesResponse>('/workspaces', {
+                signal: abortController.signal,
               });
+
+              const now = Date.now();
+              const fiveMinutes = 5 * 60 * 1000;
+
+              set({
+                workspaces: response.workspaces,
+                workspacesLoaded: true,
+                isLoading: false,
+                lastFetchedAt: now, // FE-3: Track fetch timestamp
+                isStale: false, // FE-3: Mark as fresh
+              });
+
+              // Update stale indicator based on age
+              setTimeout(() => {
+                const { lastFetchedAt: currentTimestamp } = get();
+                if (currentTimestamp === now) { // Only update if this is still the latest fetch
+                  set({ isStale: true });
+                }
+              }, fiveMinutes);
+
+              // If no current workspace, set first one
+              const { currentWorkspace } = get();
+              if (!currentWorkspace && response.workspaces.length > 0) {
+                const firstWorkspace = response.workspaces[0];
+                // Use setter to trigger interceptor updates
+                get().setCurrentWorkspace(firstWorkspace);
+              }
+            } catch (error: any) {
+              // Don't log cancelled requests as errors
+              if (error.name !== 'AbortError' && error.name !== 'CanceledError' && !abortController.signal.aborted && error.message !== 'canceled') {
+                console.error('Fetch workspaces error:', error);
+                // Handle rate limiting
+                get().handleRateLimitError(error);
+              }
+              set({ isLoading: false, workspacesLoaded: true });
+              throw error;
+            } finally {
+              // Clear the request from tracking
+              activeRequests.delete(requestKey);
             }
-          } catch (error: any) {
-            // Don't log cancelled requests as errors
-            if (error.name !== 'AbortError' && error.name !== 'CanceledError' && !signal?.aborted && error.message !== 'canceled') {
-              console.error('Fetch workspaces error:', error);
-            }
-            set({ isLoading: false, workspacesLoaded: true });
-            throw error;
-          } finally {
-            // Clear the request from tracking
-            activeRequests.delete(requestKey);
-          }
-        })();
+          })(),
+          abortController,
+          timestamp: Date.now(),
+        };
 
         // Track the request
-        activeRequests.set(requestKey, requestPromise);
+        activeRequests.set(requestKey, requestTracker);
         
-        return requestPromise;
+        return requestTracker.promise;
       },
 
       /**
@@ -320,10 +483,19 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       /**
        * Switch to different workspace
        * Clears tenant-specific data and reloads
+       * FE-4: Implements AbortController for cancelling previous requests
        */
       switchWorkspace: async (workspaceId: string) => {
         try {
           set({ isLoading: true });
+
+          // FE-4: Cancel all in-flight requests from previous workspace
+          for (const [key, tracker] of activeRequests.entries()) {
+            if (key.includes('workspace') || key.includes('members') || key.includes('invites')) {
+              tracker.abortController.abort();
+              activeRequests.delete(key);
+            }
+          }
 
           // Find workspace in list
           const workspace = get().workspaces.find((w) => w._id === workspaceId);
@@ -436,6 +608,30 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return response.membership;
         } catch (error: any) {
           console.error('Invite member error:', error);
+          throw error;
+        }
+      },
+
+      /**
+       * Send email invitation to a new user
+       */
+      sendEmailInvitation: async (workspaceId: string, input: InviteMemberInput) => {
+        try {
+          const response = await apiClient.post(
+            `/workspaces/${workspaceId}/invitations`,
+            input
+          );
+
+          // Add to pending invites list if loaded
+          if (get().pendingInvitesLoaded) {
+            set((state) => ({
+              pendingInvites: [response.invitation, ...state.pendingInvites],
+            }));
+          }
+
+          return response.invitation;
+        } catch (error: any) {
+          console.error('Send email invitation error:', error);
           throw error;
         }
       },
@@ -664,8 +860,21 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       /**
        * Clear all workspace data
+       * FE-3: Also clears background refresh state
        */
       clearWorkspaceData: () => {
+        // FE-3: Stop background refresh
+        const { backgroundRefreshInterval } = get();
+        if (backgroundRefreshInterval) {
+          clearInterval(backgroundRefreshInterval);
+        }
+
+        // FE-4: Cancel all active requests
+        for (const [key, tracker] of activeRequests.entries()) {
+          tracker.abortController.abort();
+          activeRequests.delete(key);
+        }
+
         set({
           workspaces: [],
           currentWorkspace: null,
@@ -677,6 +886,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           membersLoaded: false,
           pendingInvites: [],
           pendingInvitesLoaded: false,
+          lastFetchedAt: null, // FE-3: Clear timestamp
+          isStale: false, // FE-3: Clear stale state
+          backgroundRefreshInterval: null, // FE-3: Clear interval reference
+          rateLimitedUntil: null, // GAP 11: Clear rate limit
+          retryAfterSeconds: null, // GAP 11: Clear retry countdown
         });
       },
 
@@ -736,7 +950,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               
               // Exponential backoff: 1s, 2s, 4s
               const delay = BASE_DELAY * Math.pow(2, attempts - 1);
-              console.log(`Retrying workspace restoration in ${delay}ms (attempt ${attempts}/${MAX_ATTEMPTS})`);
               
               await sleep(delay);
               
@@ -749,7 +962,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             }
             
             // All retries exhausted - clear invalid data and stop retrying
-            console.error('All workspace restoration attempts failed. Clearing workspace data.');
             set({
               currentWorkspace: null,
               currentWorkspaceId: null,
@@ -773,3 +985,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     }
   )
 );
+
+// Register store with interceptor
+setWorkspaceIdForInterceptor(useWorkspaceStore.getState().currentWorkspaceId);
+useWorkspaceStore.subscribe((state) => {
+  setWorkspaceIdForInterceptor(state.currentWorkspaceId);
+});

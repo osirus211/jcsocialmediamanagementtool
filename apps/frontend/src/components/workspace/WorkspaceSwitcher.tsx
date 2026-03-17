@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { Workspace } from '@/types/workspace.types';
@@ -16,8 +16,9 @@ import { Workspace } from '@/types/workspace.types';
  * - Mobile responsive design
  * - Recent workspaces ordering
  * - Slack/Notion-style UX
+ * - Stale data indicator
  */
-export const WorkspaceSwitcher = () => {
+export const WorkspaceSwitcher = memo(() => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +30,7 @@ export const WorkspaceSwitcher = () => {
     workspaces,
     currentWorkspace,
     isLoading,
+    isStale,
     switchWorkspace,
     recentWorkspaceIds = [],
   } = useWorkspaceStore();
@@ -131,7 +133,7 @@ export const WorkspaceSwitcher = () => {
     setSelectedIndex(0);
   }, [searchQuery]);
 
-  const handleSwitchWorkspace = async (workspace: Workspace) => {
+  const handleSwitchWorkspace = useCallback(async (workspace: Workspace) => {
     if (workspace._id === currentWorkspace?._id) {
       setIsOpen(false);
       setSearchQuery('');
@@ -149,21 +151,21 @@ export const WorkspaceSwitcher = () => {
     } catch (error) {
       console.error('Failed to switch workspace:', error);
     }
-  };
+  }, [currentWorkspace?._id, switchWorkspace]);
 
-  const handleCreateWorkspace = () => {
+  const handleCreateWorkspace = useCallback(() => {
     setIsOpen(false);
     setSearchQuery('');
     setSelectedIndex(0);
     navigate('/workspaces/create');
-  };
+  }, [navigate]);
 
-  const handleOpenDropdown = () => {
+  const handleOpenDropdown = useCallback(() => {
     setIsOpen(!isOpen);
     if (!isOpen) {
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
-  };
+  }, [isOpen]);
 
   const getWorkspaceInitials = (name: string) => {
     return name
@@ -207,8 +209,19 @@ export const WorkspaceSwitcher = () => {
 
         {/* Workspace Info */}
         <div className="flex-1 text-left min-w-0">
-          <div className="font-semibold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
-            {currentWorkspace.name}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
+              {currentWorkspace.name}
+            </span>
+            {/* Stale Data Indicator */}
+            {isStale && (
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                <span className="text-xs text-amber-600 dark:text-amber-400 hidden sm:inline">
+                  Refreshing...
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             <span className={`inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-medium ${getPlanBadgeColor(currentWorkspace.plan)}`}>
@@ -413,4 +426,6 @@ export const WorkspaceSwitcher = () => {
       )}
     </div>
   );
-};
+});
+
+WorkspaceSwitcher.displayName = 'WorkspaceSwitcher';

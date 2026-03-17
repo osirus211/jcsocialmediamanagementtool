@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace.types';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface TransferOwnershipModalProps {
   workspace: Workspace;
@@ -30,6 +31,9 @@ export const TransferOwnershipModal = ({
   const [confirmationText, setConfirmationText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Focus trap for accessibility
+  const focusTrapRef = useFocusTrap(isOpen);
 
   // Only show admin members as potential owners
   const eligibleMembers = members.filter(
@@ -73,7 +77,14 @@ export const TransferOwnershipModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div 
+        ref={focusTrapRef}
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transfer-ownership-title"
+        aria-describedby="transfer-ownership-description"
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
@@ -83,10 +94,10 @@ export const TransferOwnershipModal = ({
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white" id="transfer-ownership-title">
                 Transfer Ownership
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400" id="transfer-ownership-description">
                 Step {step} of 3
               </p>
             </div>
@@ -117,6 +128,7 @@ export const TransferOwnershipModal = ({
                     value={selectedMemberId}
                     onChange={(e) => setSelectedMemberId(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    aria-label="Select new workspace owner"
                   >
                     <option value="">Select a member...</option>
                     {eligibleMembers.map((member) => {
@@ -194,7 +206,12 @@ export const TransferOwnershipModal = ({
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   disabled={isLoading}
                   autoFocus
+                  aria-label="Confirm workspace name"
+                  aria-describedby="confirmation-help"
                 />
+                <div id="confirmation-help" className="sr-only">
+                  Type the exact workspace name to confirm the ownership transfer
+                </div>
               </div>
 
               {!isNameMatch && confirmationText.length > 0 && (

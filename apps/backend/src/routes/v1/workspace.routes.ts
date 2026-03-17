@@ -9,6 +9,7 @@ import {
   requireOwner,
 } from '../../middleware/tenant';
 import { validateRequest } from '../../middleware/validate';
+import { csrfProtection } from '../../middleware/csrf';
 import {
   createWorkspaceSchema,
   updateWorkspaceSchema,
@@ -17,6 +18,8 @@ import {
   transferOwnershipSchema,
 } from '../../validators/workspace.validators';
 import { checkMemberLimit } from '../../middleware/planLimit';
+import { protectWorkspaceFields, protectMemberFields } from '../../middleware/massAssignmentProtection';
+import { requireConfirmationToken } from '../../middleware/confirmationToken';
 import {
   workspaceCreateRateLimiter,
   workspaceUpdateRateLimiter,
@@ -28,6 +31,10 @@ import {
   memberRemoveRateLimiter,
   memberDeactivateRateLimiter,
   memberReactivateRateLimiter,
+  memberRoleChangeRateLimiter,
+  memberRoleChangeUserRateLimiter,
+  bulkMemberRoleUpdateRateLimiter,
+  slugAvailabilityRateLimiter,
 } from '../../middleware/rateLimiter';
 import blackoutDatesRoutes from '../blackoutDates';
 
@@ -58,6 +65,7 @@ const upload = multer({
 router.post(
   '/',
   requireAuth,
+  csrfProtection,
   workspaceCreateRateLimiter,
   validateRequest(createWorkspaceSchema),
   WorkspaceController.createWorkspace
@@ -80,7 +88,9 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
   workspaceUpdateRateLimiter,
+  protectWorkspaceFields,
   validateRequest(updateWorkspaceSchema),
   WorkspaceController.updateWorkspace
 );
@@ -91,9 +101,20 @@ router.post(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
   uploadRateLimiter,
   upload.single('logo'),
   WorkspaceController.uploadLogo
+);
+
+// Generate deletion confirmation token (owner only)
+router.post(
+  '/:workspaceId/delete-token',
+  requireAuth,
+  requireWorkspace,
+  requireOwner,
+  csrfProtection,
+  WorkspaceController.generateDeleteToken
 );
 
 // Delete workspace (owner only)
@@ -102,6 +123,8 @@ router.delete(
   requireAuth,
   requireWorkspace,
   requireOwner,
+  csrfProtection,
+  requireConfirmationToken,
   workspaceDeleteRateLimiter,
   WorkspaceController.deleteWorkspace
 );
@@ -120,6 +143,7 @@ router.post(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
   checkMemberLimit,
   validateRequest(inviteMemberSchema),
   WorkspaceController.inviteMember
@@ -131,6 +155,7 @@ router.delete(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
   memberRemoveRateLimiter,
   WorkspaceController.removeMember
 );
@@ -141,6 +166,7 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
   memberDeactivateRateLimiter,
   WorkspaceController.deactivateMember
 );
@@ -151,6 +177,7 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
   memberReactivateRateLimiter,
   WorkspaceController.reactivateMember
 );
@@ -161,8 +188,30 @@ router.patch(
   requireAuth,
   requireWorkspace,
   requireAdmin,
+  csrfProtection,
+  memberRoleChangeRateLimiter,
+  memberRoleChangeUserRateLimiter,
+  protectMemberFields,
   validateRequest(updateMemberRoleSchema),
   WorkspaceController.updateMemberRole
+);
+
+// Bulk update member roles (admin or owner only)
+router.patch(
+  '/:workspaceId/members/bulk-roles',
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  csrfProtection,
+  bulkMemberRoleUpdateRateLimiter,
+  WorkspaceController.bulkUpdateMemberRoles
+);
+
+// Check slug availability
+router.get(
+  '/slug-availability/:slug',
+  slugAvailabilityRateLimiter,
+  WorkspaceController.checkSlugAvailability
 );
 
 // Transfer ownership (owner only)

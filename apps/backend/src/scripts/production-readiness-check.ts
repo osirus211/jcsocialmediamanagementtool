@@ -496,12 +496,13 @@ class ProductionReadinessValidator {
       }
 
       // Collection statistics
-      const stats = await User.collection.stats();
+      const stats = await User.collection.db.stats();
+      const userCount = await User.countDocuments();
       checks.push({
         name: 'Collection Statistics',
         status: 'PASS',
-        message: `User collection: ${stats.count} documents, ${stats.nindexes} indexes`,
-        details: `Average document size: ${Math.round(stats.avgObjSize || 0)} bytes`
+        message: `User collection: ${userCount} documents`,
+        details: `Database stats available`
       });
 
     } catch (error) {

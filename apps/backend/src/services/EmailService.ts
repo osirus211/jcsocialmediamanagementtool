@@ -204,7 +204,26 @@ export class EmailService {
    * Check if service is configured
    */
   isReady(): boolean {
-    return this.isConfigured;
+    const provider = config.email?.provider;
+    
+    if (provider === 'smtp') {
+      // Check SMTP configuration
+      const hasCredentials = 
+        config.email?.smtp?.host &&
+        config.email?.smtp?.user &&
+        config.email?.smtp?.pass &&
+        config.email?.smtp?.user !== 'your-email@gmail.com' &&
+        config.email?.smtp?.pass !== 'your-app-password';
+      
+      return !!hasCredentials;
+    }
+    
+    if (provider === 'resend') {
+      // Check Resend configuration
+      return this.isConfigured;
+    }
+    
+    return false;
   }
 
   /**

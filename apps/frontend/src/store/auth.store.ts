@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, setAccessTokenForInterceptor } from '@/lib/api-client';
 import {
   AuthState,
   AuthActions,
@@ -307,3 +307,9 @@ export const useAuthStore = create<AuthStore>()(
     }
   )
 );
+
+// Register store with interceptor
+setAccessTokenForInterceptor(useAuthStore.getState().accessToken);
+useAuthStore.subscribe((state) => {
+  setAccessTokenForInterceptor(state.accessToken);
+});

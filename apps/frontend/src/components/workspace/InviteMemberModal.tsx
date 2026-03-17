@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Users, Send, Clock, RotateCcw, Trash2 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspace.store';
 import { apiClient } from '@/lib/api-client';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface InviteMemberModalProps {
   isOpen: boolean;
@@ -29,6 +30,9 @@ export function InviteMemberModal({ isOpen, onClose }: InviteMemberModalProps) {
   const [pendingInvites, setPendingInvites] = useState<PendingInvitation[]>([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
 
+  // Focus trap for accessibility
+  const focusTrapRef = useFocusTrap(isOpen);
+
   // Load pending invitations when modal opens
   useEffect(() => {
     if (isOpen && currentWorkspace) {
@@ -52,7 +56,7 @@ export function InviteMemberModal({ isOpen, onClose }: InviteMemberModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentWorkspace || !emails.trim()) return;
+    if (!currentWorkspace || !emails.trim() || isLoading) return;
 
     setIsLoading(true);
     setError('');
@@ -94,10 +98,19 @@ export function InviteMemberModal({ isOpen, onClose }: InviteMemberModalProps) {
           .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
           .map(result => result.reason?.response?.data?.message || result.reason?.message || 'Unknown error');
         
-        setError(`Failed to send ${failed} invitation${failed > 1 ? 's' : ''}: ${failedResults[0]}`);
+        const firstError = failedResults[0];
+        if (firstError?.includes('429') || firstError?.includes('rate limit')) {
+          setError('Too many invites. Please wait before sending more.');
+        } else {
+          setError(`Failed to send ${failed} invitation${failed > 1 ? 's' : ''}: ${firstError}`);
+        }
       }
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to send invitations');
+      if (error.status === 429) {
+        setError('Too many invites. Please wait before sending more.');
+      } else {
+        setError(error.response?.data?.message || 'Failed to send invitations');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -148,18 +161,25 @@ export function InviteMemberModal({ isOpen, onClose }: InviteMemberModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div 
+        ref={focusTrapRef}
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invite-modal-title"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <Users className="w-6 h-6 text-blue-600 mr-3" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white" id="invite-modal-title">
               Invite Team Members
             </h2>
           </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Close invite modal"
           >
             <X className="w-6 h-6" />
           </button>
@@ -170,32 +190,42 @@ export function InviteMemberModal({ isOpen, onClose }: InviteMemberModalProps) {
           <form onSubmit={handleSubmit} className="mb-8">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="invite-emails" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Email Addresses
                 </label>
                 <textarea
+                  id="invite-emails"
                   value={emails}
                   onChange={(e) => setEmails(e.target.value)}
                   placeholder="Enter email addresses separated by commas or spaces&#10;example@company.com, another@company.com"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
                   rows={3}
                   required
+                  aria-describedby="email-help"
                 />
+                <div id="email-help" className="sr-only">
+                  Enter one or more email addresses separated by commas or spaces
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="invite-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Role
                 </label>
                 <select
+                  id="invite-role"
                   value={role}
                   onChange={(e) => setRole(e.target.value as 'admin' | 'member' | 'viewer')}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  aria-describedby="role-help"
                 >
                   <option value="viewer">Viewer - Can view content</option>
                   <option value="member">Member - Can create and edit content</option>
                   <option value="admin">Admin - Full workspace access</option>
                 </select>
+                <div id="role-help" className="sr-only">
+                  Select the role for the invited members
+                </div>
               </div>
 
               {error && (
@@ -278,14 +308,14 @@ export function InviteMemberModal({ isOpen, onClose }: InviteMemberModalProps) {
                       <button
                         onClick={() => handleResendInvite(invite.token, invite.invitedEmail)}
                         className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-md transition-colors"
-                        title="Resend invitation"
+                        aria-label={`Resend invitation to ${invite.invitedEmail}`}
                       >
                         <RotateCcw className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleRevokeInvite(invite.token, invite.invitedEmail)}
                         className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-md transition-colors"
-                        title="Revoke invitation"
+                        aria-label={`Revoke invitation for ${invite.invitedEmail}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

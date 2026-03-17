@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { WorkspaceMember, WorkspaceRole, MemberStatus } from '@/types/workspace.types';
 import { useAuthStore } from '@/store/auth.store';
 import { useWorkspaceStore } from '@/store/workspace.store';
@@ -10,9 +10,10 @@ interface MemberRowProps {
   isOwner: boolean;
   isAdmin: boolean;
   onRoleChange: (member: WorkspaceMember, newRole: WorkspaceRole) => void;
+  onRemove?: (member: WorkspaceMember) => () => void;
 }
 
-export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange }: MemberRowProps) => {
+export const MemberRow = memo<MemberRowProps>(({ member, workspaceId, isOwner, isAdmin, onRoleChange, onRemove }) => {
   const { user } = useAuthStore();
   const { deactivateMember, reactivateMember } = useWorkspaceStore();
   
@@ -28,7 +29,7 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
   // Cannot perform actions on owner or yourself
   const canPerformActions = isAdmin && member.role !== WorkspaceRole.OWNER && !isCurrentUser;
 
-  const handleDeactivate = async () => {
+  const handleDeactivate = useCallback(async () => {
     if (!canPerformActions) return;
     
     setIsLoading(true);
@@ -41,9 +42,9 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [canPerformActions, deactivateMember, workspaceId, memberUserId]);
 
-  const handleReactivate = async () => {
+  const handleReactivate = useCallback(async () => {
     if (!canPerformActions) return;
     
     setIsLoading(true);
@@ -56,7 +57,37 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [canPerformActions, reactivateMember, workspaceId, memberUserId]);
+
+  const handleRoleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    onRoleChange(member, e.target.value as WorkspaceRole);
+  }, [onRoleChange, member]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setShowActionsMenu(!showActionsMenu);
+    } else if (e.key === 'Escape') {
+      setShowActionsMenu(false);
+    }
+  }, [showActionsMenu]);
+
+  const handleRemoveClick = useCallback(() => {
+    setShowRemoveModal(true);
+    setShowActionsMenu(false);
+  }, []);
+
+  const handleCloseRemoveModal = useCallback(() => {
+    setShowRemoveModal(false);
+  }, []);
+
+  const toggleActionsMenu = useCallback(() => {
+    setShowActionsMenu(!showActionsMenu);
+  }, [showActionsMenu]);
+
+  const closeActionsMenu = useCallback(() => {
+    setShowActionsMenu(false);
+  }, []);
 
   const getStatusBadge = () => {
     if (!isActive) {
@@ -147,9 +178,10 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
           {canPerformActions && isActive ? (
             <select
               value={member.role}
-              onChange={(e) => onRoleChange(member, e.target.value as WorkspaceRole)}
+              onChange={handleRoleChange}
               className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white capitalize"
               disabled={isLoading}
+              aria-label={`Change role for ${memberUser ? `${memberUser.firstName} ${memberUser.lastName}` : 'member'}`}
             >
               <option value={WorkspaceRole.ADMIN}>Admin</option>
               <option value={WorkspaceRole.MEMBER}>Member</option>
@@ -165,7 +197,7 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
           {canPerformActions && (
             <div className="relative">
               <button
-                onClick={() => setShowActionsMenu(!showActionsMenu)}
+                onClick={toggleActionsMenu}
                 className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 disabled={isLoading}
               >
@@ -196,10 +228,7 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
                     )}
                     
                     <button
-                      onClick={() => {
-                        setShowRemoveModal(true);
-                        setShowActionsMenu(false);
-                      }}
+                      onClick={handleRemoveClick}
                       className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       disabled={isLoading}
                     >
@@ -219,7 +248,8 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
           member={member}
           workspaceId={workspaceId}
           isOpen={showRemoveModal}
-          onClose={() => setShowRemoveModal(false)}
+          onClose={handleCloseRemoveModal}
+          onRemove={onRemove}
         />
       )}
 
@@ -227,9 +257,11 @@ export const MemberRow = ({ member, workspaceId, isOwner, isAdmin, onRoleChange 
       {showActionsMenu && (
         <div
           className="fixed inset-0 z-0"
-          onClick={() => setShowActionsMenu(false)}
+          onClick={closeActionsMenu}
         />
       )}
     </>
   );
-};
+});
+
+MemberRow.displayName = 'MemberRow';

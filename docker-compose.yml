@@ -8,17 +8,14 @@ services:
     restart: unless-stopped
     ports:
       - '27017:27017'
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: social-media-scheduler
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
     networks:
       - sms-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
       interval: 10s
       timeout: 5s
       retries: 5
@@ -55,9 +52,9 @@ services:
     environment:
       NODE_ENV: development
       PORT: 5000
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/social-media-scheduler?authSource=admin
+      MONGODB_URI: mongodb://mongodb:27017/social-media-scheduler?replicaSet=rs0
       REDIS_HOST: redis
-      REDIS_PORT: 6380
+      REDIS_PORT: 6379
       JWT_SECRET: dev-jwt-secret-change-in-production-min-32-chars
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production-min-32-chars
       FRONTEND_URL: http://localhost:5173

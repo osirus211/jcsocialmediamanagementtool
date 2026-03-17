@@ -94,6 +94,14 @@ export const validateContentType = (req: Request, res: Response, next: NextFunct
     const contentType = req.headers['content-type'];
     
     if (!contentType) {
+      // If the body is empty, we can skip strict content-type validation
+      // Most body parsers will not have processed the body yet, but we can check raw headers or rely on express.json()
+      // For simplicity, we'll allow it if Content-Length is 0 or not present
+      const contentLength = req.headers['content-length'];
+      if (!contentLength || contentLength === '0') {
+        return next();
+      }
+
       res.status(400).json({
         error: 'Bad Request',
         message: 'Content-Type header is required',

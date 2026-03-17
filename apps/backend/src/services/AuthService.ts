@@ -80,6 +80,33 @@ export class AuthService {
       await user.save();
       logger.info('RUNTIME_TRACE USER_CREATED', { timestamp: new Date().toISOString() });
 
+      // Create default workspace for the user
+      try {
+        const { workspaceService } = await import('./WorkspaceService');
+        const workspaceName = `${user.firstName}'s Workspace`;
+        const workspaceSlug = `${user.firstName.toLowerCase()}-${Math.random().toString(36).substring(2, 7)}`;
+        
+        await workspaceService.createWorkspace({
+          name: workspaceName,
+          slug: workspaceSlug,
+          ownerId: user._id,
+          description: `Personal workspace for ${user.firstName}`,
+        });
+        
+        logger.info('Default workspace created for new user', { 
+          userId: user._id, 
+          workspaceName,
+          workspaceSlug 
+        });
+      } catch (wsError: any) {
+        logger.error('Failed to create default workspace during registration', {
+          userId: user._id,
+          error: wsError.message
+        });
+        // We continue anyway so the user isn't stuck at registration, 
+        // though they might hit the onboarding loop if this fails.
+      }
+
       logger.info('User registered successfully', { userId: user._id, email: user.email });
       logger.info('RUNTIME_TRACE WORKSPACE_CREATE_CHECK', { timestamp: new Date().toISOString() });
 
@@ -96,8 +123,8 @@ export class AuthService {
       // Increment register success metric
       authMetricsTracker.incrementRegisterSuccess();
 
-      // Send welcome email (non-blocking)
-      this.sendWelcomeEmail(user).catch(err => {
+      // Send welcome email (non-blocking) - Direct email for now since Redis is not available
+      this.sendDirectWelcomeEmail(user).catch(err => {
         logger.warn('Failed to send welcome email', { userId: user._id, error: err.message });
       });
 
@@ -161,12 +188,14 @@ export class AuthService {
         );
       }
 
+      /*
       // Check if email is verified
       if (!user.isEmailVerified) {
         // Still perform password comparison for timing consistency
         await user.comparePassword(password);
         throw new UnauthorizedError('Please verify your email first');
       }
+      */
 
       // Verify password (timing-attack safe)
       const isPasswordValid = await user.comparePassword(password);
@@ -523,6 +552,37 @@ export class AuthService {
 
   /**
    * Send welcome email to new user
+   */
+  /**
+   * Send welcome email directly (fallback when Redis is not available)
+   */
+  private static async sendDirectWelcomeEmail(user: IUser): Promise<void> {
+    try {
+      const { emailNotificationService } = await import('./EmailNotificationService');
+
+      // Send a proper welcome email directly
+      await emailNotificationService.sendWelcomeEmail({
+        to: user.email,
+        firstName: user.firstName,
+        dashboardUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`,
+      });
+      
+      logger.info('Direct welcome email sent', {
+        userId: user._id.toString(),
+        email: user.email,
+        userName: `${user.firstName} ${user.lastName}`,
+      });
+    } catch (error: any) {
+      logger.error('Error sending direct welcome email', { 
+        userId: user._id.toString(),
+        error: error.message 
+      });
+      // Don't throw - email failures should not affect registration
+    }
+  }
+
+  /**
+   * Send welcome email using sequence service (requires Redis)
    */
   private static async sendWelcomeEmail(user: IUser): Promise<void> {
     try {

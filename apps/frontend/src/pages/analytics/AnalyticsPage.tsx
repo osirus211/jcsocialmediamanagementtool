@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BestTimeHeatmap } from '@/components/analytics/BestTimeHeatmap';
 import { OptimalTimeSuggestions } from '@/components/analytics/OptimalTimeSuggestions';
 import { EngagementChart } from '@/components/analytics/EngagementChart';
@@ -11,6 +11,7 @@ import { TopPostsTable } from '@/components/analytics/TopPostsTable';
 import { ExportReportButton } from '@/components/analytics/ExportReportButton';
 import { ScheduledReportsPanel } from '@/components/analytics/ScheduledReportsPanel';
 import { Link } from 'react-router-dom';
+import { useWorkspaceStore } from '@/store/workspace.store';
 
 const PLATFORMS = [
   { id: 'all', name: 'All Platforms', icon: '📊' },
@@ -24,8 +25,45 @@ const PLATFORMS = [
 ];
 
 export function AnalyticsPage() {
+  const { currentWorkspaceId, workspacesLoaded, workspaces } = useWorkspaceStore();
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null);
+
+  // Diagnostic logging
+  useEffect(() => {
+    console.log('[AnalyticsPage] State:', { 
+      currentWorkspaceId, 
+      workspacesLoaded, 
+      workspacesCount: workspaces.length 
+    });
+  }, [currentWorkspaceId, workspacesLoaded, workspaces.length]);
+
+  if (!currentWorkspaceId) {
+    if (workspacesLoaded && workspaces.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8">
+          <div className="text-4xl mb-4">📂</div>
+          <h2 className="text-xl font-semibold mb-2">No Workspace Found</h2>
+          <p className="text-gray-600 mb-6">You need a workspace to view analytics.</p>
+          <Link
+            to="/workspaces/create"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Create Workspace
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="text-sm text-gray-500 italic">Initializing analytics context...</p>
+        </div>
+      </div>
+    );
+  }
 
   const platformForAPI = selectedPlatform === 'all' ? undefined : selectedPlatform;
 

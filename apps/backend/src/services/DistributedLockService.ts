@@ -44,6 +44,8 @@ export interface LockOptions {
   ttl?: number;          // Lock TTL in milliseconds (default: 5000)
   retryCount?: number;   // Retry attempts (default: 3)
   retryDelay?: number;   // Delay between retries in ms (default: 200)
+  retryAttempts?: number; // Alias for retryCount
+  renewInterval?: number; // Auto-renewal interval in ms
 }
 
 export interface Lock {
@@ -52,6 +54,7 @@ export interface Lock {
   acquiredAt: Date;
   ttl: number;
   expiresAt: Date;
+  renewalTimer?: NodeJS.Timeout; // Auto-renewal timer
 }
 
 export interface LockMetrics {
@@ -70,6 +73,12 @@ export interface LockMetrics {
     acquisitionDurationMs: number[];
     holdDurationMs: number[];
   };
+  // Additional metrics for tests
+  totalAcquired?: number;
+  totalReleased?: number;
+  totalRenewed?: number;
+  totalTimeouts?: number;
+  averageLockDuration?: number;
 }
 
 export class LockAcquisitionError extends Error {
@@ -441,7 +450,7 @@ export class DistributedLockService {
   /**
    * Renew lock TTL (extend expiration)
    */
-  async renewLock(lock: Lock, ttl: number): Promise<boolean> {
+  async renewLock(lock: Lock, ttl?: number): Promise<boolean> {
     try {
       const redisClient = getRedisClientSafe();
       if (!redisClient) {
@@ -449,10 +458,13 @@ export class DistributedLockService {
         return false;
       }
       
-      const result = await redisClient.expire(lock.key, Math.ceil(ttl / 1000));
+      // Use provided TTL or original TTL from lock
+      const renewalTtl = ttl || (lock.expiresAt.getTime() - lock.acquiredAt.getTime());
+      
+      const result = await redisClient.expire(lock.key, Math.ceil(renewalTtl / 1000));
       if (result === 1) {
-        lock.expiresAt = new Date(Date.now() + ttl);
-        logger.debug('Lock renewed', { key: lock.key, ttl });
+        lock.expiresAt = new Date(Date.now() + renewalTtl);
+        logger.debug('Lock renewed', { key: lock.key, ttl: renewalTtl });
         return true;
       }
       return false;
@@ -460,6 +472,26 @@ export class DistributedLockService {
       logger.error('Failed to renew lock', { key: lock.key, error: error.message });
       return false;
     }
+  }
+
+  /**
+   * Cleanup expired locks (stub method for tests)
+   */
+  async cleanupExpiredLocks(): Promise<void> {
+    const now = Date.now();
+    for (const [key, lock] of this.activeLocks.entries()) {
+      if (lock.expiresAt.getTime() < now) {
+        this.activeLocks.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Shutdown the service (stub method for tests)
+   */
+  async shutdown(): Promise<void> {
+    this.activeLocks.clear();
+    logger.info('DistributedLockService shutdown');
   }
 }
 

@@ -22,22 +22,26 @@ export const ApprovalsPage: React.FC = () => {
   const [loadingMyPosts, setLoadingMyPosts] = useState(true);
 
   const fetchStats = async () => {
+    console.log('[DEBUG ApprovalsPage] fetchStats() called');
     try {
       const count = await approvalsService.getApprovalCount();
+      console.log('[DEBUG ApprovalsPage] fetchStats() success', { pendingCount: count });
       setStats(prev => ({ ...prev, pending: count }));
     } catch (error) {
-      console.error('Failed to load approval stats');
+      console.error('[DEBUG ApprovalsPage] fetchStats() FAILED:', error);
     } finally {
       setLoadingStats(false);
     }
   };
 
   const fetchMyPosts = async () => {
+    console.log('[DEBUG ApprovalsPage] fetchMyPosts() called');
     try {
       const posts = await approvalsService.getMyPendingPosts();
+      console.log('[DEBUG ApprovalsPage] fetchMyPosts() success', { posts });
       setMyPosts(posts);
     } catch (error) {
-      console.error('Failed to load your posts');
+      console.error('[DEBUG ApprovalsPage] fetchMyPosts() FAILED:', error);
     } finally {
       setLoadingMyPosts(false);
     }

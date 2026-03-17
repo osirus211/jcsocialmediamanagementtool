@@ -1,5 +1,5 @@
 # Development Dockerfile for Backend
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Rebuild native modules for the container architecture
 RUN npm rebuild bcrypt --build-from-source

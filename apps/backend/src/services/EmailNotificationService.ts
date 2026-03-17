@@ -9,6 +9,7 @@ import { SystemEvent } from './EventService';
 import { EmailTemplateService } from './EmailTemplateService';
 import { logger } from '../utils/logger';
 import { config } from '../config';
+import nodemailer from 'nodemailer';
 
 // Email service interface (can be implemented with SendGrid, AWS SES, etc.)
 interface EmailProvider {
@@ -20,6 +21,62 @@ interface EmailProvider {
   }): Promise<void>;
 }
 
+// SMTP email provider using Nodemailer
+class SMTPEmailProvider implements EmailProvider {
+  private transporter: nodemailer.Transporter;
+
+  constructor() {
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      // Important for shared hosting SMTP compatibility
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    // Verify SMTP connection on startup
+    this.verifyConnection();
+  }
+
+  private async verifyConnection(): Promise<void> {
+    try {
+      await this.transporter.verify();
+      logger.info('✅ SMTP connection verified — email is ready', {
+        host: process.env.SMTP_HOST,
+        user: process.env.SMTP_USER,
+        port: process.env.SMTP_PORT,
+      });
+    } catch (error: any) {
+      logger.error('❌ SMTP connection failed:', {
+        error: error.message,
+        host: process.env.SMTP_HOST,
+        user: process.env.SMTP_USER,
+      });
+    }
+  }
+
+  async sendEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    await this.transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      text: params.text,
+    });
+  }
+}
+
 // Mock email provider for development
 class MockEmailProvider implements EmailProvider {
   async sendEmail(params: {
@@ -28,9 +85,10 @@ class MockEmailProvider implements EmailProvider {
     html: string;
     text: string;
   }): Promise<void> {
-    logger.info('Mock email sent:', {
+    logger.info('📧 Mock email sent:', {
       to: params.to,
       subject: params.subject,
+      preview: params.text.substring(0, 100) + '...',
     });
   }
 }
@@ -39,8 +97,34 @@ export class EmailNotificationService {
   private emailProvider: EmailProvider;
 
   constructor() {
-    // In production, initialize with real email provider (SendGrid, AWS SES, etc.)
-    this.emailProvider = new MockEmailProvider();
+    const provider = process.env.EMAIL_PROVIDER;
+    const isTest = process.env.NODE_ENV === 'test';
+    const hasCredentials = 
+      process.env.SMTP_HOST &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASS &&
+      process.env.SMTP_USER !== 'your-email@gmail.com' &&
+      process.env.SMTP_PASS !== 'your-app-password';
+
+    if (!isTest && provider === 'smtp' && hasCredentials) {
+      this.emailProvider = new SMTPEmailProvider();
+      logger.info('Email service initialized with SMTP provider', {
+        host: process.env.SMTP_HOST,
+        user: process.env.SMTP_USER,
+      });
+    } else {
+      this.emailProvider = new MockEmailProvider();
+      if (!isTest) {
+        logger.warn('⚠️  No valid SMTP credentials — using MockEmailProvider', {
+          provider,
+          hasCredentials,
+          smtpHost: process.env.SMTP_HOST,
+          smtpUser: process.env.SMTP_USER,
+        });
+      } else {
+        logger.info('Email service initialized with Mock provider (test environment)');
+      }
+    }
   }
 
   /**
@@ -352,6 +436,45 @@ export class EmailNotificationService {
       });
     } catch (error: any) {
       logger.error('Failed to send post failure email:', error);
+      throw error;
+    }
+  }
+
+  async sendWelcomeEmail(params: {
+    to: string;
+    firstName: string;
+    dashboardUrl: string;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: 'Welcome to Social Media Scheduler!',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #3b82f6;">Welcome to Social Media Scheduler!</h2>
+            <p>Hi ${params.firstName},</p>
+            <p>Welcome to Social Media Scheduler! We're excited to have you on board.</p>
+            <p>You can now start scheduling your social media posts and managing your content across multiple platforms.</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${params.dashboardUrl}" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Get Started</a>
+            </p>
+            <p>Here's what you can do with Social Media Scheduler:</p>
+            <ul>
+              <li>Schedule posts across multiple social media platforms</li>
+              <li>Manage your content calendar</li>
+              <li>Track your social media performance</li>
+              <li>Collaborate with your team</li>
+            </ul>
+            <p>If you have any questions, feel free to reach out to our support team.</p>
+            <p>Best regards,<br>The Social Media Scheduler Team</p>
+          </div>
+        `,
+        text: `Hi ${params.firstName}, Welcome to Social Media Scheduler! We're excited to have you on board. You can now start scheduling your social media posts and managing your content across multiple platforms. Visit your dashboard: ${params.dashboardUrl}`,
+      });
+
+      logger.info('Welcome email sent', { to: params.to });
+    } catch (error: any) {
+      logger.error('Failed to send welcome email', { error: error.message, to: params.to });
       throw error;
     }
   }

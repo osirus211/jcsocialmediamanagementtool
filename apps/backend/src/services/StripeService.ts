@@ -18,11 +18,22 @@ import {
   recordPaymentFailed,
 } from '../config/billingMetrics';
 
-const stripe = new Stripe(config.stripe.secretKey || '', {
+// Only initialize Stripe if we have a real secret key
+const isStripeConfigured = config.stripe.secretKey && 
+  config.stripe.secretKey !== 'your-stripe-secret-key' && 
+  config.stripe.secretKey.startsWith('sk_');
+
+const stripe = isStripeConfigured ? new Stripe(config.stripe.secretKey!, {
   apiVersion: '2024-11-20.acacia' as any,
-});
+}) : null;
 
 export class StripeService {
+  private ensureStripeConfigured(): void {
+    if (!stripe) {
+      throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.');
+    }
+  }
+
   /**
    * Create Stripe customer
    */
@@ -31,10 +42,11 @@ export class StripeService {
     email: string;
     name: string;
   }): Promise<Stripe.Customer> {
+    this.ensureStripeConfigured();
     const { workspaceId, email, name } = params;
 
     try {
-      const customer = await stripe.customers.create({
+      const customer = await stripe!.customers.create({
         email,
         name,
         metadata: {
@@ -62,6 +74,7 @@ export class StripeService {
     name: string;
     trialDays?: number;
   }): Promise<ISubscription> {
+    this.ensureStripeConfigured();
     const { workspaceId, planId, billingCycle, paymentMethodId, email, name, trialDays } = params;
 
     const session = await mongoose.startSession();
@@ -86,12 +99,12 @@ export class StripeService {
       }
 
       // Attach payment method to customer
-      await stripe.paymentMethods.attach(paymentMethodId, {
+      await stripe!.paymentMethods.attach(paymentMethodId, {
         customer: stripeCustomerId,
       });
 
       // Set as default payment method
-      await stripe.customers.update(stripeCustomerId, {
+      await stripe!.customers.update(stripeCustomerId, {
         invoice_settings: {
           default_payment_method: paymentMethodId,
         },
@@ -108,7 +121,7 @@ export class StripeService {
       }
 
       // Create Stripe subscription
-      const stripeSubscription = await stripe.subscriptions.create({
+      const stripeSubscription = await stripe!.subscriptions.create({
         customer: stripeCustomerId,
         items: [{ price: stripePriceId }],
         trial_period_days: trialDays,
@@ -201,6 +214,7 @@ export class StripeService {
     workspaceId: mongoose.Types.ObjectId;
     immediately?: boolean;
   }): Promise<void> {
+    this.ensureStripeConfigured();
     const { workspaceId, immediately = false } = params;
 
     try {
@@ -211,12 +225,12 @@ export class StripeService {
 
       if (immediately) {
         // Cancel immediately
-        await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+        await stripe!.subscriptions.cancel(subscription.stripeSubscriptionId);
         subscription.status = SubscriptionStatus.CANCELED;
         subscription.canceledAt = new Date();
       } else {
         // Cancel at period end
-        await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        await stripe!.subscriptions.update(subscription.stripeSubscriptionId, {
           cancel_at_period_end: true,
         });
         subscription.cancelAtPeriodEnd = true;
@@ -236,6 +250,7 @@ export class StripeService {
    * Reactivate canceled subscription
    */
   async reactivateSubscription(workspaceId: mongoose.Types.ObjectId): Promise<void> {
+    this.ensureStripeConfigured();
     try {
       const subscription = await SubscriptionModel.findOne({ workspaceId });
       if (!subscription) {
@@ -247,7 +262,7 @@ export class StripeService {
       }
 
       // Reactivate in Stripe
-      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+      await stripe!.subscriptions.update(subscription.stripeSubscriptionId, {
         cancel_at_period_end: false,
       });
 
@@ -269,6 +284,7 @@ export class StripeService {
     newPlanId: mongoose.Types.ObjectId;
     billingCycle: BillingCycle;
   }): Promise<void> {
+    this.ensureStripeConfigured();
     const { workspaceId, newPlanId, billingCycle } = params;
 
     try {
@@ -292,11 +308,11 @@ export class StripeService {
       }
 
       // Update Stripe subscription
-      const stripeSubscription = await stripe.subscriptions.retrieve(
+      const stripeSubscription = await stripe!.subscriptions.retrieve(
         subscription.stripeSubscriptionId
       );
 
-      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+      await stripe!.subscriptions.update(subscription.stripeSubscriptionId, {
         items: [
           {
             id: stripeSubscription.items.data[0].id,
@@ -327,6 +343,7 @@ export class StripeService {
    * Handle Stripe webhook events
    */
   async handleWebhook(event: Stripe.Event): Promise<void> {
+    this.ensureStripeConfigured();
     logger.info(`Processing Stripe webhook: ${event.type}`);
 
     try {
@@ -474,8 +491,9 @@ export class StripeService {
    * Construct webhook event from request
    */
   constructWebhookEvent(payload: string | Buffer, signature: string): Stripe.Event {
+    this.ensureStripeConfigured();
     const webhookSecret = config.stripe.webhookSecret || '';
-    return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+    return stripe!.webhooks.constructEvent(payload, signature, webhookSecret);
   }
 }
 

@@ -19,6 +19,7 @@ const CIRCUIT_BREAKER_HALF_OPEN_REQUESTS = 5; // Test with 5 requests
 
 export const connectRedis = async (): Promise<Redis> => {
   try {
+    console.log(`🔌 Connecting to Redis at ${config.redis.host}:${config.redis.port} (type: ${typeof config.redis.port})`);
     redisClient = new Redis({
       host: config.redis.host,
       port: config.redis.port,

@@ -1,1 +1,4 @@
-{"email": "apitest@example.com", "password": "Password123"}
+{
+  "email": "test@example.com",
+  "password": "TestPassword123!"
+}

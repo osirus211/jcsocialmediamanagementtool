@@ -54,6 +54,7 @@ router.post(
 // Refresh access token
 router.post(
   '/refresh',
+  authRateLimiter,
   validateRequest(refreshTokenSchema),
   AuthController.refreshToken
 );

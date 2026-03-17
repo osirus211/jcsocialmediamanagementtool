@@ -16,6 +16,7 @@ const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPassword').then(m
 const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmail').then(module => ({ default: module.VerifyEmailPage })));
 const MagicLinkRequestPage = lazy(() => import('@/pages/auth/MagicLinkRequest').then(module => ({ default: module.MagicLinkRequestPage })));
 const MagicLinkVerifyPage = lazy(() => import('@/pages/auth/MagicLinkVerify').then(module => ({ default: module.MagicLinkVerifyPage })));
+const TestAuthPage = lazy(() => import('@/pages/auth/TestAuth').then(module => ({ default: module.default })));
 const AcceptInvitePage = lazy(() => import('@/pages/AcceptInvite').then(module => ({ default: module.AcceptInvite })));
 
 // Dashboard
@@ -311,6 +312,10 @@ const router = createBrowserRouter([
       {
         path: 'magic-link/verify',
         element: <SuspenseWrapper><MagicLinkVerifyPage /></SuspenseWrapper>,
+      },
+      {
+        path: 'test',
+        element: <SuspenseWrapper><TestAuthPage /></SuspenseWrapper>,
       },
     ],
   },

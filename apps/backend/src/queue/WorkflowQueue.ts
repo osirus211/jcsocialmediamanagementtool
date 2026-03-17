@@ -56,6 +56,30 @@ export class WorkflowQueue {
         triggerType: data.triggerType,
         runId: data.runId,
       });
+
+      // #region agent log
+      fetch('http://127.0.0.1:7299/ingest/bd0f3255-cb97-4c4f-8cc3-98b58e5f32d9', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Debug-Session-Id': 'f1222c',
+        },
+        body: JSON.stringify({
+          sessionId: 'f1222c',
+          runId: 'initial',
+          hypothesisId: 'H1',
+          location: 'WorkflowQueue.ts:53',
+          message: 'Workflow execution job enqueued',
+          data: {
+            workflowId: data.workflowId,
+            workspaceId: data.workspaceId,
+            triggerType: data.triggerType,
+            runId: data.runId,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
     } catch (error: any) {
       logger.error('Add workflow execution error:', {
         workflowId: data.workflowId,

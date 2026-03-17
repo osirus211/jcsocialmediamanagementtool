@@ -19,8 +19,10 @@ export interface PlatformToken {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date | null;
+  expiresIn?: number; // Duration in seconds
   tokenType: TokenType;
   platform: SocialPlatform;
+  scope?: string[]; // OAuth scopes granted
 }
 
 /**

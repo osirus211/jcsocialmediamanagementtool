@@ -8,15 +8,28 @@ export class DashboardLayoutService {
    */
   static async getLayout(userId: string, workspaceId: string): Promise<IDashboardLayout | null> {
     try {
-      let layout = await DashboardLayout.findOne({
-        userId: new mongoose.Types.ObjectId(userId),
-        workspaceId: new mongoose.Types.ObjectId(workspaceId),
-      });
-
-      // If no layout exists, create default layout
-      if (!layout) {
-        layout = await this.createDefaultLayout(userId, workspaceId);
-      }
+      const defaultWidgets = this.getDefaultWidgets();
+      
+      // Use findOneAndUpdate with upsert to atomically get or create the layout
+      // This prevents race conditions where multiple requests try to create the same layout
+      const layout = await DashboardLayout.findOneAndUpdate(
+        {
+          userId: new mongoose.Types.ObjectId(userId),
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        },
+        {
+          $setOnInsert: {
+            userId: new mongoose.Types.ObjectId(userId),
+            workspaceId: new mongoose.Types.ObjectId(workspaceId),
+            widgets: defaultWidgets,
+          }
+        },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+        }
+      );
 
       return layout;
     } catch (error: any) {
@@ -24,8 +37,9 @@ export class DashboardLayoutService {
         userId,
         workspaceId,
         error: error.message,
+        stack: error.stack,
       });
-      throw new Error(`Failed to get dashboard layout: ${error.message}`);
+      throw error; // Let the caller handle it or rethrow as a clearer error
     }
   }
 
@@ -108,22 +122,10 @@ export class DashboardLayoutService {
 
   /**
    * Create default layout for new user
+   * Deprecated: getLayout now handles this atomically via upsert
    */
   private static async createDefaultLayout(userId: string, workspaceId: string): Promise<any> {
-    const defaultWidgets = this.getDefaultWidgets();
-
-    const layout = await DashboardLayout.create({
-      userId: new mongoose.Types.ObjectId(userId),
-      workspaceId: new mongoose.Types.ObjectId(workspaceId),
-      widgets: defaultWidgets,
-    });
-
-    logger.info('Default dashboard layout created', {
-      userId,
-      workspaceId,
-    });
-
-    return layout;
+    return this.getLayout(userId, workspaceId);
   }
 
   /**

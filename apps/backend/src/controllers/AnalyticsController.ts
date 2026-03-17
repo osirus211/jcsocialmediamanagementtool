@@ -173,8 +173,8 @@ export class AnalyticsController {
         { $match: matchStage },
         {
           $addFields: {
-            dayOfWeek: { $dayOfWeek: '$recordedAt' }, // 1=Sunday, 7=Saturday
-            hour: { $hour: '$recordedAt' }
+            dayOfWeek: { $dayOfWeek: '$collectedAt' }, // 1=Sunday, 7=Saturday
+            hour: { $hour: '$collectedAt' }
           }
         },
         {

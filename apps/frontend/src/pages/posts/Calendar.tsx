@@ -5,12 +5,13 @@ import { useCalendarData } from '@/hooks/useCalendarData';
 import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { WeekView } from '@/components/calendar/WeekView';
+import { ListView } from '@/components/calendar/ListView';
 import { DragDropProvider } from '@/components/calendar/DragDropProvider';
 import { Post } from '@/types/post.types';
 import { AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { logger } from '@/lib/logger';
 
-type ViewMode = 'month' | 'week';
+type ViewMode = 'month' | 'week' | 'list';
 
 /**
  * CalendarPage Component
@@ -39,6 +40,7 @@ export const CalendarPage = () => {
   const { currentWorkspace, currentWorkspaceId, fetchMembers } = useWorkspaceStore();
   
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(() => {
     // Get start of current week (Sunday)
@@ -78,7 +80,7 @@ export const CalendarPage = () => {
         from: from.toISOString().split('T')[0],
         to: to.toISOString().split('T')[0],
       };
-    } else {
+    } else if (viewMode === 'week') {
       // Week view: 7 days starting from currentWeek
       const from = new Date(currentWeek);
       const to = new Date(currentWeek);
@@ -88,8 +90,52 @@ export const CalendarPage = () => {
         from: from.toISOString().split('T')[0],
         to: to.toISOString().split('T')[0],
       };
+    } else {
+      // List view: Show wider range (3 months)
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const to = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+      
+      return {
+        from: from.toISOString().split('T')[0],
+        to: to.toISOString().split('T')[0],
+      };
     }
   }, [viewMode, currentMonth, currentWeek]);
+
+  /**
+   * Filter posts by search query
+   */
+  const filteredPosts = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return posts;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    return posts.filter(post => {
+      // Search in content
+      if (post.content.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Search in hashtags
+      if (post.metadata?.hashtags?.some(tag => tag.toLowerCase().includes(query))) {
+        return true;
+      }
+      
+      // Search in mentions
+      if (post.metadata?.mentions?.some(mention => mention.toLowerCase().includes(query))) {
+        return true;
+      }
+      
+      // Search in platform
+      if (typeof post.socialAccountId === 'string' && post.socialAccountId.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      return false;
+    });
+  }, [posts, searchQuery]);
 
   /**
    * Fetch posts when date range changes
@@ -155,6 +201,72 @@ export const CalendarPage = () => {
   }, []);
 
   /**
+   * Keyboard navigation
+   */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle keyboard shortcuts when not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (viewMode === 'month') {
+            previousMonth();
+          } else if (viewMode === 'week') {
+            previousWeek();
+          }
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (viewMode === 'month') {
+            nextMonth();
+          } else if (viewMode === 'week') {
+            nextWeek();
+          }
+          break;
+        case 't':
+        case 'T':
+          e.preventDefault();
+          goToToday();
+          break;
+        case '1':
+          e.preventDefault();
+          setViewMode('month');
+          break;
+        case '2':
+          e.preventDefault();
+          setViewMode('week');
+          break;
+        case '3':
+          e.preventDefault();
+          setViewMode('list');
+          break;
+        case '/':
+          e.preventDefault();
+          // Focus search input
+          const searchInput = document.querySelector('input[placeholder="Search posts..."]') as HTMLInputElement;
+          if (searchInput) {
+            searchInput.focus();
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          // Clear search if active
+          if (searchQuery) {
+            setSearchQuery('');
+          }
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, searchQuery, previousMonth, nextMonth, previousWeek, nextWeek, goToToday]);
+
+  /**
    * Post click handler - navigate to composer with post ID
    */
   const handlePostClick = useCallback((post: Post) => {
@@ -178,7 +290,7 @@ export const CalendarPage = () => {
   /**
    * Empty state check
    */
-  const isEmpty = !isLoading && posts.length === 0;
+  const isEmpty = !isLoading && filteredPosts.length === 0;
 
   if (!currentWorkspace) {
     return (
@@ -225,51 +337,67 @@ export const CalendarPage = () => {
           onViewModeChange={setViewMode}
           selectedMemberIds={selectedMemberIds}
           onFilterByMembers={filterByMembers}
-          postCount={posts.length}
+          postCount={filteredPosts.length}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
 
         <div className="flex-1 p-6">
-          {/* Navigation */}
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <button
-              onClick={viewMode === 'month' ? previousMonth : previousWeek}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              ← Previous
-            </button>
-            
-            <button
-              onClick={goToToday}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Today
-            </button>
-            
-            <h2 className="text-xl font-semibold min-w-[200px] text-center">
-              {viewMode === 'month'
-                ? currentMonth.toLocaleDateString('en-US', {
-                    month: 'long',
-                    year: 'numeric',
-                  })
-                : `${currentWeek.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })} - ${new Date(
-                    currentWeek.getTime() + 6 * 24 * 60 * 60 * 1000
-                  ).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}`}
-            </h2>
-            
-            <button
-              onClick={viewMode === 'month' ? nextMonth : nextWeek}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Next →
-            </button>
+          {/* Keyboard shortcuts help */}
+          <div className="fixed bottom-4 right-4 z-40">
+            <div className="bg-gray-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg opacity-75 hover:opacity-100 transition-opacity">
+              <div className="space-y-1">
+                <div><kbd className="bg-gray-700 px-1 rounded">←/→</kbd> Navigate</div>
+                <div><kbd className="bg-gray-700 px-1 rounded">T</kbd> Today</div>
+                <div><kbd className="bg-gray-700 px-1 rounded">1/2/3</kbd> Views</div>
+                <div><kbd className="bg-gray-700 px-1 rounded">/</kbd> Search</div>
+              </div>
+            </div>
           </div>
+
+          {/* Navigation - only show for Month and Week views */}
+          {viewMode !== 'list' && (
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <button
+                onClick={viewMode === 'month' ? previousMonth : previousWeek}
+                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                ← Previous
+              </button>
+              
+              <button
+                onClick={goToToday}
+                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Today
+              </button>
+              
+              <h2 className="text-xl font-semibold min-w-[200px] text-center">
+                {viewMode === 'month'
+                  ? currentMonth.toLocaleDateString('en-US', {
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : `${currentWeek.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })} - ${new Date(
+                      currentWeek.getTime() + 6 * 24 * 60 * 60 * 1000
+                    ).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}`}
+              </h2>
+              
+              <button
+                onClick={viewMode === 'month' ? nextMonth : nextWeek}
+                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          )}
 
           {/* Loading state */}
           {isLoading && (
@@ -284,17 +412,29 @@ export const CalendarPage = () => {
             <div className="text-center py-12">
               <CalendarIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                No scheduled posts
+                {searchQuery ? 'No posts found' : 'No scheduled posts'}
               </h3>
               <p className="text-gray-600 mb-4">
-                Create your first post to see it on the calendar
+                {searchQuery 
+                  ? `No posts match "${searchQuery}". Try a different search term.`
+                  : 'Create your first post to see it on the calendar'
+                }
               </p>
-              <button
-                onClick={() => navigate('/posts/create')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Create Post
-              </button>
+              {searchQuery ? (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Clear Search
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate('/posts/create')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Create Post
+                </button>
+              )}
             </div>
           )}
 
@@ -304,14 +444,20 @@ export const CalendarPage = () => {
               {viewMode === 'month' ? (
                 <MonthGrid
                   currentMonth={currentMonth}
-                  posts={posts}
+                  posts={filteredPosts}
+                  onPostClick={handlePostClick}
+                  onReschedule={handleReschedule}
+                />
+              ) : viewMode === 'week' ? (
+                <WeekView
+                  currentWeek={currentWeek}
+                  posts={filteredPosts}
                   onPostClick={handlePostClick}
                   onReschedule={handleReschedule}
                 />
               ) : (
-                <WeekView
-                  currentWeek={currentWeek}
-                  posts={posts}
+                <ListView
+                  posts={filteredPosts}
                   onPostClick={handlePostClick}
                   onReschedule={handleReschedule}
                 />

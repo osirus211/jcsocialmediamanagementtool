@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useOnboardingStore } from '@/store/onboarding.store';
-import { ChevronRight, ChevronLeft, Plus, X, Mail, Users } from 'lucide-react';
+import { useWorkspaceStore } from '@/store/workspace.store';
+import { ChevronRight, ChevronLeft, Plus, X, Mail, Users, AlertCircle } from 'lucide-react';
 
 interface InviteTeamStepProps {
   onNext: () => void;
@@ -9,7 +10,7 @@ interface InviteTeamStepProps {
 
 interface TeamMember {
   email: string;
-  role: 'admin' | 'member';
+  role: 'admin' | 'member' | 'viewer';
 }
 
 /**
@@ -19,10 +20,13 @@ interface TeamMember {
  */
 export function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) {
   const { currentStepData, updateStepData } = useOnboardingStore();
+  const { currentWorkspaceId, sendEmailInvitation } = useWorkspaceStore();
+  
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState<'admin' | 'member'>('member');
+  const [newRole, setNewRole] = useState<'admin' | 'member' | 'viewer'>('member');
   const [isInviting, setIsInviting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const addTeamMember = () => {
     if (newEmail && isValidEmail(newEmail)) {
@@ -44,19 +48,28 @@ export function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) {
   };
 
   const handleInviteTeam = async () => {
-    if (teamMembers.length === 0) return;
+    if (teamMembers.length === 0 || !currentWorkspaceId) return;
     
     setIsInviting(true);
+    setError(null);
     try {
-      // TODO: Implement actual team invitation API call
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Mock delay
+      // Send all invitations in parallel
+      await Promise.all(
+        teamMembers.map(member => 
+          sendEmailInvitation(currentWorkspaceId, {
+            email: member.email,
+            role: member.role as any
+          })
+        )
+      );
       
       updateStepData({ 
         teamMembersInvited: teamMembers.map(m => m.email) 
       });
       onNext();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to invite team members:', error);
+      setError(error.response?.data?.error || 'Failed to send one or more invitations. Please check the email addresses and try again.');
     } finally {
       setIsInviting(false);
     }
@@ -86,6 +99,14 @@ export function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) {
       </div>
 
       <div className="space-y-6">
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
         {/* Add Team Member Form */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-center mb-4">
@@ -108,11 +129,12 @@ export function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) {
               
               <select
                 value={newRole}
-                onChange={(e) => setNewRole(e.target.value as 'admin' | 'member')}
+                onChange={(e) => setNewRole(e.target.value as 'admin' | 'member' | 'viewer')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
+                <option value="viewer">Viewer</option>
               </select>
               
               <button

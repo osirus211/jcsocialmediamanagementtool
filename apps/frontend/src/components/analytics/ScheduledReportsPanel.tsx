@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Send, Trash2, Edit, Calendar, Mail, FileText, ToggleLeft, ToggleRight } from 'lucide-react';
 import { reportsService, ScheduledReport, CreateReportData } from '@/services/reports.service';
+import { useWorkspaceStore } from '@/store/workspace.store';
 
 export function ScheduledReportsPanel() {
+  const { currentWorkspaceId } = useWorkspaceStore();
   const [reports, setReports] = useState<ScheduledReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,8 +27,10 @@ export function ScheduledReportsPanel() {
   const [recipientInput, setRecipientInput] = useState('');
 
   useEffect(() => {
-    loadReports();
-  }, []);
+    if (currentWorkspaceId) {
+      loadReports();
+    }
+  }, [currentWorkspaceId]);
 
   const loadReports = async () => {
     try {

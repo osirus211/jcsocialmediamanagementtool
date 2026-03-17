@@ -107,10 +107,10 @@ export class PostingTimePredictionService {
           $match: {
             workspaceId: new mongoose.Types.ObjectId(workspaceId),
             platform,
-            recordedAt: { $gte: ninetyDaysAgo },
+            collectedAt: { $gte: ninetyDaysAgo },
           },
         },
-        { $sort: { postId: 1, recordedAt: -1 } },
+        { $sort: { postId: 1, collectedAt: -1 } },
         {
           $group: {
             _id: '$postId',
@@ -139,7 +139,7 @@ export class PostingTimePredictionService {
 
     // Group by hour and day of week
     historicalData.forEach((post) => {
-      const date = new Date(post.recordedAt);
+      const date = new Date(post.collectedAt);
       const hour = date.getHours();
       const dayOfWeek = date.getDay();
       const key = `${dayOfWeek}-${hour}`;

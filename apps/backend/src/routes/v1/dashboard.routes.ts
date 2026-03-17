@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { DashboardController } from '../../controllers/DashboardController';
 import { DashboardLayoutService } from '../../services/DashboardLayoutService';
 import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
 import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 
@@ -30,9 +31,10 @@ const saveLayoutSchema = z.object({
 });
 
 /**
- * All dashboard routes require authentication
+ * All dashboard routes require authentication and workspace context
  */
 router.use(requireAuth);
+router.use(requireWorkspace);
 
 /**
  * Get workspace overview dashboard
@@ -100,9 +102,19 @@ router.get('/activity', DashboardController.getActivity);
  * Get dashboard layout
  * GET /api/v1/dashboard/layout
  */
-router.get('/layout', requireAuth, async (req, res): Promise<void> => {
+router.get('/layout', async (req, res): Promise<void> => {
   try {
     const userId = req.user!.userId;
+    
+    // Safety check even with requireWorkspace middleware
+    if (!req.workspace) {
+      res.status(400).json({
+        success: false,
+        error: 'Workspace context is required',
+      });
+      return;
+    }
+
     const workspaceId = req.workspace.workspaceId.toString();
 
     const layout = await DashboardLayoutService.getLayout(userId, workspaceId);
@@ -128,7 +140,7 @@ router.get('/layout', requireAuth, async (req, res): Promise<void> => {
  * Save dashboard layout
  * POST /api/v1/dashboard/layout
  */
-router.post('/layout', requireAuth, validateRequest(saveLayoutSchema), async (req, res): Promise<void> => {
+router.post('/layout', validateRequest(saveLayoutSchema), async (req, res): Promise<void> => {
   try {
     const userId = req.user!.userId;
     const workspaceId = req.workspace.workspaceId.toString();
@@ -157,7 +169,7 @@ router.post('/layout', requireAuth, validateRequest(saveLayoutSchema), async (re
  * Reset dashboard layout
  * POST /api/v1/dashboard/layout/reset
  */
-router.post('/layout/reset', requireAuth, async (req, res): Promise<void> => {
+router.post('/layout/reset', async (req, res): Promise<void> => {
   try {
     const userId = req.user!.userId;
     const workspaceId = req.workspace.workspaceId.toString();

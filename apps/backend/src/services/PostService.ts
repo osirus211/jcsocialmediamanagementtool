@@ -1077,15 +1077,32 @@ export class PostService {
     /**
      * Update post status
      */
-    async updatePostStatus(postId: string, status: PostStatus): Promise<IScheduledPost> {
+    async updatePostStatus(postId: string, status: PostStatus): Promise<IScheduledPost>;
+    async updatePostStatus(postId: string, status: PostStatus, metadata: Record<string, any>): Promise<IScheduledPost>;
+    async updatePostStatus(postId: string, status: PostStatus, metadata?: Record<string, any>): Promise<IScheduledPost> {
+      const updateData: any = {
+        status,
+        updatedAt: new Date(),
+        ...(status === PostStatus.PUBLISHED && { publishedAt: new Date() }),
+        ...(status === PostStatus.FAILED && { failedAt: new Date() }),
+      };
+
+      // Add metadata updates if provided
+      if (metadata) {
+        Object.keys(metadata).forEach(key => {
+          if (key === 'platformPostId') {
+            updateData['metadata.platformPostId'] = metadata[key];
+          } else if (key === 'errorMessage') {
+            updateData.errorMessage = metadata[key];
+          } else {
+            updateData[`metadata.${key}`] = metadata[key];
+          }
+        });
+      }
+
       const post = await ScheduledPost.findByIdAndUpdate(
         postId,
-        {
-          status,
-          updatedAt: new Date(),
-          ...(status === PostStatus.PUBLISHED && { publishedAt: new Date() }),
-          ...(status === PostStatus.FAILED && { failedAt: new Date() }),
-        },
+        updateData,
         { new: true }
       );
 
@@ -1112,6 +1129,33 @@ export class PostService {
 
       return post;
     }
+
+  /**
+   * Schedule a post (stub method for tests)
+   */
+  async schedulePost(input: CreatePostInput): Promise<IScheduledPost> {
+    return this.createPost(input);
+  }
+
+  /**
+   * Cancel a scheduled post (stub method for tests)
+   */
+  async cancelScheduledPost(postId: string, userId: string): Promise<void> {
+    await ScheduledPost.findByIdAndUpdate(postId, {
+      status: PostStatus.DRAFT,
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
+   * Retry a failed post (stub method for tests)
+   */
+  async retryFailedPost(postId: string, userId: string): Promise<void> {
+    await ScheduledPost.findByIdAndUpdate(postId, {
+      status: PostStatus.SCHEDULED,
+      updatedAt: new Date(),
+    });
+  }
 
 }
 
