@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import { AnalyticsController } from '../../controllers/AnalyticsController';
+import { AnalyticsService } from '../../services/AnalyticsService';
 import { FollowerAnalyticsService } from '../../services/FollowerAnalyticsService';
 import { HashtagAnalyticsService } from '../../services/HashtagAnalyticsService';
 import { PostROIService } from '../../services/PostROIService';
@@ -322,6 +323,246 @@ router.get('/posts/top', requirePermission(Permission.VIEW_ANALYTICS), async (re
     const posts = await PostROIService.getTopPerformingPosts(workspaceId, startDate, endDate, sortBy, limit);
     
     res.json({ success: true, data: posts });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/summary
+ * @desc    Get summary KPI metrics with previous period comparison
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms[]
+ */
+router.get('/summary', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+      platforms: z.array(z.string()).optional(),
+    });
+
+    const { startDate, endDate, platforms } = schema.parse(req.query);
+    const workspaceId = req.workspace.workspaceId.toString();
+
+    // Validate date range
+    if (endDate < startDate) {
+      res.status(422).json({ success: false, error: 'End date must be after start date' });
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      res.status(422).json({ success: false, error: 'Date range cannot exceed 365 days' });
+      return;
+    }
+
+    // Calculate previous period dates
+    const previousStartDate = new Date(startDate.getTime() - (endDate.getTime() - startDate.getTime()));
+    const previousEndDate = new Date(startDate);
+
+    const summary = await AnalyticsService.getSummaryMetrics(
+      workspaceId, 
+      startDate, 
+      endDate, 
+      previousStartDate, 
+      previousEndDate, 
+      platforms
+    );
+    
+    res.json({ success: true, data: summary });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/follower-growth
+ * @desc    Get follower growth data by date and platform
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms[]
+ */
+router.get('/follower-growth', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+      platforms: z.array(z.string()).optional(),
+    });
+
+    const { startDate, endDate, platforms } = schema.parse(req.query);
+    const workspaceId = req.workspace.workspaceId.toString();
+
+    // Validate date range
+    if (endDate < startDate) {
+      res.status(422).json({ success: false, error: 'End date must be after start date' });
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      res.status(422).json({ success: false, error: 'Date range cannot exceed 365 days' });
+      return;
+    }
+
+    const data = await AnalyticsService.getFollowerGrowthData(workspaceId, startDate, endDate, platforms);
+    
+    res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/engagement
+ * @desc    Get engagement data grouped by day or platform
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms[], groupBy (day|platform)
+ */
+router.get('/engagement', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+      platforms: z.array(z.string()).optional(),
+      groupBy: z.enum(['day', 'platform']).default('day'),
+    });
+
+    const { startDate, endDate, platforms, groupBy } = schema.parse(req.query);
+    const workspaceId = req.workspace.workspaceId.toString();
+
+    // Validate date range
+    if (endDate < startDate) {
+      res.status(422).json({ success: false, error: 'End date must be after start date' });
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      res.status(422).json({ success: false, error: 'Date range cannot exceed 365 days' });
+      return;
+    }
+
+    const data = await AnalyticsService.getEngagementData(workspaceId, startDate, endDate, platforms, groupBy);
+    
+    res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/top-posts
+ * @desc    Get top performing posts with sorting
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms[], sortBy, sortDir, limit
+ */
+router.get('/top-posts', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+      platforms: z.array(z.string()).optional(),
+      sortBy: z.enum(['engagementRate', 'reach', 'likes', 'comments', 'shares']).default('engagementRate'),
+      sortDir: z.enum(['asc', 'desc']).default('desc'),
+      limit: z.string().optional().transform(val => val ? parseInt(val, 10) : 10),
+    });
+
+    const { startDate, endDate, platforms, sortBy, sortDir, limit } = schema.parse(req.query);
+    const workspaceId = req.workspace.workspaceId.toString();
+
+    // Validate date range
+    if (endDate < startDate) {
+      res.status(422).json({ success: false, error: 'End date must be after start date' });
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      res.status(422).json({ success: false, error: 'Date range cannot exceed 365 days' });
+      return;
+    }
+
+    const data = await AnalyticsService.getTopPostsData(workspaceId, startDate, endDate, platforms, sortBy, sortDir, limit);
+    
+    res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/platform-comparison
+ * @desc    Get platform comparison metrics
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate
+ */
+router.get('/platform-comparison', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+    });
+
+    const { startDate, endDate } = schema.parse(req.query);
+    const workspaceId = req.workspace.workspaceId.toString();
+
+    // Validate date range
+    if (endDate < startDate) {
+      res.status(422).json({ success: false, error: 'End date must be after start date' });
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      res.status(422).json({ success: false, error: 'Date range cannot exceed 365 days' });
+      return;
+    }
+
+    const data = await AnalyticsService.getPlatformComparisonData(workspaceId, startDate, endDate);
+    
+    res.json({ success: true, data });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/v1/analytics/export/pdf
+ * @desc    Export analytics report as PDF
+ * @access  Private (requires auth + workspace + VIEW_ANALYTICS permission)
+ * @query   startDate, endDate, platforms[]
+ */
+router.get('/export/pdf', requirePermission(Permission.VIEW_ANALYTICS), async (req, res) => {
+  try {
+    const schema = z.object({
+      startDate: z.string().transform(val => new Date(val)),
+      endDate: z.string().transform(val => new Date(val)),
+      platforms: z.array(z.string()).optional(),
+    });
+
+    const { startDate, endDate, platforms } = schema.parse(req.query);
+    const workspaceId = req.workspace.workspaceId.toString();
+
+    // Validate date range
+    if (endDate < startDate) {
+      res.status(422).json({ success: false, error: 'End date must be after start date' });
+      return;
+    }
+
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 365) {
+      res.status(422).json({ success: false, error: 'Date range cannot exceed 365 days' });
+      return;
+    }
+
+    const pdfBuffer = await AnalyticsService.generatePDFReport(workspaceId, startDate, endDate, platforms);
+    
+    const filename = `analytics-${workspaceId}-${startDate.toISOString().split('T')[0]}-${endDate.toISOString().split('T')[0]}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdfBuffer);
   } catch (error: any) {
     res.status(400).json({ success: false, error: error.message });
   }

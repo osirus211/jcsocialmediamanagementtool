@@ -1,181 +1,194 @@
 import { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useWorkspaceStore } from '@/store/workspace.store';
-import { logger } from '@/lib/logger';
-
-interface EngagementData {
-  date: string;
-  engagementRate: number;
-  platform?: string;
-}
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface EngagementChartProps {
-  selectedPlatform?: string;
+  data: Array<any>;
+  viewType: 'day' | 'platform';
+  isLoading?: boolean;
 }
 
-export function EngagementChart({ selectedPlatform }: EngagementChartProps) {
-  const { currentWorkspace } = useWorkspaceStore();
-  const [chartData, setChartData] = useState<EngagementData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const PLATFORM_COLORS: Record<string, string> = {
+  twitter: '#1DA1F2',
+  facebook: '#1877F2',
+  instagram: '#E4405F',
+  linkedin: '#0A66C2',
+  tiktok: '#000000',
+  threads: '#000000',
+  bluesky: '#00A8E8',
+};
 
-  useEffect(() => {
-    if (!currentWorkspace) return;
+const ENGAGEMENT_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
 
-    const fetchEngagementData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Calculate date range (last 30 days)
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - 30);
+export function EngagementChart({ data, viewType, isLoading = false }: EngagementChartProps) {
+  const formatNumber = (value: number) => {
+    if (value >= 1000000) {
+      return (value / 1000000).toFixed(1) + 'M';
+    } else if (value >= 1000) {
+      return (value / 1000).toFixed(1) + 'K';
+    }
+    return value.toString();
+  };
 
-        // Mock data for now - in real implementation, this would call the analytics API
-        const mockData: EngagementData[] = [];
-        for (let i = 0; i < 30; i++) {
-          const date = new Date(startDate);
-          date.setDate(startDate.getDate() + i);
-          
-          mockData.push({
-            date: date.toISOString().split('T')[0],
-            engagementRate: Math.random() * 8 + 2, // Random engagement rate between 2-10%
-            platform: selectedPlatform || 'all'
-          });
-        }
-        
-        setChartData(mockData);
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load engagement data';
-        logger.error('Failed to fetch engagement data', { error: errorMessage });
-        setError(errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchEngagementData();
-  }, [selectedPlatform, currentWorkspace]);
-
-  const formatDate = (dateStr: string): string => {
+  const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const formatTooltipValue = (value: number): string => {
-    return `${value.toFixed(2)}%`;
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+          <p className="font-medium text-gray-900 mb-2">
+            {viewType === 'day' ? formatDate(label) : label.charAt(0).toUpperCase() + label.slice(1)}
+          </p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              ></div>
+              <span className="font-medium">{entry.name}:</span>
+              <span className="text-gray-600">{formatNumber(entry.value)}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   if (isLoading) {
     return (
-      <div className="h-80 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
-        <div className="text-gray-500">Loading chart...</div>
+      <div className="h-80 flex items-center justify-center">
+        <div className="animate-pulse w-full h-full bg-gray-200 rounded"></div>
       </div>
     );
   }
 
-  if (error) {
+  if (!data || data.length === 0) {
     return (
-      <div className="h-80 bg-gray-50 rounded-lg flex items-center justify-center">
+      <div className="h-80 flex items-center justify-center text-gray-500">
         <div className="text-center">
-          <p className="text-red-600 mb-2">Failed to load chart</p>
-          <p className="text-gray-500 text-sm">{error}</p>
+          <div className="text-4xl mb-2">📊</div>
+          <p className="text-lg font-medium">No engagement data available</p>
+          <p className="text-sm">Engagement data will appear here once posts are published and analytics are collected.</p>
         </div>
       </div>
     );
   }
 
-  if (chartData.length === 0) {
+  if (viewType === 'day') {
+    // Day view: grouped bars by platform per day
     return (
-      <div className="h-80 bg-gray-50 rounded-lg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-gray-400 mb-2">📈</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No engagement data</h3>
-          <p className="text-gray-500">
-            Publish posts to see your engagement trends
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="text-sm text-gray-600">
-        Engagement rate over the last 30 days
-      </div>
-      
-      <div className="h-80">
+      <div className="h-80 w-full" role="img" aria-label="Engagement by day chart showing daily engagement breakdown by platform">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={chartData}
-            margin={{
-              top: 20,
-              right: 30,
-              left: 20,
-              bottom: 20,
-            }}
-          >
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis
-              dataKey="date"
+            <XAxis 
+              dataKey="date" 
               tickFormatter={formatDate}
-              stroke="#6b7280"
+              stroke="#666"
               fontSize={12}
-              tickLine={false}
-              axisLine={false}
             />
-            <YAxis
-              tickFormatter={(value) => `${value}%`}
-              stroke="#6b7280"
+            <YAxis 
+              tickFormatter={formatNumber}
+              stroke="#666"
               fontSize={12}
-              tickLine={false}
-              axisLine={false}
             />
-            <Tooltip
-              formatter={formatTooltipValue}
-              labelFormatter={(label) => `Date: ${formatDate(label)}`}
-              contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="engagementRate"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
-            />
-          </LineChart>
+            <Tooltip content={<CustomTooltip />} />
+            <Legend />
+            <Bar dataKey="likes" fill="#3B82F6" name="Likes" />
+            <Bar dataKey="comments" fill="#10B981" name="Comments" />
+            <Bar dataKey="shares" fill="#F59E0B" name="Shares" />
+            <Bar dataKey="saves" fill="#EF4444" name="Saves" />
+          </BarChart>
         </ResponsiveContainer>
+        
+        {/* Screen reader accessible data table */}
+        <div className="sr-only">
+          <table>
+            <caption>Daily engagement data breakdown</caption>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Likes</th>
+                <th>Comments</th>
+                <th>Shares</th>
+                <th>Saves</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, index) => (
+                <tr key={index}>
+                  <td>{row.date}</td>
+                  <td>{row.likes}</td>
+                  <td>{row.comments}</td>
+                  <td>{row.shares}</td>
+                  <td>{row.saves}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-      
-      {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">
-            {(chartData.reduce((sum, d) => sum + d.engagementRate, 0) / chartData.length).toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-500">Avg Engagement</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">
-            {Math.max(...chartData.map(d => d.engagementRate)).toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-500">Peak Engagement</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">
-            {chartData.length}
-          </div>
-          <div className="text-sm text-gray-500">Days Tracked</div>
+    );
+  } else {
+    // Platform view: single bar per platform
+    return (
+      <div className="h-80 w-full" role="img" aria-label="Engagement by platform chart showing total engagement per platform">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis 
+              dataKey="platform" 
+              stroke="#666"
+              fontSize={12}
+              tickFormatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
+            />
+            <YAxis 
+              tickFormatter={formatNumber}
+              stroke="#666"
+              fontSize={12}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Bar 
+              dataKey="total" 
+              fill="#3B82F6" 
+              name="Total Engagement"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+        
+        {/* Screen reader accessible data table */}
+        <div className="sr-only">
+          <table>
+            <caption>Platform engagement data totals</caption>
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Likes</th>
+                <th>Comments</th>
+                <th>Shares</th>
+                <th>Saves</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, index) => (
+                <tr key={index}>
+                  <td>{row.platform}</td>
+                  <td>{row.likes}</td>
+                  <td>{row.comments}</td>
+                  <td>{row.shares}</td>
+                  <td>{row.saves}</td>
+                  <td>{row.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 }

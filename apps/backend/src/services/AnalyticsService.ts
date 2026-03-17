@@ -446,6 +446,468 @@ export class AnalyticsService {
   }
 
   /**
+   * Get summary KPI metrics with previous period comparison
+   */
+  static async getSummaryMetrics(
+    workspaceId: string,
+    startDate: Date,
+    endDate: Date,
+    previousStartDate: Date,
+    previousEndDate: Date,
+    platforms?: string[]
+  ): Promise<{
+    reach: { current: number; previous: number; percentageChange: number };
+    engagement: { current: number; previous: number; percentageChange: number };
+    followerGrowth: { current: number; previous: number; percentageChange: number };
+    postsPublished: { current: number; previous: number; percentageChange: number };
+  }> {
+    try {
+      const buildMatchStage = (start: Date, end: Date) => {
+        const match: any = {
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          collectedAt: { $gte: start, $lte: end }
+        };
+        if (platforms && platforms.length > 0) {
+          match.platform = { $in: platforms };
+        }
+        return match;
+      };
+
+      // Get current period metrics
+      const currentMetrics = await this.getBaseMetrics(workspaceId, startDate, endDate);
+      const previousMetrics = await this.getBaseMetrics(workspaceId, previousStartDate, previousEndDate);
+
+      const calculateChange = (current: number, previous: number) => {
+        if (previous === 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - previous) / previous) * 100 * 10) / 10;
+      };
+
+      return {
+        reach: {
+          current: currentMetrics.totalImpressions,
+          previous: previousMetrics.totalImpressions,
+          percentageChange: calculateChange(currentMetrics.totalImpressions, previousMetrics.totalImpressions)
+        },
+        engagement: {
+          current: currentMetrics.totalEngagement,
+          previous: previousMetrics.totalEngagement,
+          percentageChange: calculateChange(currentMetrics.totalEngagement, previousMetrics.totalEngagement)
+        },
+        followerGrowth: {
+          current: 0, // TODO: Implement follower tracking
+          previous: 0,
+          percentageChange: 0
+        },
+        postsPublished: {
+          current: currentMetrics.postsPublished,
+          previous: previousMetrics.postsPublished,
+          percentageChange: calculateChange(currentMetrics.postsPublished, previousMetrics.postsPublished)
+        }
+      };
+    } catch (error: any) {
+      logger.error('Get summary metrics error:', error);
+      throw new Error(`Failed to get summary metrics: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get follower growth data by date and platform
+   */
+  static async getFollowerGrowthData(
+    workspaceId: string,
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<Array<{ date: string; platform: string; followerCount: number }>> {
+    try {
+      // TODO: Implement actual follower tracking
+      // For now, return mock data
+      const data: Array<{ date: string; platform: string; followerCount: number }> = [];
+      const platformList = platforms || ['twitter', 'facebook', 'instagram', 'linkedin'];
+      
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        platformList.forEach(platform => {
+          data.push({
+            date: currentDate.toISOString().split('T')[0],
+            platform,
+            followerCount: Math.floor(Math.random() * 1000) + 500
+          });
+        });
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      return data;
+    } catch (error: any) {
+      logger.error('Get follower growth data error:', error);
+      throw new Error(`Failed to get follower growth data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get engagement data grouped by day or platform
+   */
+  static async getEngagementData(
+    workspaceId: string,
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[],
+    groupBy: 'day' | 'platform' = 'day'
+  ): Promise<Array<any>> {
+    try {
+      const matchStage: any = {
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        collectedAt: { $gte: startDate, $lte: endDate }
+      };
+
+      if (platforms && platforms.length > 0) {
+        matchStage.platform = { $in: platforms };
+      }
+
+      if (groupBy === 'day') {
+        return await PostAnalytics.aggregate([
+          { $match: matchStage },
+          { $sort: { postId: 1, collectedAt: -1 } },
+          {
+            $group: {
+              _id: { postId: '$postId', date: { $dateToString: { format: '%Y-%m-%d', date: '$collectedAt' } } },
+              latest: { $first: '$ROOT' }
+            }
+          },
+          { $replaceRoot: { newRoot: '$latest' } },
+          {
+            $group: {
+              _id: { 
+                date: { $dateToString: { format: '%Y-%m-%d', date: '$collectedAt' } },
+                platform: '$platform'
+              },
+              likes: { $sum: '$likes' },
+              comments: { $sum: '$comments' },
+              shares: { $sum: '$shares' },
+              saves: { $sum: '$saves' },
+              total: { $sum: { $add: ['$likes', '$comments', '$shares', '$saves'] } }
+            }
+          },
+          {
+            $group: {
+              _id: '$_id.date',
+              platforms: {
+                $push: {
+                  platform: '$_id.platform',
+                  likes: '$likes',
+                  comments: '$comments',
+                  shares: '$shares',
+                  saves: '$saves',
+                  total: '$total'
+                }
+              },
+              totalLikes: { $sum: '$likes' },
+              totalComments: { $sum: '$comments' },
+              totalShares: { $sum: '$shares' },
+              totalSaves: { $sum: '$saves' },
+              total: { $sum: '$total' }
+            }
+          },
+          {
+            $project: {
+              date: '$_id',
+              platforms: 1,
+              likes: '$totalLikes',
+              comments: '$totalComments',
+              shares: '$totalShares',
+              saves: '$totalSaves',
+              total: 1,
+              _id: 0
+            }
+          },
+          { $sort: { date: 1 } }
+        ]);
+      } else {
+        return await PostAnalytics.aggregate([
+          { $match: matchStage },
+          { $sort: { postId: 1, collectedAt: -1 } },
+          {
+            $group: {
+              _id: '$postId',
+              latest: { $first: '$ROOT' }
+            }
+          },
+          { $replaceRoot: { newRoot: '$latest' } },
+          {
+            $group: {
+              _id: '$platform',
+              likes: { $sum: '$likes' },
+              comments: { $sum: '$comments' },
+              shares: { $sum: '$shares' },
+              saves: { $sum: '$saves' },
+              total: { $sum: { $add: ['$likes', '$comments', '$shares', '$saves'] } }
+            }
+          },
+          {
+            $project: {
+              platform: '$_id',
+              likes: 1,
+              comments: 1,
+              shares: 1,
+              saves: 1,
+              total: 1,
+              _id: 0
+            }
+          },
+          { $sort: { total: -1 } }
+        ]);
+      }
+    } catch (error: any) {
+      logger.error('Get engagement data error:', error);
+      throw new Error(`Failed to get engagement data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get top performing posts with sorting
+   */
+  static async getTopPostsData(
+    workspaceId: string,
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[],
+    sortBy: string = 'engagementRate',
+    sortDir: 'asc' | 'desc' = 'desc',
+    limit: number = 10
+  ): Promise<Array<any>> {
+    try {
+      const matchStage: any = {
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        collectedAt: { $gte: startDate, $lte: endDate }
+      };
+
+      if (platforms && platforms.length > 0) {
+        matchStage.platform = { $in: platforms };
+      }
+
+      const sortStage: any = {};
+      sortStage[sortBy] = sortDir === 'desc' ? -1 : 1;
+
+      return await PostAnalytics.aggregate([
+        { $match: matchStage },
+        { $sort: { postId: 1, collectedAt: -1 } },
+        {
+          $group: {
+            _id: '$postId',
+            latest: { $first: '$ROOT' }
+          }
+        },
+        { $replaceRoot: { newRoot: '$latest' } },
+        {
+          $lookup: {
+            from: 'posts',
+            localField: 'postId',
+            foreignField: '_id',
+            as: 'post'
+          }
+        },
+        { $unwind: '$post' },
+        {
+          $addFields: {
+            engagementRate: {
+              $cond: [
+                { $gt: ['$impressions', 0] },
+                {
+                  $multiply: [
+                    {
+                      $divide: [
+                        { $add: ['$likes', '$comments', '$shares', '$saves'] },
+                        '$impressions'
+                      ]
+                    },
+                    100
+                  ]
+                },
+                0
+              ]
+            },
+            reach: '$impressions'
+          }
+        },
+        {
+          $project: {
+            postId: '$postId',
+            platform: 1,
+            thumbnail: '$post.media.0.url',
+            publishedAt: '$post.publishedAt',
+            likes: 1,
+            comments: 1,
+            shares: 1,
+            saves: 1,
+            reach: 1,
+            engagementRate: 1,
+            _id: 0
+          }
+        },
+        { $sort: sortStage },
+        { $limit: limit }
+      ]);
+    } catch (error: any) {
+      logger.error('Get top posts data error:', error);
+      throw new Error(`Failed to get top posts data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get platform comparison data
+   */
+  static async getPlatformComparisonData(
+    workspaceId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Array<any>> {
+    try {
+      const matchStage = {
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        collectedAt: { $gte: startDate, $lte: endDate }
+      };
+
+      const results = await PostAnalytics.aggregate([
+        { $match: matchStage },
+        { $sort: { postId: 1, collectedAt: -1 } },
+        {
+          $group: {
+            _id: '$postId',
+            latest: { $first: '$ROOT' }
+          }
+        },
+        { $replaceRoot: { newRoot: '$latest' } },
+        {
+          $group: {
+            _id: '$platform',
+            followers: { $first: 1000 }, // TODO: Get actual follower count
+            followerGrowth: { $first: 50 }, // TODO: Calculate actual growth
+            posts: { $sum: 1 },
+            reach: { $sum: '$impressions' },
+            engagement: { $sum: { $add: ['$likes', '$comments', '$shares', '$saves'] } },
+            totalImpressions: { $sum: '$impressions' },
+            bestPostingHour: { $first: 14 } // TODO: Calculate from actual data
+          }
+        },
+        {
+          $project: {
+            platform: '$_id',
+            followers: 1,
+            followerGrowth: 1,
+            posts: 1,
+            reach: 1,
+            engagement: 1,
+            engagementRate: {
+              $cond: [
+                { $gt: ['$totalImpressions', 0] },
+                {
+                  $multiply: [
+                    { $divide: ['$engagement', '$totalImpressions'] },
+                    100
+                  ]
+                },
+                0
+              ]
+            },
+            bestPostingHour: 1,
+            lastSyncedAt: { $literal: new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000) }, // Mock: random time within last 2 hours
+            _id: 0
+          }
+        },
+        { $sort: { engagement: -1 } }
+      ]);
+
+      return results;
+    } catch (error: any) {
+      logger.error('Get platform comparison data error:', error);
+      throw new Error(`Failed to get platform comparison data: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate PDF report
+   */
+  static async generatePDFReport(
+    workspaceId: string,
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<Buffer> {
+    try {
+      const PDFDocument = require('pdfkit');
+      
+      // Get all data for the report
+      const [summary, followerGrowth, engagement, topPosts, platformComparison] = await Promise.all([
+        this.getSummaryMetrics(workspaceId, startDate, endDate, 
+          new Date(startDate.getTime() - (endDate.getTime() - startDate.getTime())), 
+          new Date(startDate), platforms),
+        this.getFollowerGrowthData(workspaceId, startDate, endDate, platforms),
+        this.getEngagementData(workspaceId, startDate, endDate, platforms, 'platform'),
+        this.getTopPostsData(workspaceId, startDate, endDate, platforms, 'engagementRate', 'desc', 10),
+        this.getPlatformComparisonData(workspaceId, startDate, endDate)
+      ]);
+
+      return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ margin: 50 });
+        const chunks: Buffer[] = [];
+
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        // Cover page
+        doc.fontSize(20).text('Analytics Report', { align: 'center' });
+        doc.fontSize(12).text(`Workspace: ${workspaceId}`, { align: 'center' });
+        doc.text(`${startDate.toISOString().split('T')[0]} – ${endDate.toISOString().split('T')[0]}`, { align: 'center' });
+        doc.moveDown(2);
+
+        // KPI Summary
+        doc.fontSize(14).text('Summary');
+        doc.fontSize(11);
+        doc.text(`Reach: ${summary.reach.current.toLocaleString()} (${summary.reach.percentageChange > 0 ? '+' : ''}${summary.reach.percentageChange}% vs prior period)`);
+        doc.text(`Engagement: ${summary.engagement.current.toLocaleString()} (${summary.engagement.percentageChange > 0 ? '+' : ''}${summary.engagement.percentageChange}% vs prior period)`);
+        doc.text(`Follower Growth: ${summary.followerGrowth.current.toLocaleString()} (${summary.followerGrowth.percentageChange > 0 ? '+' : ''}${summary.followerGrowth.percentageChange}% vs prior period)`);
+        doc.text(`Posts Published: ${summary.postsPublished.current.toLocaleString()} (${summary.postsPublished.percentageChange > 0 ? '+' : ''}${summary.postsPublished.percentageChange}% vs prior period)`);
+        doc.moveDown();
+
+        // Platform Comparison
+        if (platformComparison.length > 0) {
+          doc.fontSize(14).text('Platform Comparison');
+          doc.fontSize(10);
+          platformComparison.forEach(p => {
+            doc.text(`${p.platform.charAt(0).toUpperCase() + p.platform.slice(1)} | Followers: ${p.followers.toLocaleString()} | Engagement: ${p.engagement.toLocaleString()} | Rate: ${p.engagementRate.toFixed(1)}%`);
+          });
+          doc.moveDown();
+        }
+
+        // Top Posts
+        if (topPosts.length > 0) {
+          doc.fontSize(14).text('Top Posts');
+          doc.fontSize(10);
+          topPosts.slice(0, 10).forEach((p, i) => {
+            doc.text(`${i + 1}. ${p.platform.charAt(0).toUpperCase() + p.platform.slice(1)} | ${new Date(p.publishedAt).toLocaleDateString()} | Engagement Rate: ${p.engagementRate.toFixed(1)}%`);
+          });
+          doc.moveDown();
+        }
+
+        // Engagement by Platform
+        if (engagement.length > 0) {
+          doc.fontSize(14).text('Engagement by Platform');
+          doc.fontSize(10);
+          engagement.forEach(e => {
+            doc.text(`${e.platform.charAt(0).toUpperCase() + e.platform.slice(1)}: ${e.total.toLocaleString()} total (${e.likes} likes, ${e.comments} comments, ${e.shares} shares, ${e.saves} saves)`);
+          });
+        }
+
+        doc.end();
+      });
+    } catch (error: any) {
+      logger.error('Generate PDF report error:', error);
+      throw new Error(`Failed to generate PDF report: ${error.message}`);
+    }
+  }
+
+  /**
    * Get mock metrics based on platform
    */
   private static getMockMetricsForPlatform(platform: string) {

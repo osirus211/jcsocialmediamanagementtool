@@ -282,6 +282,235 @@ class AnalyticsService {
   }
 
   /**
+   * Get summary KPI metrics
+   */
+  async getSummaryMetrics(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<{
+    reach: { current: number; previous: number; percentageChange: number };
+    engagement: { current: number; previous: number; percentageChange: number };
+    followerGrowth: { current: number; previous: number; percentageChange: number };
+    postsPublished: { current: number; previous: number; percentageChange: number };
+  }> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    if (platforms) {
+      platforms.forEach(platform => params.append('platforms', platform));
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      `/analytics/summary?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get follower growth data
+   */
+  async getFollowerGrowthData(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<Array<{ date: string; platform: string; followerCount: number }>> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    if (platforms) {
+      platforms.forEach(platform => params.append('platforms', platform));
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: Array<{ date: string; platform: string; followerCount: number }> }>(
+      `/analytics/follower-growth?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get engagement data
+   */
+  async getEngagementData(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[],
+    groupBy: 'day' | 'platform' = 'day'
+  ): Promise<Array<any>> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    params.append('groupBy', groupBy);
+    if (platforms) {
+      platforms.forEach(platform => params.append('platforms', platform));
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: Array<any> }>(
+      `/analytics/engagement?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get top posts data
+   */
+  async getTopPostsData(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[],
+    sortBy: string = 'engagementRate',
+    sortDir: 'asc' | 'desc' = 'desc',
+    limit: number = 10
+  ): Promise<Array<any>> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    params.append('sortBy', sortBy);
+    params.append('sortDir', sortDir);
+    params.append('limit', limit.toString());
+    if (platforms) {
+      platforms.forEach(platform => params.append('platforms', platform));
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: Array<any> }>(
+      `/analytics/top-posts?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Get platform comparison data
+   */
+  async getPlatformComparisonData(
+    startDate: Date,
+    endDate: Date
+  ): Promise<Array<any>> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+
+    const response = await apiClient.get<{ success: boolean; data: Array<any> }>(
+      `/analytics/platform-comparison?${params.toString()}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Export analytics as PDF
+   */
+  async exportPDF(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<void> {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate.toISOString());
+    params.append('endDate', endDate.toISOString());
+    if (platforms) {
+      platforms.forEach(platform => params.append('platforms', platform));
+    }
+
+    const response = await fetch(`/api/v1/analytics/export/pdf?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const filename = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 
+      `analytics-${startDate.toISOString().split('T')[0]}-${endDate.toISOString().split('T')[0]}.pdf`;
+    
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Export analytics as CSV (client-side)
+   */
+  async exportCSV(
+    startDate: Date,
+    endDate: Date,
+    platforms?: string[]
+  ): Promise<void> {
+    try {
+      // Fetch all data needed for CSV export
+      const [summary, followerGrowth, engagement, topPosts, platformComparison] = await Promise.all([
+        this.getSummaryMetrics(startDate, endDate, platforms),
+        this.getFollowerGrowthData(startDate, endDate, platforms),
+        this.getEngagementData(startDate, endDate, platforms, 'day'),
+        this.getTopPostsData(startDate, endDate, platforms),
+        this.getPlatformComparisonData(startDate, endDate)
+      ]);
+
+      // Build CSV content
+      let csvContent = '';
+
+      // KPI Summary section
+      csvContent += 'KPI Summary\n';
+      csvContent += 'Metric,Current,Previous,Change %\n';
+      csvContent += `Total Reach,${summary.reach.current},${summary.reach.previous},${summary.reach.percentageChange}\n`;
+      csvContent += `Total Engagement,${summary.engagement.current},${summary.engagement.previous},${summary.engagement.percentageChange}\n`;
+      csvContent += `Follower Growth,${summary.followerGrowth.current},${summary.followerGrowth.previous},${summary.followerGrowth.percentageChange}\n`;
+      csvContent += `Posts Published,${summary.postsPublished.current},${summary.postsPublished.previous},${summary.postsPublished.percentageChange}\n`;
+      csvContent += '\n';
+
+      // Engagement by day section
+      csvContent += 'Engagement by Day\n';
+      csvContent += 'Date,Likes,Comments,Shares,Saves,Total\n';
+      engagement.forEach(day => {
+        csvContent += `${day.date},${day.likes},${day.comments},${day.shares},${day.saves},${day.total}\n`;
+      });
+      csvContent += '\n';
+
+      // Top posts section
+      csvContent += 'Top Posts\n';
+      csvContent += 'Platform,Published At,Likes,Comments,Shares,Saves,Reach,Engagement Rate\n';
+      topPosts.forEach(post => {
+        csvContent += `${post.platform},${post.publishedAt},${post.likes},${post.comments},${post.shares},${post.saves},${post.reach},${post.engagementRate}\n`;
+      });
+      csvContent += '\n';
+
+      // Platform comparison section
+      csvContent += 'Platform Comparison\n';
+      csvContent += 'Platform,Followers,Follower Growth,Posts,Reach,Engagement,Engagement Rate,Best Posting Hour\n';
+      platformComparison.forEach(platform => {
+        csvContent += `${platform.platform},${platform.followers},${platform.followerGrowth},${platform.posts},${platform.reach},${platform.engagement},${platform.engagementRate},${platform.bestPostingHour}\n`;
+      });
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `analytics-${startDate.toISOString().split('T')[0]}-${endDate.toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Download report file
    */
   async downloadReport(reportType: string, format: string, startDate: string, endDate: string): Promise<void> {

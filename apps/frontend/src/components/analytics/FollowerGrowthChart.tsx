@@ -1,217 +1,165 @@
 import { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { analyticsService, FollowerTrendData } from '@/services/analytics.service';
-import { useWorkspaceStore } from '@/store/workspace.store';
-import { useSocialAccountStore } from '@/store/social.store';
-import { logger } from '@/lib/logger';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface FollowerGrowthChartProps {
-  selectedAccountId?: string;
+  data: Array<{ date: string; platform: string; followerCount: number }>;
+  isLoading?: boolean;
 }
 
-export function FollowerGrowthChart({ selectedAccountId }: FollowerGrowthChartProps) {
-  const { currentWorkspace } = useWorkspaceStore();
-  const { accounts } = useSocialAccountStore();
-  const [chartData, setChartData] = useState<FollowerTrendData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d');
-  const [accountId, setAccountId] = useState<string>(selectedAccountId || '');
+const PLATFORM_COLORS: Record<string, string> = {
+  twitter: '#1DA1F2',
+  facebook: '#1877F2',
+  instagram: '#E4405F',
+  linkedin: '#0A66C2',
+  tiktok: '#000000',
+  threads: '#000000',
+  bluesky: '#00A8E8',
+};
 
-  // Set default account if not provided
+export function FollowerGrowthChart({ data, isLoading = false }: FollowerGrowthChartProps) {
+  const [chartData, setChartData] = useState<any[]>([]);
+
   useEffect(() => {
-    if (!selectedAccountId && accounts.length > 0 && !accountId) {
-      setAccountId(accounts[0]._id);
+    if (!data || data.length === 0) {
+      setChartData([]);
+      return;
     }
-  }, [accounts, selectedAccountId, accountId]);
 
-  useEffect(() => {
-    if (!currentWorkspace || !accountId) return;
-
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
-        const endDate = new Date();
-        const startDate = new Date(endDate.getTime() - days * 24 * 60 * 60 * 1000);
-
-        const trends = await analyticsService.getFollowerTrends(accountId, startDate, endDate, 'day');
-        setChartData(trends);
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load follower trends';
-        logger.error('Follower trends fetch error:', { error: err });
-        setError(errorMessage);
-      } finally {
-        setIsLoading(false);
+    // Group data by date and create chart format
+    const groupedData = data.reduce((acc, item) => {
+      const date = item.date;
+      if (!acc[date]) {
+        acc[date] = { date };
       }
-    };
+      acc[date][item.platform] = item.followerCount;
+      return acc;
+    }, {} as Record<string, any>);
 
-    fetchData();
-  }, [currentWorkspace, accountId, dateRange]);
+    const chartArray = Object.values(groupedData).sort((a: any, b: any) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
 
-  const selectedAccount = accounts.find(acc => acc._id === accountId);
-  const currentFollowers = chartData.length > 0 ? chartData[chartData.length - 1].followerCount : 0;
-  const previousFollowers = chartData.length > 1 ? chartData[0].followerCount : currentFollowers;
-  const growth = currentFollowers - previousFollowers;
-  const growthPercentage = previousFollowers > 0 ? (growth / previousFollowers) * 100 : 0;
+    setChartData(chartArray);
+  }, [data]);
 
-  if (error) {
+  const formatNumber = (value: number) => {
+    if (value >= 1000000) {
+      return (value / 1000000).toFixed(1) + 'M';
+    } else if (value >= 1000) {
+      return (value / 1000).toFixed(1) + 'K';
+    }
+    return value.toString();
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+          <p className="font-medium text-gray-900 mb-2">{formatDate(label)}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              ></div>
+              <span className="capitalize font-medium">{entry.dataKey}:</span>
+              <span className="text-gray-600">{formatNumber(entry.value)} followers</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Follower Growth</h3>
-        <div className="text-center py-8">
-          <div className="text-red-600 mb-2">⚠️ Error loading data</div>
-          <div className="text-sm text-gray-500">{error}</div>
+      <div className="h-80 flex items-center justify-center">
+        <div className="animate-pulse w-full h-full bg-gray-200 rounded"></div>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center text-gray-500">
+        <div className="text-center">
+          <div className="text-4xl mb-2">📈</div>
+          <p className="text-lg font-medium">No follower data available</p>
+          <p className="text-sm">Follower data will appear here once your accounts are connected and synced.</p>
         </div>
       </div>
     );
   }
 
+  // Get unique platforms for lines
+  const platforms = Array.from(new Set(data.map(item => item.platform)));
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Follower Growth</h3>
-        
-        <div className="flex items-center gap-4">
-          {/* Account Selector */}
-          {!selectedAccountId && accounts.length > 1 && (
-            <select
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {accounts.map((account) => (
-                <option key={account._id} value={account._id}>
-                  {account.accountName} ({account.platform})
-                </option>
+    <div className="h-80 w-full" role="img" aria-label="Follower growth chart showing growth over time by platform">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis 
+            dataKey="date" 
+            tickFormatter={formatDate}
+            stroke="#666"
+            fontSize={12}
+          />
+          <YAxis 
+            tickFormatter={formatNumber}
+            stroke="#666"
+            fontSize={12}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend 
+            wrapperStyle={{ paddingTop: '20px' }}
+            iconType="line"
+          />
+          {platforms.map((platform) => (
+            <Line
+              key={platform}
+              type="monotone"
+              dataKey={platform}
+              stroke={PLATFORM_COLORS[platform] || '#8884d8'}
+              strokeWidth={2}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+              name={platform.charAt(0).toUpperCase() + platform.slice(1)}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      
+      {/* Screen reader accessible data table */}
+      <div className="sr-only">
+        <table>
+          <caption>Follower growth data by platform over time</caption>
+          <thead>
+            <tr>
+              <th>Date</th>
+              {platforms.map(platform => (
+                <th key={platform}>{platform} Followers</th>
               ))}
-            </select>
-          )}
-
-          {/* Date Range Selector */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            {(['7d', '30d', '90d'] as const).map((range) => (
-              <button
-                key={range}
-                onClick={() => setDateRange(range)}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  dateRange === range
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {range}
-              </button>
+            </tr>
+          </thead>
+          <tbody>
+            {chartData.map((row, index) => (
+              <tr key={index}>
+                <td>{row.date}</td>
+                {platforms.map(platform => (
+                  <td key={platform}>{row[platform] || 0}</td>
+                ))}
+              </tr>
             ))}
-          </div>
-        </div>
+          </tbody>
+        </table>
       </div>
-
-      {/* Growth Delta Badge */}
-      {!isLoading && chartData.length > 0 && (
-        <div className="flex items-center gap-4 mb-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900">
-              {currentFollowers.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500">Current Followers</div>
-          </div>
-          
-          <div className="text-center">
-            <div className={`text-2xl font-bold ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {growth >= 0 ? '+' : ''}{growth.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-500">
-              {growthPercentage >= 0 ? '+' : ''}{growthPercentage.toFixed(1)}% change
-            </div>
-          </div>
-
-          {selectedAccount && (
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-700">
-                {selectedAccount.accountName}
-              </div>
-              <div className="text-sm text-gray-500 capitalize">
-                {selectedAccount.platform}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="h-80 flex items-center justify-center">
-          <div className="text-gray-500">Loading follower trends...</div>
-        </div>
-      ) : chartData.length === 0 ? (
-        <div className="h-80 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-gray-400 mb-2">📊</div>
-            <div className="text-gray-600">No follower data available</div>
-            <div className="text-sm text-gray-500 mt-1">
-              Follower tracking will begin once data is collected
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 5,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                stroke="#6b7280"
-                fontSize={12}
-                tickFormatter={(value) => {
-                  const date = new Date(value);
-                  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                }}
-              />
-              <YAxis 
-                stroke="#6b7280"
-                fontSize={12}
-                tickFormatter={(value) => value.toLocaleString()}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                }}
-                labelFormatter={(value) => {
-                  const date = new Date(value);
-                  return date.toLocaleDateString('en-US', { 
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  });
-                }}
-                formatter={(value: number) => [value.toLocaleString(), 'Followers']}
-              />
-              <Line
-                type="monotone"
-                dataKey="followerCount"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
     </div>
   );
 }

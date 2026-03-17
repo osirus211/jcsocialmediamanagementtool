@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react';
-import { BestTimeHeatmap } from '@/components/analytics/BestTimeHeatmap';
-import { OptimalTimeSuggestions } from '@/components/analytics/OptimalTimeSuggestions';
-import { EngagementChart } from '@/components/analytics/EngagementChart';
-import { FollowerGrowthSummary } from '@/components/analytics/FollowerGrowthSummary';
-import { FollowerGrowthChart } from '@/components/analytics/FollowerGrowthChart';
-import { HashtagSuggestions } from '@/components/analytics/HashtagSuggestions';
-import { HashtagPerformanceTable } from '@/components/analytics/HashtagPerformanceTable';
-import { HashtagTrendChart } from '@/components/analytics/HashtagTrendChart';
-import { TopPostsTable } from '@/components/analytics/TopPostsTable';
-import { ExportReportButton } from '@/components/analytics/ExportReportButton';
-import { ScheduledReportsPanel } from '@/components/analytics/ScheduledReportsPanel';
-import { Link } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
+import { analyticsService } from '@/services/analytics.service';
+import { Link } from 'react-router-dom';
+
+// Components
+import { KPICard } from '@/components/analytics/KPICard';
+import { FollowerGrowthChart } from '@/components/analytics/FollowerGrowthChart';
+import { EngagementChart } from '@/components/analytics/EngagementChart';
+import { TopPostsGrid } from '@/components/analytics/TopPostsGrid';
+import { PlatformComparisonTable } from '@/components/analytics/PlatformComparisonTable';
+import { DateRangePicker } from '@/components/analytics/DateRangePicker';
+import { PlatformFilter } from '@/components/analytics/PlatformFilter';
+import { ExportButtons } from '@/components/analytics/ExportButtons';
 
 const PLATFORMS = [
-  { id: 'all', name: 'All Platforms', icon: '📊' },
-  { id: 'twitter', name: 'Twitter', icon: '🐦' },
+  { id: 'twitter', name: 'Twitter', icon: '𝕏' },
   { id: 'facebook', name: 'Facebook', icon: '📘' },
   { id: 'instagram', name: 'Instagram', icon: '📷' },
   { id: 'linkedin', name: 'LinkedIn', icon: '💼' },
@@ -26,17 +25,99 @@ const PLATFORMS = [
 
 export function AnalyticsPage() {
   const { currentWorkspaceId, workspacesLoaded, workspaces } = useWorkspaceStore();
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
-  const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null);
+  
+  // Date range state
+  const [dateRange, setDateRange] = useState<{
+    startDate: Date;
+    endDate: Date;
+    preset: string;
+  }>(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    return { startDate, endDate, preset: 'Last 30 days' };
+  });
 
-  // Diagnostic logging
+  // Platform filter state
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+
+  // Data state
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [followerGrowthData, setFollowerGrowthData] = useState<any[]>([]);
+  const [engagementData, setEngagementData] = useState<any[]>([]);
+  const [topPostsData, setTopPostsData] = useState<any[]>([]);
+  const [platformComparisonData, setPlatformComparisonData] = useState<any[]>([]);
+  
+  // UI state
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [engagementView, setEngagementView] = useState<'day' | 'platform'>('day');
+
+  // Load data when filters change
   useEffect(() => {
-    console.log('[AnalyticsPage] State:', { 
-      currentWorkspaceId, 
-      workspacesLoaded, 
-      workspacesCount: workspaces.length 
-    });
-  }, [currentWorkspaceId, workspacesLoaded, workspaces.length]);
+    if (currentWorkspaceId) {
+      loadAnalyticsData();
+    }
+  }, [currentWorkspaceId, dateRange, selectedPlatforms]);
+
+  const loadAnalyticsData = async () => {
+    if (!currentWorkspaceId) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const platforms = selectedPlatforms.length > 0 ? selectedPlatforms : undefined;
+
+      const [summary, followerGrowth, engagement, topPosts, platformComparison] = await Promise.all([
+        analyticsService.getSummaryMetrics(dateRange.startDate, dateRange.endDate, platforms),
+        analyticsService.getFollowerGrowthData(dateRange.startDate, dateRange.endDate, platforms),
+        analyticsService.getEngagementData(dateRange.startDate, dateRange.endDate, platforms, engagementView),
+        analyticsService.getTopPostsData(dateRange.startDate, dateRange.endDate, platforms),
+        analyticsService.getPlatformComparisonData(dateRange.startDate, dateRange.endDate)
+      ]);
+
+      setSummaryData(summary);
+      setFollowerGrowthData(followerGrowth);
+      setEngagementData(engagement);
+      setTopPostsData(topPosts);
+      setPlatformComparisonData(platformComparison);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load analytics data');
+      console.error('Analytics data loading error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDateRangeChange = (startDate: Date, endDate: Date, preset: string) => {
+    setDateRange({ startDate, endDate, preset });
+  };
+
+  const handlePlatformFilterChange = (platforms: string[]) => {
+    setSelectedPlatforms(platforms);
+  };
+
+  const formatNumber = (num: number): string => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toLocaleString();
+  };
+
+  const getTrendIcon = (change: number): string => {
+    if (change > 0) return '↑';
+    if (change < 0) return '↓';
+    return '→';
+  };
+
+  const getTrendColor = (change: number): string => {
+    if (change > 0) return 'text-green-600';
+    if (change < 0) return 'text-red-600';
+    return 'text-gray-600';
+  };
 
   if (!currentWorkspaceId) {
     if (workspacesLoaded && workspaces.length === 0) {
@@ -59,178 +140,191 @@ export function AnalyticsPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="text-sm text-gray-500 italic">Initializing analytics context...</p>
+          <p className="text-sm text-gray-500 italic">Loading analytics...</p>
         </div>
       </div>
     );
   }
 
-  const platformForAPI = selectedPlatform === 'all' ? undefined : selectedPlatform;
-
-  const handleHashtagClick = (hashtag: string) => {
-    setSelectedHashtag(hashtag);
-  };
-
-  const handleCloseHashtagTrend = () => {
-    setSelectedHashtag(null);
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
           <p className="mt-2 text-gray-600">
-            Discover your optimal posting times and track engagement performance
+            {dateRange.preset} • {selectedPlatforms.length > 0 ? `${selectedPlatforms.length} platforms` : 'All platforms'}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            to="/analytics/dashboard"
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Custom Dashboard
-          </Link>
-          <Link
-            to="/analytics/competitors"
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Competitors
-          </Link>
-          <ExportReportButton />
+          <ExportButtons 
+            startDate={dateRange.startDate}
+            endDate={dateRange.endDate}
+            platforms={selectedPlatforms}
+            data={{
+              summary: summaryData,
+              followerGrowth: followerGrowthData,
+              engagement: engagementData,
+              topPosts: topPostsData,
+              platformComparison: platformComparisonData
+            }}
+          />
         </div>
       </div>
 
-      {/* Platform Filter */}
-      <div className="mb-8">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 overflow-x-auto">
-            {PLATFORMS.map((platform) => (
-              <button
-                key={platform.id}
-                onClick={() => setSelectedPlatform(platform.id)}
-                className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  selectedPlatform === platform.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <span className="mr-2">{platform.icon}</span>
-                {platform.name}
-              </button>
-            ))}
-          </nav>
-        </div>
+      {/* Filters */}
+      <div className="mb-8 flex flex-col lg:flex-row gap-4">
+        <DateRangePicker
+          startDate={dateRange.startDate}
+          endDate={dateRange.endDate}
+          onChange={handleDateRangeChange}
+        />
+        <PlatformFilter
+          platforms={PLATFORMS}
+          selectedPlatforms={selectedPlatforms}
+          onChange={handlePlatformFilterChange}
+        />
       </div>
 
-      <div className="space-y-12">
-        {/* Section 1: Hashtag Performance */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-600">{error}</p>
+          <button
+            onClick={loadAnalyticsData}
+            className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-8">
+        {/* KPI Cards */}
         <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Hashtag Performance</h2>
-            <p className="mt-2 text-gray-600">
-              Discover which hashtags drive the most engagement
-            </p>
-          </div>
-          
-          <div className="space-y-6">
-            <HashtagSuggestions />
-            <HashtagPerformanceTable onHashtagClick={handleHashtagClick} />
-            
-            {/* Hashtag Trend Modal/Panel */}
-            {selectedHashtag && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                  <HashtagTrendChart 
-                    hashtag={selectedHashtag} 
-                    onClose={handleCloseHashtagTrend}
-                  />
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Key Metrics</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {isLoading ? (
+              // Loading skeletons
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-white border rounded-lg p-6 animate-pulse">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                    <div className="w-12 h-4 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="w-20 h-8 bg-gray-200 rounded mb-1"></div>
+                  <div className="w-16 h-4 bg-gray-200 rounded"></div>
                 </div>
-              </div>
+              ))
+            ) : summaryData ? (
+              <>
+                <KPICard
+                  title="Total Reach"
+                  value={formatNumber(summaryData.reach.current)}
+                  change={summaryData.reach.percentageChange}
+                  icon="👁️"
+                  trend={getTrendIcon(summaryData.reach.percentageChange)}
+                  trendColor={getTrendColor(summaryData.reach.percentageChange)}
+                />
+                <KPICard
+                  title="Total Engagement"
+                  value={formatNumber(summaryData.engagement.current)}
+                  change={summaryData.engagement.percentageChange}
+                  icon="❤️"
+                  trend={getTrendIcon(summaryData.engagement.percentageChange)}
+                  trendColor={getTrendColor(summaryData.engagement.percentageChange)}
+                />
+                <KPICard
+                  title="Follower Growth"
+                  value={formatNumber(summaryData.followerGrowth.current)}
+                  change={summaryData.followerGrowth.percentageChange}
+                  icon="📈"
+                  trend={getTrendIcon(summaryData.followerGrowth.percentageChange)}
+                  trendColor={getTrendColor(summaryData.followerGrowth.percentageChange)}
+                />
+                <KPICard
+                  title="Posts Published"
+                  value={formatNumber(summaryData.postsPublished.current)}
+                  change={summaryData.postsPublished.percentageChange}
+                  icon="📝"
+                  trend={getTrendIcon(summaryData.postsPublished.percentageChange)}
+                  trendColor={getTrendColor(summaryData.postsPublished.percentageChange)}
+                />
+              </>
+            ) : (
+              // Error state
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-white border rounded-lg p-6 text-center text-gray-500">
+                  <div className="text-2xl mb-2">—</div>
+                  <div className="text-sm">No data</div>
+                </div>
+              ))
             )}
           </div>
         </section>
 
-        {/* Section 2: Follower Growth */}
+        {/* Follower Growth Chart */}
         <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Follower Growth</h2>
-            <p className="mt-2 text-gray-600">
-              Track your follower growth across all platforms
-            </p>
-          </div>
-          
-          <div className="space-y-6">
-            <FollowerGrowthSummary dateRange="30d" />
-            <FollowerGrowthChart />
-          </div>
-        </section>
-
-        {/* Section 3: Best Times to Post */}
-        <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Best Times to Post</h2>
-            <p className="mt-2 text-gray-600">
-              Heatmap showing when your posts get the most engagement
-            </p>
-          </div>
-          
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Follower Growth Over Time</h2>
           <div className="bg-white rounded-lg shadow-sm border p-6">
-            <BestTimeHeatmap platform={platformForAPI} />
+            <FollowerGrowthChart 
+              data={followerGrowthData}
+              isLoading={isLoading}
+            />
           </div>
         </section>
 
-        {/* Section 4: AI Suggestions */}
+        {/* Engagement Chart */}
         <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">AI Suggestions</h2>
-            <p className="mt-2 text-gray-600">
-              Personalized recommendations for optimal posting times
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Engagement Analysis</h2>
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setEngagementView('day')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  engagementView === 'day'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                By Day
+              </button>
+              <button
+                onClick={() => setEngagementView('platform')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  engagementView === 'platform'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                By Platform
+              </button>
+            </div>
           </div>
-          
           <div className="bg-white rounded-lg shadow-sm border p-6">
-            <OptimalTimeSuggestions selectedPlatform={platformForAPI} />
+            <EngagementChart 
+              data={engagementData}
+              viewType={engagementView}
+              isLoading={isLoading}
+            />
           </div>
         </section>
 
-        {/* Section 5: Engagement Trends */}
+        {/* Top Posts Grid */}
         <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Engagement Trends</h2>
-            <p className="mt-2 text-gray-600">
-              Track your engagement rate over time
-            </p>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <EngagementChart selectedPlatform={platformForAPI} />
-          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Performing Posts</h2>
+          <TopPostsGrid 
+            data={topPostsData}
+            isLoading={isLoading}
+          />
         </section>
 
-        {/* Section 6: Post Performance */}
+        {/* Platform Comparison Table */}
         <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Post Performance</h2>
-            <p className="mt-2 text-gray-600">
-              Analyze individual post performance and ROI
-            </p>
-          </div>
-          
-          <TopPostsTable />
-        </section>
-
-        {/* Section 7: Scheduled Reports */}
-        <section>
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Scheduled Reports</h2>
-            <p className="mt-2 text-gray-600">
-              Set up automated analytics reports delivered to your inbox
-            </p>
-          </div>
-          
-          <ScheduledReportsPanel />
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Platform Comparison</h2>
+          <PlatformComparisonTable 
+            data={platformComparisonData}
+            isLoading={isLoading}
+          />
         </section>
       </div>
     </div>
