@@ -110,6 +110,21 @@ export class AuthService {
       logger.info('User registered successfully', { userId: user._id, email: user.email });
       logger.info('RUNTIME_TRACE WORKSPACE_CREATE_CHECK', { timestamp: new Date().toISOString() });
 
+      // Generate email verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const hashedVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+      const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Store verification token on user
+      user.emailVerificationToken = hashedVerificationToken;
+      user.emailVerificationExpiresAt = verificationExpiresAt;
+      await user.save();
+
+      // Send email verification email (non-blocking)
+      this.sendEmailVerificationEmail(user, verificationToken).catch(err => {
+        logger.warn('Failed to send email verification email', { userId: user._id, error: err.message });
+      });
+
       // Generate tokens
       const tokens = TokenService.generateTokenPair({
         userId: user._id.toString(),
@@ -179,6 +194,11 @@ export class AuthService {
         throw new UnauthorizedError('Invalid email or password');
       }
 
+      // Check if account is locked
+      if (user.lockUntil && user.lockUntil > new Date()) {
+        throw new UnauthorizedError('Account temporarily locked due to too many failed login attempts');
+      }
+
       // Check if user is using OAuth
       if (user.provider !== OAuthProvider.LOCAL) {
         // Still perform dummy comparison for timing consistency
@@ -188,19 +208,44 @@ export class AuthService {
         );
       }
 
-      /*
       // Check if email is verified
       if (!user.isEmailVerified) {
         // Still perform password comparison for timing consistency
         await user.comparePassword(password);
         throw new UnauthorizedError('Please verify your email first');
       }
-      */
 
       // Verify password (timing-attack safe)
       const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
+        // Increment failed login attempts
+        const attempts = (user.loginAttempts || 0) + 1;
+        const lockUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : undefined; // 15 minutes lockout
+        
+        await User.updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              loginAttempts: attempts,
+              lockUntil: lockUntil
+            }
+          }
+        );
+        
         throw new UnauthorizedError('Invalid email or password');
+      }
+
+      // Reset login attempts on successful password verification
+      if (user.loginAttempts > 0) {
+        await User.updateOne(
+          { _id: user._id },
+          {
+            $unset: {
+              loginAttempts: 1,
+              lockUntil: 1
+            }
+          }
+        );
       }
 
       // Check if 2FA is enabled
@@ -446,21 +491,29 @@ export class AuthService {
   }
 
   /**
-   * Verify email (placeholder for email verification flow)
+   * Verify email with token
    */
   static async verifyEmail(userId: string, token: string): Promise<void> {
     try {
-      // TODO: Implement email verification logic
-      // 1. Verify token
-      // 2. Update user.isEmailVerified = true
-      // 3. Remove verification token
+      // Hash the provided token to match stored hash
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+      
+      // Find user by verification token and check expiration
+      const user = await User.findOne({
+        _id: userId,
+        emailVerificationToken: hashedToken,
+        emailVerificationExpiresAt: { $gt: new Date() },
+        softDeletedAt: null
+      }).select('+emailVerificationToken +emailVerificationExpiresAt');
 
-      const user = await User.findById(userId);
       if (!user) {
-        throw new NotFoundError('User not found');
+        throw new BadRequestError('Invalid or expired verification token');
       }
 
+      // Mark email as verified and clear verification token
       user.isEmailVerified = true;
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpiresAt = undefined;
       await user.save();
 
       logger.info('Email verified successfully', { userId: user._id });
@@ -577,6 +630,32 @@ export class AuthService {
         userId: user._id.toString(),
         error: error.message 
       });
+      // Don't throw - email failures should not affect registration
+    }
+  }
+
+  /**
+   * Send email verification email
+   */
+  private static async sendEmailVerificationEmail(user: IUser, verificationToken: string): Promise<void> {
+    try {
+      const { emailNotificationService } = await import('./EmailNotificationService');
+
+      const verificationUrl = `${config.frontend.url}/auth/verify-email?token=${verificationToken}`;
+
+      // Send email verification email
+      await emailNotificationService.sendEmailVerificationEmail({
+        to: user.email,
+        firstName: user.firstName,
+        verificationUrl,
+      });
+
+      logger.info('Email verification email sent', {
+        to: user.email,
+        userId: user._id.toString(),
+      });
+    } catch (error: any) {
+      logger.error('Error sending email verification email', { error: error.message });
       // Don't throw - email failures should not affect registration
     }
   }
@@ -930,7 +1009,18 @@ export class AuthService {
       }
 
       // TODO: Generate verification token and store pending email change
-      // For now, we'll simulate the process
+      // Implementation: Generate secure token and store in user model
+      const changeToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(changeToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      user.pendingEmailChange = {
+        newEmail: newEmail.toLowerCase(),
+        token: hashedToken,
+        expiresAt
+      };
+      await user.save();
+      
       logger.info('Email change requested', {
         userId: user._id.toString(),
         currentEmail: user.email,
@@ -938,7 +1028,7 @@ export class AuthService {
       });
 
       // TODO: Send verification email to new address
-      AuthService.sendEmailChangeVerification(user, newEmail).catch(err => {
+      AuthService.sendEmailChangeVerification(user, newEmail, changeToken).catch(err => {
         logger.warn('Failed to send email change verification', { 
           userId: user._id, 
           error: err.message 
@@ -964,6 +1054,39 @@ export class AuthService {
       }
 
       // TODO: Check if there's a pending email change and resend verification
+      // Implementation: Check for pending email change and resend if exists
+      if (user.pendingEmailChange && user.pendingEmailChange.expiresAt > new Date()) {
+        const newToken = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(newToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        
+        user.pendingEmailChange.token = hashedToken;
+        user.pendingEmailChange.expiresAt = expiresAt;
+        await user.save();
+        
+        AuthService.sendEmailChangeVerification(user, user.pendingEmailChange.newEmail, newToken).catch(err => {
+          logger.warn('Failed to resend email change verification', { 
+            userId: user._id, 
+            error: err.message 
+          });
+        });
+      } else {
+        // Resend regular email verification if no pending change
+        if (!user.isEmailVerified) {
+          const verificationToken = crypto.randomBytes(32).toString('hex');
+          const hashedVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+          const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+          user.emailVerificationToken = hashedVerificationToken;
+          user.emailVerificationExpiresAt = verificationExpiresAt;
+          await user.save();
+
+          this.sendEmailVerificationEmail(user, verificationToken).catch(err => {
+            logger.warn('Failed to resend email verification', { userId: user._id, error: err.message });
+          });
+        }
+      }
+      
       logger.info('Email verification resent', {
         userId: user._id.toString(),
       });
@@ -987,6 +1110,12 @@ export class AuthService {
       }
 
       // TODO: Remove pending email change record
+      // Implementation: Clear pending email change from user
+      if (user.pendingEmailChange) {
+        user.pendingEmailChange = undefined;
+        await user.save();
+      }
+      
       logger.info('Email change cancelled', {
         userId: user._id.toString(),
       });
@@ -1010,7 +1139,14 @@ export class AuthService {
       }
 
       // TODO: Return actual pending email change from database
-      // For now, return null (no pending changes)
+      // Implementation: Return pending email change if exists and not expired
+      if (user.pendingEmailChange && user.pendingEmailChange.expiresAt > new Date()) {
+        return {
+          newEmail: user.pendingEmailChange.newEmail,
+          expiresAt: user.pendingEmailChange.expiresAt
+        };
+      }
+      
       return null;
     } catch (error: any) {
       logger.error('Error getting pending email change', {
@@ -1231,10 +1367,31 @@ export class AuthService {
   /**
    * Send email change verification
    */
-  private static async sendEmailChangeVerification(user: IUser, newEmail: string): Promise<void> {
+  private static async sendEmailChangeVerification(user: IUser, newEmail: string, token: string): Promise<void> {
     try {
-      // TODO: Generate verification token and send email
-      logger.info('Email change verification would be sent', {
+      // Send email change verification using EmailService
+      const { EmailService } = await import('./EmailService');
+      const emailService = new EmailService();
+      
+      const verificationUrl = `${config.frontend.url}/auth/verify-email-change?token=${token}&userId=${user._id}`;
+      
+      await emailService.sendEmail({
+        to: newEmail,
+        subject: 'Verify Your New Email Address',
+        body: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Verify Your New Email Address</h2>
+            <p>Hello ${user.firstName},</p>
+            <p>You requested to change your email address from <strong>${user.email}</strong> to <strong>${newEmail}</strong>.</p>
+            <p>Please click the link below to verify your new email address:</p>
+            <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify New Email</a>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't request this change, please ignore this email.</p>
+          </div>
+        `
+      });
+      
+      logger.info('Email change verification sent', {
         to: newEmail,
         userId: user._id.toString(),
       });

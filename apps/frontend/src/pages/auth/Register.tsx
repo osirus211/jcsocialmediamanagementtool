@@ -8,19 +8,21 @@ import { registerSchema, RegisterFormData } from '@/validators/auth.validators';
 export const RegisterPage = () => {
   const navigate = useNavigate();
   const { register: registerUser, isLoading } = useAuthStore();
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
+    trigger,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    mode: 'all',
   });
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      setError(null);
+      setLocalError(null);
       await registerUser({
         email: data.email,
         password: data.password,
@@ -29,9 +31,25 @@ export const RegisterPage = () => {
       });
       navigate('/onboarding');
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setLocalError(err.message || 'Registration failed');
     }
   };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Manually trigger validation to ensure errors show up
+    const isValid = await trigger();
+    if (!isValid) {
+      return;
+    }
+    
+    // If validation passes, call the actual submit handler
+    handleSubmit(onSubmit)(e);
+  };
+
+  // Use local error only
+  const displayError = localError;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
@@ -39,43 +57,71 @@ export const RegisterPage = () => {
         Create Account
       </h2>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      {displayError && (
+        <div 
+          className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+          role="alert"
+          aria-live="polite"
+        >
+          <p className="text-sm text-red-600 dark:text-red-400">{displayError}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleFormSubmit} className="space-y-4" role="form" aria-label="Create your account">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label 
+              htmlFor="firstName"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               First Name
             </label>
             <input
               {...register('firstName')}
+              id="firstName"
               type="text"
+              required
+              aria-required="true"
+              aria-invalid={!!errors.firstName}
+              aria-describedby={errors.firstName ? 'firstName-error' : undefined}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               placeholder="John"
             />
             {errors.firstName && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              <p 
+                id="firstName-error"
+                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                role="alert"
+              >
                 {errors.firstName.message}
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label 
+              htmlFor="lastName"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Last Name
             </label>
             <input
               {...register('lastName')}
+              id="lastName"
               type="text"
+              required
+              aria-required="true"
+              aria-invalid={!!errors.lastName}
+              aria-describedby={errors.lastName ? 'lastName-error' : undefined}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               placeholder="Doe"
             />
             {errors.lastName && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              <p 
+                id="lastName-error"
+                className="mt-1 text-sm text-red-600 dark:text-red-400"
+                role="alert"
+              >
                 {errors.lastName.message}
               </p>
             )}
@@ -83,34 +129,60 @@ export const RegisterPage = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label 
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Email
           </label>
           <input
             {...register('email')}
+            id="email"
             type="email"
+            autoComplete="email"
+            required
+            aria-required="true"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? 'email-error' : undefined}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             placeholder="you@example.com"
           />
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            <p 
+              id="email-error"
+              className="mt-1 text-sm text-red-600 dark:text-red-400"
+              role="alert"
+            >
               {errors.email.message}
             </p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label 
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Password
           </label>
           <input
             {...register('password')}
+            id="password"
             type="password"
+            autoComplete="new-password"
+            required
+            aria-required="true"
+            aria-invalid={!!errors.password}
+            aria-describedby={errors.password ? 'password-error' : undefined}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             placeholder="••••••••"
           />
           {errors.password && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            <p 
+              id="password-error"
+              className="mt-1 text-sm text-red-600 dark:text-red-400"
+              role="alert"
+            >
               {errors.password.message}
             </p>
           )}

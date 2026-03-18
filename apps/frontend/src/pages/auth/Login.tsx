@@ -16,13 +16,12 @@ export const LoginPage = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitted },
     setFocus,
     trigger,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: 'onChange', // Validate on change
-    reValidateMode: 'onChange',
+    mode: 'all',
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -43,8 +42,11 @@ export const LoginPage = () => {
       navigate(redirectTo);
     } catch (err: any) {
       // Handle specific error types
-      if (err.message?.includes('verify your email')) {
+      if (err.code === 'EMAIL_NOT_VERIFIED' || err.message?.includes('verify your email')) {
         setError('Please verify your email first. Check your inbox for the verification link.');
+        // Redirect to verification pending page
+        navigate('/auth/verify-email-pending');
+        return;
       } else if (err.message?.includes('Too many')) {
         setError('Too many login attempts. Please try again in 15 minutes.');
       } else if (err.message?.includes('Account temporarily locked')) {
@@ -64,6 +66,8 @@ export const LoginPage = () => {
     }
   };
 
+  const handleFormSubmit = handleSubmit(onSubmit);
+
   const handleOAuthLogin = async (platform: string) => {
     try {
       setError(null);
@@ -75,10 +79,11 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-        Sign In
-      </h2>
+    <div className="max-w-md w-full mx-auto px-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 overflow-x-hidden">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          Sign In
+        </h2>
 
       {error && (
         <div 
@@ -90,7 +95,7 @@ export const LoginPage = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" role="form">
+      <form onSubmit={handleFormSubmit} className="space-y-4" role="form" aria-label="Sign in to your account">
         <div>
           <label 
             htmlFor="email"
@@ -105,6 +110,7 @@ export const LoginPage = () => {
             autoComplete="email"
             required
             aria-required="true"
+            aria-invalid={!!errors.email}
             aria-describedby={errors.email ? 'email-error' : undefined}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             placeholder="you@example.com"
@@ -129,12 +135,6 @@ export const LoginPage = () => {
             >
               Password
             </label>
-            <Link
-              to="/auth/forgot-password"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Forgot password?
-            </Link>
           </div>
           <div className="relative">
             <input
@@ -144,6 +144,7 @@ export const LoginPage = () => {
               autoComplete="current-password"
               required
               aria-required="true"
+              aria-invalid={!!errors.password}
               aria-describedby={errors.password ? 'password-error' : undefined}
               className="w-full px-4 py-2 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               placeholder="••••••••"
@@ -176,6 +177,14 @@ export const LoginPage = () => {
               {errors.password.message}
             </p>
           )}
+          <div className="mt-2 text-right">
+            <Link
+              to="/auth/forgot-password"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </div>
 
         <button
@@ -218,6 +227,7 @@ export const LoginPage = () => {
               type="button"
               onClick={() => handleOAuthLogin('google')}
               className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Continue with Google"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -231,6 +241,7 @@ export const LoginPage = () => {
               type="button"
               onClick={() => handleOAuthLogin('github')}
               className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Continue with GitHub"
             >
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd" />
@@ -241,12 +252,14 @@ export const LoginPage = () => {
               type="button"
               onClick={() => handleOAuthLogin('apple')}
               className="w-full flex items-center justify-center px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              aria-label="Continue with Apple"
             >
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M15.5 2.25c-.8 0-1.5.3-2.1.8-.5.5-.8 1.2-.8 1.9 0 .1 0 .2.1.3.1 0 .2 0 .3-.1.7-.4 1.4-.6 2.1-.6.8 0 1.5.3 2.1.8.5.5.8 1.2.8 1.9 0 1.1-.4 2.1-1.2 2.8-.8.7-1.8 1.1-2.9 1.1-.9 0-1.7-.3-2.4-.8-.7-.5-1.2-1.2-1.5-2-.3-.8-.3-1.7 0-2.5.3-.8.8-1.5 1.5-2 .7-.5 1.5-.8 2.4-.8.3 0 .6 0 .9.1.3.1.6.2.8.4.2.2.4.4.5.7.1.3.1.6 0 .9-.1.3-.3.5-.5.7-.2.2-.5.3-.8.3-.3 0-.6-.1-.8-.3-.2-.2-.3-.5-.3-.8 0-.2.1-.4.2-.5.1-.1.3-.2.5-.2.1 0 .2 0 .3.1.1.1.1.2.1.3 0 .1-.1.2-.2.2-.1 0-.2 0-.2-.1 0-.1 0-.1.1-.2 0 0 0-.1-.1-.1-.1 0-.2.1-.2.2-.1.2-.1.4 0 .6.1.2.3.3.5.3.3 0 .5-.1.7-.3.2-.2.3-.4.3-.7 0-.4-.2-.8-.5-1.1-.3-.3-.7-.5-1.1-.5-.5 0-1 .2-1.4.5-.4.3-.7.7-.9 1.2-.2.5-.2 1 0 1.5.2.5.5.9.9 1.2.4.3.9.5 1.4.5.7 0 1.4-.3 1.9-.7.5-.4.9-1 1.1-1.6.2-.6.2-1.3 0-1.9-.2-.6-.6-1.1-1.1-1.5-.5-.4-1.1-.6-1.8-.6z"/>
               </svg>
               Continue with Apple
             </button>
+          </div>
           </div>
         </div>
       </div>

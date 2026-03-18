@@ -36,12 +36,16 @@ export class AuthTokenService {
   static generateTokenPair(payload: TokenPayload): TokenPair {
     const accessToken = jwt.sign(payload, config.jwt.secret, {
       expiresIn: config.jwt.accessExpiry,
+      algorithm: 'HS256',
     } as jwt.SignOptions);
 
     const refreshToken = jwt.sign(
       { ...payload, tokenFamily: payload.userId },
       config.jwt.refreshSecret,
-      { expiresIn: config.jwt.refreshExpiry } as jwt.SignOptions
+      { 
+        expiresIn: config.jwt.refreshExpiry,
+        algorithm: 'HS256',
+      } as jwt.SignOptions
     );
 
     return {
@@ -57,6 +61,7 @@ export class AuthTokenService {
   static generateTempToken(payload: TokenPayload & { purpose: string }, expiresIn: string = '5m'): string {
     return jwt.sign(payload, config.jwt.secret, {
       expiresIn,
+      algorithm: 'HS256',
     } as jwt.SignOptions);
   }
 
@@ -65,7 +70,7 @@ export class AuthTokenService {
    */
   static verifyAccessToken(token: string): TokenPayload {
     try {
-      return jwt.verify(token, config.jwt.secret) as TokenPayload;
+      return jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] }) as TokenPayload;
     } catch (error: any) {
       // Re-throw JWT errors with their original name for proper error handling
       if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
@@ -80,7 +85,7 @@ export class AuthTokenService {
    */
   static async verifyRefreshToken(token: string): Promise<TokenPayload & { tokenFamily: string }> {
     try {
-      const decoded = jwt.verify(token, config.jwt.refreshSecret) as TokenPayload & { tokenFamily: string };
+      const decoded = jwt.verify(token, config.jwt.refreshSecret, { algorithms: ['HS256'] }) as TokenPayload & { tokenFamily: string };
       
       // Check if token is blacklisted (revoked)
       const isBlacklisted = await this.isTokenBlacklisted(token);

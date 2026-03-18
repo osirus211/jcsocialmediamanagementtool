@@ -60,9 +60,17 @@ export interface IUser extends Document {
   magicLinkToken?: string;
   magicLinkExpiresAt?: Date;
   
+  // Email verification
+  emailVerificationToken?: string;
+  emailVerificationExpiresAt?: Date;
+  
   // Password reset
   passwordResetToken?: string;
   passwordResetExpiresAt?: Date;
+  
+  // Account lockout
+  loginAttempts: number;
+  lockUntil?: Date;
   
   // Notification preferences
   notificationPreferences: {
@@ -87,6 +95,14 @@ export interface IUser extends Document {
   emailSequenceStep: number;
   emailSequenceStarted: boolean;
   emailSequenceCompleted: boolean;
+  nextEmailAt?: Date;
+  
+  // Email change state
+  pendingEmailChange?: {
+    newEmail: string;
+    token: string;
+    expiresAt: Date;
+  };
   
   createdAt: Date;
   updatedAt: Date;
@@ -189,8 +205,12 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     twoFactorVerifiedAt: { type: Date, default: null },
     magicLinkToken: { type: String, default: null, select: false },
     magicLinkExpiresAt: { type: Date, default: null, select: false },
+    emailVerificationToken: { type: String, default: null, select: false },
+    emailVerificationExpiresAt: { type: Date, default: null, select: false },
     passwordResetToken: { type: String, default: null, select: false },
     passwordResetExpiresAt: { type: Date, default: null, select: false },
+    loginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date, default: null },
     notificationPreferences: {
       type: {
         email: {
@@ -242,6 +262,18 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     emailSequenceCompleted: {
       type: Boolean,
       default: false,
+    },
+    nextEmailAt: {
+      type: Date,
+      required: false,
+    },
+    pendingEmailChange: {
+      type: {
+        newEmail: { type: String, required: true },
+        token: { type: String, required: true },
+        expiresAt: { type: Date, required: true }
+      },
+      required: false,
     },
   },
   {

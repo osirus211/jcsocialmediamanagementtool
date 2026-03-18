@@ -58,10 +58,11 @@ export const ResetPasswordPage = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
     watch,
   } = useForm<ResetPasswordData>({
     resolver: zodResolver(resetPasswordSchema),
+    mode: 'onChange',
   });
 
   const password = watch('password');
@@ -187,8 +188,9 @@ export const ResetPasswordPage = () => {
             <Link
               to="/auth/login"
               className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              aria-label="Return to sign in page"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
               Back to Sign In
             </Link>
           </div>
@@ -209,20 +211,33 @@ export const ResetPasswordPage = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div 
+          className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+          role="alert"
+          aria-live="polite"
+        >
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" role="form" aria-label="Set new password">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label 
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             New Password
           </label>
           <div className="relative">
             <input
               {...register('password')}
+              id="password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              required
+              aria-required="true"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'password-error' : password ? 'password-strength' : undefined}
               className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               placeholder="••••••••"
             />
@@ -230,47 +245,52 @@ export const ResetPasswordPage = () => {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
             </button>
           </div>
           {errors.password && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            <p 
+              id="password-error"
+              className="mt-1 text-sm text-red-600 dark:text-red-400"
+              role="alert"
+            >
               {errors.password.message}
             </p>
           )}
           
           {/* Password Strength Indicator */}
           {password && (
-            <div className="mt-2">
+            <div className="mt-2" id="password-strength" aria-label="Password strength indicator">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-gray-600 dark:text-gray-400">Password Strength</span>
                 <span className={`text-xs font-medium text-${passwordStrength.color}-600`}>
                   {passwordStrength.label}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5" role="progressbar" aria-valuenow={passwordStrength.score} aria-valuemin={0} aria-valuemax={4} aria-label={`Password strength: ${passwordStrength.label}`}>
                 <div
                   className={`h-1.5 rounded-full bg-${passwordStrength.color}-500 transition-all duration-300`}
                   style={{ width: `${(passwordStrength.score / 4) * 100}%` }}
                 />
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-green-600' : 'text-gray-400'}`}>
-                  {passwordStrength.checks.length ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                  8+ characters
+              <div className="mt-2 grid grid-cols-2 gap-1 text-xs" role="list" aria-label="Password requirements">
+                <div className={`flex items-center gap-1 ${passwordStrength.checks.length ? 'text-green-600' : 'text-gray-400'}`} role="listitem">
+                  {passwordStrength.checks.length ? <CheckCircle className="w-3 h-3" aria-hidden="true" /> : <XCircle className="w-3 h-3" aria-hidden="true" />}
+                  <span aria-label={passwordStrength.checks.length ? '8 or more characters: satisfied' : '8 or more characters: not satisfied'}>8+ characters</span>
                 </div>
-                <div className={`flex items-center gap-1 ${passwordStrength.checks.uppercase ? 'text-green-600' : 'text-gray-400'}`}>
-                  {passwordStrength.checks.uppercase ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                  Uppercase
+                <div className={`flex items-center gap-1 ${passwordStrength.checks.uppercase ? 'text-green-600' : 'text-gray-400'}`} role="listitem">
+                  {passwordStrength.checks.uppercase ? <CheckCircle className="w-3 h-3" aria-hidden="true" /> : <XCircle className="w-3 h-3" aria-hidden="true" />}
+                  <span aria-label={passwordStrength.checks.uppercase ? 'Uppercase letter: satisfied' : 'Uppercase letter: not satisfied'}>Uppercase</span>
                 </div>
-                <div className={`flex items-center gap-1 ${passwordStrength.checks.lowercase ? 'text-green-600' : 'text-gray-400'}`}>
-                  {passwordStrength.checks.lowercase ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                  Lowercase
+                <div className={`flex items-center gap-1 ${passwordStrength.checks.lowercase ? 'text-green-600' : 'text-gray-400'}`} role="listitem">
+                  {passwordStrength.checks.lowercase ? <CheckCircle className="w-3 h-3" aria-hidden="true" /> : <XCircle className="w-3 h-3" aria-hidden="true" />}
+                  <span aria-label={passwordStrength.checks.lowercase ? 'Lowercase letter: satisfied' : 'Lowercase letter: not satisfied'}>Lowercase</span>
                 </div>
-                <div className={`flex items-center gap-1 ${passwordStrength.checks.number ? 'text-green-600' : 'text-gray-400'}`}>
-                  {passwordStrength.checks.number ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                  Number
+                <div className={`flex items-center gap-1 ${passwordStrength.checks.number ? 'text-green-600' : 'text-gray-400'}`} role="listitem">
+                  {passwordStrength.checks.number ? <CheckCircle className="w-3 h-3" aria-hidden="true" /> : <XCircle className="w-3 h-3" aria-hidden="true" />}
+                  <span aria-label={passwordStrength.checks.number ? 'Number: satisfied' : 'Number: not satisfied'}>Number</span>
                 </div>
               </div>
             </div>
@@ -278,13 +298,22 @@ export const ResetPasswordPage = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label 
+            htmlFor="confirmPassword"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Confirm New Password
           </label>
           <div className="relative">
             <input
               {...register('confirmPassword')}
+              id="confirmPassword"
               type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              required
+              aria-required="true"
+              aria-invalid={!!errors.confirmPassword}
+              aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
               className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               placeholder="••••••••"
             />
@@ -292,12 +321,17 @@ export const ResetPasswordPage = () => {
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
             >
-              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
             </button>
           </div>
           {errors.confirmPassword && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            <p 
+              id="confirmPassword-error"
+              className="mt-1 text-sm text-red-600 dark:text-red-400"
+              role="alert"
+            >
               {errors.confirmPassword.message}
             </p>
           )}
@@ -305,7 +339,8 @@ export const ResetPasswordPage = () => {
 
         <button
           type="submit"
-          disabled={isLoading || passwordStrength.score < 4}
+          disabled={isLoading || !isValid || passwordStrength.score < 4}
+          aria-disabled={isLoading || !isValid || passwordStrength.score < 4}
           className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isLoading ? 'Resetting Password...' : 'Reset Password'}
@@ -316,8 +351,9 @@ export const ResetPasswordPage = () => {
         <Link
           to="/auth/login"
           className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+          aria-label="Return to sign in page"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           Back to Sign In
         </Link>
       </div>

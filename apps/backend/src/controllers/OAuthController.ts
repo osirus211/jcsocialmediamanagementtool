@@ -1383,13 +1383,47 @@ export class OAuthController {
         duration: Date.now() - startTime,
       });
 
-      // Step 6: Final response
+      // Step 6: Generate JWT tokens for user authentication
+      const { User } = await import('../models/User');
+      const { AuthTokenService } = await import('../services/AuthTokenService');
+      
+      const user = await User.findById(stateData.userId);
+      if (!user) {
+        throw new Error('User not found for OAuth callback');
+      }
+
+      // Generate JWT tokens using the same pattern as email/password login
+      const authTokens = AuthTokenService.generateTokenPair({
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      });
+
+      // Store refresh token on user
+      await user.addRefreshToken(authTokens.refreshToken);
+
+      // Set refresh token in httpOnly cookie (same pattern as AuthController)
+      res.cookie('refreshToken', authTokens.refreshToken, {
+        httpOnly: true,
+        secure: config.env === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/api/v1/auth',
+      });
+
+      logger.info('[OAuth] JWT tokens generated', {
+        platform,
+        userId: user._id,
+        workspaceId: stateData.workspaceId,
+      });
+
+      // Step 7: Final response with access token
       const frontendUrl = config.cors.origin;
-      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=${platform}&account=${account._id}`;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=${platform}&account=${account._id}&token=${authTokens.accessToken}`;
       debugReport.finalResponseStatus = 302;
       logger.debug('[OAuth] Callback completed successfully', { step: 'callback_complete' });
       
-      // Redirect to frontend with success
+      // Redirect to frontend with success and access token
       res.redirect(redirectUrl);
       
       } catch (dbError: any) {
@@ -2434,8 +2468,41 @@ export class OAuthController {
         },
       });
 
+      // Generate JWT tokens for user authentication
+      const { User } = await import('../models/User');
+      const { AuthTokenService } = await import('../services/AuthTokenService');
+      
+      const user = await User.findById(consumedState.userId);
+      if (!user) {
+        throw new Error('User not found for GitHub OAuth callback');
+      }
+
+      // Generate JWT tokens using the same pattern as email/password login
+      const authTokens = AuthTokenService.generateTokenPair({
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      });
+
+      // Store refresh token on user
+      await user.addRefreshToken(authTokens.refreshToken);
+
+      // Set refresh token in httpOnly cookie (same pattern as AuthController)
+      res.cookie('refreshToken', authTokens.refreshToken, {
+        httpOnly: true,
+        secure: config.env === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/api/v1/auth',
+      });
+
+      logger.info('[OAuth] GitHub JWT tokens generated', {
+        userId: user._id,
+        workspaceId: consumedState.workspaceId,
+      });
+
       const frontendUrl = config.cors.origin;
-      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=github&account=${socialAccount._id}`;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=github&account=${socialAccount._id}&token=${authTokens.accessToken}`;
       debugReport.finalResponseStatus = 302;
       logger.debug('[OAuth] GitHub callback success redirect', { step: 'github_success_redirect' });
       
@@ -2574,8 +2641,41 @@ export class OAuthController {
         },
       });
 
+      // Generate JWT tokens for user authentication
+      const { User } = await import('../models/User');
+      const { AuthTokenService } = await import('../services/AuthTokenService');
+      
+      const user = await User.findById(consumedState.userId);
+      if (!user) {
+        throw new Error('User not found for Apple OAuth callback');
+      }
+
+      // Generate JWT tokens using the same pattern as email/password login
+      const authTokens = AuthTokenService.generateTokenPair({
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      });
+
+      // Store refresh token on user
+      await user.addRefreshToken(authTokens.refreshToken);
+
+      // Set refresh token in httpOnly cookie (same pattern as AuthController)
+      res.cookie('refreshToken', authTokens.refreshToken, {
+        httpOnly: true,
+        secure: config.env === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        path: '/api/v1/auth',
+      });
+
+      logger.info('[OAuth] Apple JWT tokens generated', {
+        userId: user._id,
+        workspaceId: consumedState.workspaceId,
+      });
+
       const frontendUrl = config.cors.origin;
-      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=apple&account=${socialAccount._id}`;
+      const redirectUrl = `${frontendUrl}/social/accounts?success=true&platform=apple&account=${socialAccount._id}&token=${authTokens.accessToken}`;
       debugReport.finalResponseStatus = 302;
       logger.debug('[OAuth] Apple callback success redirect', { step: 'apple_success_redirect' });
       
