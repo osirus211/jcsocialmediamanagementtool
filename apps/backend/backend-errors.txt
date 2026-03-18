@@ -1,0 +1,493 @@
+MongoDB Memory Server started at: mongodb://127.0.0.1:7791/
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"stripeCustomerId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"stripeSubscriptionId":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"timestamp":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: `errors` is a reserved schema pathname and may break some functionality. You are allowed to use it, but use at your own risk. To disable this warning pass `suppressReservedKeysWarning` as a schema option.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"collectedAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"createdAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"shareToken":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"deletedAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"deletedAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"deletedAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+FAIL src/__tests__/analytics/dashboard.test.ts (10.031 s)
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/dashboard ΓÇ║ should return unified dashboard analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      120 |         .set('Authorization', `Bearer ${accessToken}`)
+      121 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 122 |         .expect(200);
+          |          ^
+      123 |
+      124 |       expect(response.body.success).toBe(true);
+      125 |       expect(response.body.data).toHaveProperty('overview');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:122:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/dashboard ΓÇ║ should filter by platform when specified
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      139 |         .set('Authorization', `Bearer ${accessToken}`)
+      140 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 141 |         .expect(200);
+          |          ^
+      142 |
+      143 |       expect(response.body.success).toBe(true);
+      144 |       expect(response.body.data).toHaveProperty('overview');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:141:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/hashtags/performance ΓÇ║ should return hashtag analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      152 |         .set('Authorization', `Bearer ${accessToken}`)
+      153 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 154 |         .expect(200);
+          |          ^
+      155 |
+      156 |       expect(response.body.success).toBe(true);
+      157 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:154:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/hashtags/performance ΓÇ║ should sort hashtags by engagement by default
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      172 |         .set('Authorization', `Bearer ${accessToken}`)
+      173 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 174 |         .expect(200);
+          |          ^
+      175 |
+      176 |       expect(response.body.success).toBe(true);
+      177 |     });
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:174:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/best-times/heatmap ΓÇ║ should return best posting times heatmap data
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      184 |         .set('Authorization', `Bearer ${accessToken}`)
+      185 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 186 |         .expect(200);
+          |          ^
+      187 |
+      188 |       expect(response.body.success).toBe(true);
+      189 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:186:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/link-clicks ΓÇ║ should return link click analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      212 |         .set('Authorization', `Bearer ${accessToken}`)
+      213 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 214 |         .expect(200);
+          |          ^
+      215 |
+      216 |       expect(response.body.success).toBe(true);
+      217 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:214:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/link-clicks ΓÇ║ should group by different dimensions
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      231 |         .set('Authorization', `Bearer ${accessToken}`)
+      232 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 233 |         .expect(200);
+          |          ^
+      234 |
+      235 |       expect(response.body.success).toBe(true);
+      236 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:233:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/competitors ΓÇ║ should return competitor analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      244 |         .set('Authorization', `Bearer ${accessToken}`)
+      245 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 246 |         .expect(200);
+          |          ^
+      247 |
+      248 |       expect(response.body.success).toBe(true);
+      249 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:246:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ POST /api/v1/analytics/export ΓÇ║ should export analytics report as PDF
+
+    expected 200 "OK", got 500 "Internal Server Error"
+
+      276 |         .set('X-Workspace-ID', workspace._id.toString())
+      277 |         .send(exportOptions)
+    > 278 |         .expect(200);
+          |          ^
+      279 |
+      280 |       expect(response.body.success).toBe(true);
+      281 |       expect(response.body.data).toHaveProperty('fileName');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:278:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ POST /api/v1/analytics/export ΓÇ║ should export analytics report as CSV
+
+    expected 200 "OK", got 500 "Internal Server Error"
+
+      300 |         .set('X-Workspace-ID', workspace._id.toString())
+      301 |         .send(exportOptions)
+    > 302 |         .expect(200);
+          |          ^
+      303 |
+      304 |       expect(response.body.success).toBe(true);
+      305 |       expect(response.body.data).toHaveProperty('fileName');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:302:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ POST /api/v1/analytics/export ΓÇ║ should validate export options
+
+    expected 400 "Bad Request", got 500 "Internal Server Error"
+
+      319 |         .set('X-Workspace-ID', workspace._id.toString())
+      320 |         .send(invalidOptions)
+    > 321 |         .expect(400);
+          |          ^
+      322 |     });
+      323 |   });
+      324 |
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:321:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+PASS src/__tests__/analytics/post-metrics.test.ts (10.075 s)
+PASS src/__tests__/analytics/analytics.test.ts
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"timestamp":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"timestamp":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+PASS src/__tests__/auth/oauth.controller.test.ts
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+PASS src/__tests__/workspace/workspace.service.test.ts
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+PASS src/__tests__/workspace/tenancy-isolation.test.ts
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"deletedAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(node:27172) [MONGOOSE] Warning: Duplicate schema index on {"deletedAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+PASS src/__tests__/analytics/analytics-store-integration.test.ts
+PASS src/__tests__/rss/rss-feeds.test.ts
+PASS src/__tests__/rss/rss-articles.test.ts
+PASS src/services/__tests__/WorkspaceService.isolated.test.ts
+PASS src/__tests__/posts/bulk-schedule.test.ts
+PASS src/__tests__/ai/ai-generate.test.ts
+PASS src/__tests__/auth/auth.service.test.ts
+PASS src/__tests__/auth/auth.routes.test.ts
+PASS src/services/__tests__/WorkspaceInvitation.test.ts
+PASS src/__tests__/workspace/invite.integration.test.ts
+PASS src/__tests__/workspace/workspace.routes.test.ts
+PASS src/__tests__/analytics/post-metrics-simple.test.ts
+PASS src/__tests__/analytics/simple-test.test.ts
+PASS src/__tests__/analytics/analytics-export.test.ts
+PASS src/__tests__/simple.test.ts
+
+Summary of all failing tests
+FAIL src/__tests__/analytics/dashboard.test.ts (10.031 s)
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/dashboard ΓÇ║ should return unified dashboard analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      120 |         .set('Authorization', `Bearer ${accessToken}`)
+      121 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 122 |         .expect(200);
+          |          ^
+      123 |
+      124 |       expect(response.body.success).toBe(true);
+      125 |       expect(response.body.data).toHaveProperty('overview');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:122:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/dashboard ΓÇ║ should filter by platform when specified
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      139 |         .set('Authorization', `Bearer ${accessToken}`)
+      140 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 141 |         .expect(200);
+          |          ^
+      142 |
+      143 |       expect(response.body.success).toBe(true);
+      144 |       expect(response.body.data).toHaveProperty('overview');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:141:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/hashtags/performance ΓÇ║ should return hashtag analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      152 |         .set('Authorization', `Bearer ${accessToken}`)
+      153 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 154 |         .expect(200);
+          |          ^
+      155 |
+      156 |       expect(response.body.success).toBe(true);
+      157 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:154:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/hashtags/performance ΓÇ║ should sort hashtags by engagement by default
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      172 |         .set('Authorization', `Bearer ${accessToken}`)
+      173 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 174 |         .expect(200);
+          |          ^
+      175 |
+      176 |       expect(response.body.success).toBe(true);
+      177 |     });
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:174:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/best-times/heatmap ΓÇ║ should return best posting times heatmap data
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      184 |         .set('Authorization', `Bearer ${accessToken}`)
+      185 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 186 |         .expect(200);
+          |          ^
+      187 |
+      188 |       expect(response.body.success).toBe(true);
+      189 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:186:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/link-clicks ΓÇ║ should return link click analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      212 |         .set('Authorization', `Bearer ${accessToken}`)
+      213 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 214 |         .expect(200);
+          |          ^
+      215 |
+      216 |       expect(response.body.success).toBe(true);
+      217 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:214:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/link-clicks ΓÇ║ should group by different dimensions
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      231 |         .set('Authorization', `Bearer ${accessToken}`)
+      232 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 233 |         .expect(200);
+          |          ^
+      234 |
+      235 |       expect(response.body.success).toBe(true);
+      236 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:233:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ GET /api/v1/analytics/competitors ΓÇ║ should return competitor analytics
+
+    expected 200 "OK", got 403 "Forbidden"
+
+      244 |         .set('Authorization', `Bearer ${accessToken}`)
+      245 |         .set('X-Workspace-ID', workspace._id.toString())
+    > 246 |         .expect(200);
+          |          ^
+      247 |
+      248 |       expect(response.body.success).toBe(true);
+      249 |       expect(Array.isArray(response.body.data)).toBe(true);
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:246:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ POST /api/v1/analytics/export ΓÇ║ should export analytics report as PDF
+
+    expected 200 "OK", got 500 "Internal Server Error"
+
+      276 |         .set('X-Workspace-ID', workspace._id.toString())
+      277 |         .send(exportOptions)
+    > 278 |         .expect(200);
+          |          ^
+      279 |
+      280 |       expect(response.body.success).toBe(true);
+      281 |       expect(response.body.data).toHaveProperty('fileName');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:278:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ POST /api/v1/analytics/export ΓÇ║ should export analytics report as CSV
+
+    expected 200 "OK", got 500 "Internal Server Error"
+
+      300 |         .set('X-Workspace-ID', workspace._id.toString())
+      301 |         .send(exportOptions)
+    > 302 |         .expect(200);
+          |          ^
+      303 |
+      304 |       expect(response.body.success).toBe(true);
+      305 |       expect(response.body.data).toHaveProperty('fileName');
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:302:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+  ΓùÅ Analytics Dashboard API ΓÇ║ POST /api/v1/analytics/export ΓÇ║ should validate export options
+
+    expected 400 "Bad Request", got 500 "Internal Server Error"
+
+      319 |         .set('X-Workspace-ID', workspace._id.toString())
+      320 |         .send(invalidOptions)
+    > 321 |         .expect(400);
+          |          ^
+      322 |     });
+      323 |   });
+      324 |
+
+      at Object.<anonymous> (src/__tests__/analytics/dashboard.test.ts:321:10)
+      ----
+      at Test._assertStatus (node_modules/supertest/lib/test.js:252:14)
+      at node_modules/supertest/lib/test.js:308:13
+      at Test._assertFunction (node_modules/supertest/lib/test.js:285:13)
+      at Test.assert (node_modules/supertest/lib/test.js:164:23)
+      at Server.localAssert (node_modules/supertest/lib/test.js:120:14)
+
+
+Test Suites: 1 failed, 20 passed, 21 total
+Tests:       11 failed, 134 passed, 145 total
+Snapshots:   0 total
+Time:        25.862 s, estimated 26 s
+Ran all test suites.
+MongoDB Memory Server stopped

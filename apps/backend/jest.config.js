@@ -16,6 +16,8 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(nanoid|uuid|chalk|@bull-board)/)'
   ],
+  globalSetup: '<rootDir>/src/__tests__/globalSetup.ts',
+  globalTeardown: '<rootDir>/src/__tests__/globalTeardown.ts',
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: [

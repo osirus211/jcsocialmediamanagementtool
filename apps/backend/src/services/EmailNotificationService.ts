@@ -440,6 +440,44 @@ export class EmailNotificationService {
     }
   }
 
+  /**
+   * Send email verification email
+   */
+  async sendEmailVerificationEmail(params: {
+    to: string;
+    firstName: string;
+    verificationUrl: string;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: 'Verify Your Email Address',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #3b82f6;">Verify Your Email Address</h2>
+            <p>Hi ${params.firstName},</p>
+            <p>Thank you for registering! Please verify your email address to complete your account setup.</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${params.verificationUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Verify Email Address
+              </a>
+            </p>
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #6b7280;">${params.verificationUrl}</p>
+            <p>This verification link will expire in 24 hours.</p>
+            <p>If you didn't create an account, please ignore this email.</p>
+          </div>
+        `,
+        text: `Hi ${params.firstName}, Thank you for registering! Please verify your email address by clicking this link: ${params.verificationUrl} This verification link will expire in 24 hours. If you didn't create an account, please ignore this email.`,
+      });
+
+      logger.info('Email verification email sent', { to: params.to });
+    } catch (error: any) {
+      logger.error('Failed to send email verification email', { error: error.message, to: params.to });
+      throw error;
+    }
+  }
+
   async sendWelcomeEmail(params: {
     to: string;
     firstName: string;

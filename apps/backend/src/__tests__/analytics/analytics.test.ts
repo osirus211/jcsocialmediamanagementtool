@@ -12,35 +12,10 @@ describe('Analytics API', () => {
   let authToken: string;
   let workspaceId: string;
   let userId: string;
+  let testCounter = 0;
 
   beforeAll(async () => {
     await setupTestDatabase();
-    
-    // Create test user and workspace
-    const user = new User({
-      email: 'test@example.com',
-      password: 'TestPassword123!',
-      name: 'Test User',
-      firstName: 'Test',
-      lastName: 'User'
-    });
-    await user.save();
-    userId = user._id.toString();
-
-    const workspace = new Workspace({
-      name: 'Test Workspace',
-      slug: 'test-workspace',
-      ownerId: userId,
-      members: [{ userId, role: 'owner' }]
-    });
-    await workspace.save();
-    workspaceId = workspace._id.toString();
-
-    authToken = AuthTokenService.generateTokenPair({
-      userId,
-      email: user.email,
-      role: 'owner'
-    }).accessToken;
   });
 
   afterAll(async () => {
@@ -49,10 +24,11 @@ describe('Analytics API', () => {
 
   beforeEach(async () => {
     await clearTestDatabase();
+    testCounter++;
     
-    // Recreate user and workspace for each test
+    // Create unique user and workspace for each test
     const user = new User({
-      email: 'test@example.com',
+      email: `test${testCounter}@example.com`,
       password: 'TestPassword123!',
       name: 'Test User',
       firstName: 'Test',
@@ -62,8 +38,8 @@ describe('Analytics API', () => {
     userId = user._id.toString();
 
     const workspace = new Workspace({
-      name: 'Test Workspace',
-      slug: 'test-workspace',
+      name: `Test Workspace ${testCounter}`,
+      slug: `test-workspace-${testCounter}`,
       ownerId: userId,
       members: [{ userId, role: 'owner' }]
     });

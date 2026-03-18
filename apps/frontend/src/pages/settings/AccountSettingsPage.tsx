@@ -32,14 +32,16 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { AccountService } from '@/services/account.service';
+import { UserProfileService } from '@/services/user-profile.service';
 import { toast } from '@/lib/notifications';
 import { GDPRSettings } from '@/components/settings/GDPRSettings';
 import type { 
   LoginActivity, 
   TrustedDevice, 
   AccountStatus,
-  EmailChangeRequest 
+  EmailChangeRequest
 } from '@/types/account.types';
+import type { UserSession } from '@/types/auth.types';
 
 export function AccountSettingsPage() {
   const navigate = useNavigate();
@@ -70,6 +72,7 @@ export function AccountSettingsPage() {
   // Security State
   const [loginHistory, setLoginHistory] = useState<LoginActivity[]>([]);
   const [trustedDevices, setTrustedDevices] = useState<TrustedDevice[]>([]);
+  const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
   
   // Danger Zone State
@@ -84,15 +87,17 @@ export function AccountSettingsPage() {
   const loadAccountData = async () => {
     try {
       setIsLoading(true);
-      const [history, devices, status, pendingEmail] = await Promise.all([
+      const [history, devices, sessions, status, pendingEmail] = await Promise.all([
         AccountService.getLoginHistory(),
         AccountService.getTrustedDevices(),
+        UserProfileService.getSessions(),
         AccountService.getAccountStatus(),
         AccountService.getPendingEmailChange(),
       ]);
       
       setLoginHistory(history);
       setTrustedDevices(devices);
+      setActiveSessions(sessions);
       setAccountStatus(status);
       setPendingEmailChange(pendingEmail);
     } catch (error) {
@@ -202,6 +207,28 @@ export function AccountSettingsPage() {
     }
   };
 
+  const handleRevokeSession = async (sessionId: string) => {
+    try {
+      await UserProfileService.revokeSession(sessionId);
+      setActiveSessions(sessions => sessions.filter(s => s.id !== sessionId));
+      toast.success('Session revoked successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to revoke session');
+    }
+  };
+
+  const handleRevokeAllOtherSessions = async () => {
+    try {
+      // Revoke all sessions except current
+      const otherSessions = activeSessions.filter(s => !s.current);
+      await Promise.all(otherSessions.map(s => UserProfileService.revokeSession(s.id)));
+      setActiveSessions(sessions => sessions.filter(s => s.current));
+      toast.success('All other sessions revoked successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to revoke sessions');
+    }
+  };
+
   const handleExportData = async () => {
     try {
       setIsLoading(true);
@@ -294,7 +321,7 @@ export function AccountSettingsPage() {
     );
   }
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl w-full mx-auto px-4 p-6 overflow-x-hidden">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
@@ -305,7 +332,7 @@ export function AccountSettingsPage() {
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -605,6 +632,66 @@ export function AccountSettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* Active Sessions */}
+            <div className="bg-white rounded-lg border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Monitor className="w-5 h-5" />
+                  Active Sessions
+                </h3>
+                {activeSessions.filter(s => !s.current).length > 0 && (
+                  <button
+                    onClick={handleRevokeAllOtherSessions}
+                    className="px-3 py-1 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50"
+                  >
+                    Revoke All Other Sessions
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                {activeSessions.length > 0 ? (
+                  activeSessions.map((session) => (
+                    <div key={session.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                      <div className="flex items-center gap-3">
+                        <Monitor className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{session.device}</p>
+                          <p className="text-xs text-gray-500">
+                            {session.location} • Last active: {new Date(session.lastActive).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {session.current && (
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                            Current Session
+                          </span>
+                        )}
+                        {!session.current ? (
+                          <button
+                            onClick={() => handleRevokeSession(session.id)}
+                            className="px-3 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50"
+                          >
+                            Revoke
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="px-3 py-1 text-xs text-gray-400 border border-gray-200 rounded cursor-not-allowed"
+                            aria-label="Cannot revoke current session"
+                          >
+                            Current
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No active sessions</p>
+                )}
+              </div>
+            </div>
 
             {/* Login History */}
             <div className="bg-white rounded-lg border p-6">

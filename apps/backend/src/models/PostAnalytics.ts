@@ -226,6 +226,21 @@ PostAnalyticsSchema.pre('save', function (next) {
   next();
 });
 
+// Cleanup method (RULE 15)
+PostAnalyticsSchema.statics.cleanup = async function() {
+  try {
+    const cutoffDate = new Date(Date.now() - MAX_POST_METRICS_DAYS * 24 * 60 * 60 * 1000);
+    const result = await this.deleteMany({
+      collectedAt: { $lt: cutoffDate }
+    });
+    console.log(`Cleaned up ${result.deletedCount} old PostAnalytics records`);
+    return result;
+  } catch (error) {
+    console.error('PostAnalytics cleanup failed:', error);
+    throw error;
+  }
+};
+
 export const PostAnalytics = mongoose.model<IPostAnalytics>('PostAnalytics', PostAnalyticsSchema);
 
 // Storage limits

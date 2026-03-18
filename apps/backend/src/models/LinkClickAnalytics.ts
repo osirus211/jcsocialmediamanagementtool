@@ -186,14 +186,12 @@ const LinkClickAnalyticsSchema = new Schema<ILinkClickAnalytics>(
     },
     hourOfDay: {
       type: Number,
-      required: true,
       min: 0,
       max: 23,
       index: true,
     },
     dayOfWeek: {
       type: Number,
-      required: true,
       min: 0,
       max: 6,
       index: true,
@@ -251,8 +249,8 @@ LinkClickAnalyticsSchema.index({ deletedAt: 1 }); // Soft delete queries
 LinkClickAnalyticsSchema.pre('save', function (next) {
   if (this.clickedAt) {
     const date = new Date(this.clickedAt);
-    this.hourOfDay = date.getHours();
-    this.dayOfWeek = date.getDay();
+    this.hourOfDay = date.getUTCHours();
+    this.dayOfWeek = date.getUTCDay();
   }
   next();
 });

@@ -116,10 +116,16 @@ export class EmailSequenceService {
   }
 
   /**
-   * Schedule a single sequence email
+   * Schedule a single sequence email with per-user timing
    */
   private async scheduleSequenceEmail(userId: string, sequenceStep: EmailSequenceStep): Promise<Job> {
     const jobId = `email-sequence-${userId}-step-${sequenceStep.step}`;
+    
+    // Calculate per-user delay based on registration time to spread load
+    const user = await User.findById(userId);
+    const baseDelay = sequenceStep.delay;
+    const userSpecificOffset = user ? (user.createdAt.getTime() % (60 * 60 * 1000)) : 0; // 0-60 min offset
+    const finalDelay = baseDelay + userSpecificOffset;
     
     const job = await this.queue.add(
       'send-sequence-email',
@@ -131,15 +137,17 @@ export class EmailSequenceService {
       },
       {
         jobId,
-        delay: sequenceStep.delay,
+        delay: finalDelay,
         priority: 5, // Medium priority
       }
     );
 
-    logger.info('Sequence email scheduled', {
+    logger.info('Sequence email scheduled with per-user timing', {
       userId,
       step: sequenceStep.step,
-      delay: sequenceStep.delay,
+      baseDelay,
+      userOffset: userSpecificOffset,
+      finalDelay,
       jobId: job.id,
     });
 
@@ -180,8 +188,17 @@ export class EmailSequenceService {
       // Send the email
       await this.sendSequenceEmail(user, step, templateType, subject);
 
-      // Update user progress
+      // Update user progress and set next email time
       user.emailSequenceStep = Math.max(user.emailSequenceStep, step);
+      
+      // Set nextEmailAt for the next step if not the last step
+      const nextStep = EMAIL_SEQUENCE_STEPS.find(s => s.step === step + 1);
+      if (nextStep) {
+        const userSpecificOffset = user.createdAt.getTime() % (60 * 60 * 1000); // 0-60 min offset
+        user.nextEmailAt = new Date(Date.now() + nextStep.delay + userSpecificOffset);
+      } else {
+        user.nextEmailAt = undefined; // No more emails
+      }
       
       // Mark as completed if this is the last step
       if (step === EMAIL_SEQUENCE_STEPS.length - 1) {

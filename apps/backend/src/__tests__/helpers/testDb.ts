@@ -1,22 +1,23 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-
-let mongoServer: MongoMemoryServer;
 
 export const connectTestDB = async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
+  // Use the MongoDB URI set by globalSetup
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGODB_TEST_URI;
+  if (!mongoUri) {
+    throw new Error('MongoDB URI not set by globalSetup');
+  }
   
-  await mongoose.connect(mongoUri);
+  // Only connect if not already connected
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(mongoUri);
+  }
 };
 
 export const disconnectTestDB = async () => {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
   }
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  // Don't stop the global MongoDB server - that's handled by globalTeardown
 };
 
 export const clearTestDB = async () => {

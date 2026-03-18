@@ -156,7 +156,7 @@ export function UserProfilePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl w-full mx-auto px-4 p-6 overflow-x-hidden">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">User Profile</h1>
@@ -167,7 +167,7 @@ export function UserProfilePage() {
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (

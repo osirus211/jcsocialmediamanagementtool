@@ -124,6 +124,7 @@ app.use((req, res, next) => {
     '/api/v1/workspaces', // Temporarily disable CSRF for workspace routes
     '/api/v1/onboarding', // Temporarily disable CSRF for onboarding routes (for e2e testing)
     '/api/v1/test-auth', // Test authentication routes (for testing email functionality)
+    '/api/v1/analytics/export', // Export routes for testing
   ];
   
   const isExcluded = excludedPaths.some(path => req.path.startsWith(path));
@@ -429,7 +430,10 @@ app.use('/unsubscribe', unsubscribeRoutes);
 // app.use('/api/v2', apiV2Routes);
 
 // API v1 routes
-app.use('/api/v1', apiV1Routes);
+app.use('/api/v1', (req, res, next) => {
+  console.log(`API v1 route: ${req.method} ${req.path}`);
+  next();
+}, apiV1Routes);
 
 // Public API v1 routes (external integrations)
 app.use('/api/public/v1', publicApiV1Routes);

@@ -11,13 +11,6 @@ import { HashtagAnalytics, MAX_HASHTAG_ANALYTICS_DAYS } from '../../models/Hasht
 import { LinkClickAnalytics, MAX_LINK_CLICKS_DAYS } from '../../models/LinkClickAnalytics';
 
 describe('Analytics Models Integration', () => {
-  beforeAll(async () => {
-    // Connect to test database if not already connected
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/test');
-    }
-  });
-
   afterAll(async () => {
     // Clean up test data
     await PostAnalytics.deleteMany({});
@@ -89,7 +82,7 @@ describe('Analytics Models Integration', () => {
   });
 
   it('should create LinkClickAnalytics with timing fields auto-calculated', async () => {
-    const clickedAt = new Date('2024-01-15T14:30:00Z'); // Monday 2:30 PM
+    const clickedAt = new Date('2024-01-15T14:30:00.000Z'); // Monday 2:30 PM UTC
     
     const linkClickAnalytics = new LinkClickAnalytics({
       workspaceId: new mongoose.Types.ObjectId(),
@@ -107,7 +100,7 @@ describe('Analytics Models Integration', () => {
     await linkClickAnalytics.save();
 
     // Check auto-calculated timing fields
-    expect(linkClickAnalytics.hourOfDay).toBe(14); // 2 PM
+    expect(linkClickAnalytics.hourOfDay).toBe(14); // 2 PM UTC
     expect(linkClickAnalytics.dayOfWeek).toBe(1); // Monday
     expect(linkClickAnalytics.utmSource).toBe('twitter');
   });

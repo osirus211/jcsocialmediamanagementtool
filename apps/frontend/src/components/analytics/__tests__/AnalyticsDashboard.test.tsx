@@ -275,7 +275,7 @@ describe('AnalyticsDashboard', () => {
         
         if (startDateInput) {
           expect(startDateInput.max).toBeTruthy()
-          expect(new Date(startDateInput.max) <= new Date()).toBe(true)
+          expect(new Date(startDateInput.max).getTime()).toBeLessThanOrEqual(new Date().getTime())
         }
       } else {
         // If custom range is not implemented, just verify the dropdown opened
@@ -640,7 +640,7 @@ describe('AnalyticsDashboard', () => {
 
 
     it('PDF button shows loading state during request', async () => {
-      // Mock the PDF export to take time (RULE 28)
+      // Mock the PDF export to take time
       vi.mocked(analyticsService.exportPDF).mockImplementation(() => 
         new Promise(resolve => setTimeout(() => resolve(new Blob()), 150))
       )
@@ -656,7 +656,7 @@ describe('AnalyticsDashboard', () => {
       // Click the button
       await userEvent.click(screen.getByTestId('export-pdf-button'))
       
-      // Loading text should appear immediately after click (RULE 28)
+      // Loading text should appear immediately after click
       expect(screen.getByText(/generating/i)).toBeInTheDocument()
     })
   })
