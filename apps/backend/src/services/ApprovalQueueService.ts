@@ -68,8 +68,221 @@ export class ApprovalQueueService {
   }
 
   /**
-   * Approve post
+   * Approve current stage
    */
+  async approveCurrentStage(params: {
+    postId: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+    comment?: string;
+  }): Promise<void> {
+    const { postId, userId, comment } = params;
+
+    const post = await ScheduledPost.findById(postId);
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    // Check if post has approval stages
+    if (!post.approvalStages || post.approvalStages.length === 0) {
+      // Fall back to legacy approval
+      return this.approvePost({ postId, userId });
+    }
+
+    const currentStageIndex = post.currentStage;
+    const currentStage = post.approvalStages[currentStageIndex];
+
+    if (!currentStage) {
+      throw new Error('No current approval stage found');
+    }
+
+    // Check if user is assigned to this stage
+    const isAssigned = currentStage.assignedTo.some(id => id.toString() === userId.toString());
+    if (!isAssigned) {
+      throw new Error('User not assigned to current approval stage');
+    }
+
+    // Check current stage status
+    if (currentStage.status !== 'pending') {
+      throw new Error('Current stage is not pending approval');
+    }
+
+    // Approve current stage
+    currentStage.status = 'approved';
+    currentStage.approvedBy = userId;
+    currentStage.approvedAt = new Date();
+
+    // Check if there are more stages
+    const nextStageIndex = currentStageIndex + 1;
+    if (nextStageIndex < post.approvalStages.length) {
+      // Move to next stage
+      post.currentStage = nextStageIndex;
+      post.status = PostStatus.PENDING_APPROVAL;
+    } else {
+      // Final stage - approve the post
+      post.status = PostStatus.APPROVED;
+      post.approvedBy = userId;
+      post.approvedAt = new Date();
+    }
+
+    await post.save();
+
+    // Log activity
+    await this.logActivity({
+      workspaceId: post.workspaceId,
+      userId,
+      action: ActivityAction.POST_APPROVED,
+      resourceType: 'ScheduledPost',
+      resourceId: postId,
+      details: { 
+        stage: currentStage.stageName,
+        stageOrder: currentStage.stageOrder,
+        comment 
+      },
+    });
+
+    // Notify next stage assignees or creator
+    if (nextStageIndex < post.approvalStages.length) {
+      await this.notifyNextStageAssignees(post.workspaceId, postId, nextStageIndex);
+    } else {
+      await this.notifyCreator(post.createdBy, postId, 'approved');
+    }
+
+    logger.info(`Stage ${currentStage.stageName} approved for post: ${postId}`);
+  }
+
+  /**
+   * Reject current stage
+   */
+  async rejectCurrentStage(params: {
+    postId: mongoose.Types.ObjectId;
+    userId: mongoose.Types.ObjectId;
+    reason: string;
+  }): Promise<void> {
+    const { postId, userId, reason } = params;
+
+    const post = await ScheduledPost.findById(postId);
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    // Check if post has approval stages
+    if (!post.approvalStages || post.approvalStages.length === 0) {
+      // Fall back to legacy rejection
+      return this.rejectPost({ postId, userId, reason });
+    }
+
+    const currentStageIndex = post.currentStage;
+    const currentStage = post.approvalStages[currentStageIndex];
+
+    if (!currentStage) {
+      throw new Error('No current approval stage found');
+    }
+
+    // Check if user is assigned to this stage
+    const isAssigned = currentStage.assignedTo.some(id => id.toString() === userId.toString());
+    if (!isAssigned) {
+      throw new Error('User not assigned to current approval stage');
+    }
+
+    // Reject current stage
+    currentStage.status = 'rejected';
+    currentStage.rejectedBy = userId;
+    currentStage.rejectedAt = new Date();
+    currentStage.rejectionReason = reason;
+
+    // Reject the entire post
+    post.status = PostStatus.REJECTED;
+    post.rejectedBy = userId;
+    post.rejectedAt = new Date();
+    post.rejectionReason = reason;
+
+    await post.save();
+
+    // Log activity
+    await this.logActivity({
+      workspaceId: post.workspaceId,
+      userId,
+      action: ActivityAction.POST_REJECTED,
+      resourceType: 'ScheduledPost',
+      resourceId: postId,
+      details: { 
+        stage: currentStage.stageName,
+        stageOrder: currentStage.stageOrder,
+        reason 
+      },
+    });
+
+    // Notify creator
+    await this.notifyCreator(post.createdBy, postId, 'rejected', reason);
+
+    logger.info(`Stage ${currentStage.stageName} rejected for post: ${postId}`);
+  }
+
+  /**
+   * Configure approval stages for workspace
+   */
+  async configureApprovalStages(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    stages: { name: string; assignedTo: mongoose.Types.ObjectId[] }[];
+  }): Promise<void> {
+    const { workspaceId, stages } = params;
+
+    // This would typically be stored in workspace settings
+    // For now, we'll apply to new posts via the workspace model
+    // Implementation depends on workspace settings structure
+    
+    logger.info(`Configured ${stages.length} approval stages for workspace: ${workspaceId}`);
+  }
+
+  /**
+   * Notify next stage assignees
+   */
+  private async notifyNextStageAssignees(
+    workspaceId: mongoose.Types.ObjectId,
+    postId: mongoose.Types.ObjectId,
+    stageIndex: number
+  ): Promise<void> {
+    try {
+      const post = await ScheduledPost.findById(postId).populate('createdBy', 'name email');
+      if (!post || !post.approvalStages || !post.approvalStages[stageIndex]) {
+        return;
+      }
+
+      const stage = post.approvalStages[stageIndex];
+      
+      // Get assignee details
+      const assignees = await WorkspaceMember.find({
+        workspaceId,
+        userId: { $in: stage.assignedTo },
+        isActive: true,
+      }).populate('userId', 'email name');
+
+      // Send notifications
+      for (const assignee of assignees) {
+        const assigneeUser = assignee.userId as any;
+        if (assigneeUser?.email) {
+          await emailNotificationService.sendNotification({
+            eventType: 'APPROVAL_REQUIRED' as any,
+            workspaceId: workspaceId.toString(),
+            userId: assigneeUser._id.toString(),
+            payload: {
+              postId: postId.toString(),
+              content: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+              platform: post.platform,
+              scheduledAt: post.scheduledAt.toISOString(),
+              submitterName: (post.createdBy as any)?.name || 'Unknown',
+              stageName: stage.stageName,
+              stageOrder: stage.stageOrder,
+            },
+          });
+        }
+      }
+
+      logger.info(`Notified ${assignees.length} assignees for stage ${stage.stageName}`);
+    } catch (error) {
+      logger.error('Failed to notify next stage assignees:', error);
+    }
+  }
   async approvePost(params: {
     postId: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;

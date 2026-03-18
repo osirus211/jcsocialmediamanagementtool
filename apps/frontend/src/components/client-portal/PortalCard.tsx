@@ -112,6 +112,13 @@ export const PortalCard: React.FC<PortalCardProps> = ({ portal, onDelete, onUpda
     ? Math.ceil((new Date(portal.expiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
+  // Token expiry logic
+  const isTokenExpired = portal.tokenExpiresAt && new Date(portal.tokenExpiresAt) < new Date();
+  const daysUntilTokenExpiry = portal.tokenExpiresAt 
+    ? Math.ceil((new Date(portal.tokenExpiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isTokenExpiringSoon = daysUntilTokenExpiry !== null && daysUntilTokenExpiry <= 7;
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
       {/* Header */}
@@ -124,6 +131,12 @@ export const PortalCard: React.FC<PortalCardProps> = ({ portal, onDelete, onUpda
               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                 <Shield className="w-3 h-3 mr-1" />
                 Protected
+              </span>
+            )}
+            {isTokenExpiringSoon && !isTokenExpired && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                <Clock className="w-3 h-3 mr-1" />
+                Expiring soon
               </span>
             )}
           </div>
@@ -262,8 +275,25 @@ export const PortalCard: React.FC<PortalCardProps> = ({ portal, onDelete, onUpda
 
       {/* Last Access */}
       {portal.lastAccessedAt && (
-        <div className="text-xs text-gray-500 mb-4">
+        <div className="text-xs text-gray-500 mb-2">
           Last accessed: {new Date(portal.lastAccessedAt).toLocaleDateString()}
+        </div>
+      )}
+
+      {/* Token Expiry */}
+      {portal.tokenExpiresAt && (
+        <div className="text-xs text-gray-500 mb-4">
+          Link expires: {new Date(portal.tokenExpiresAt).toLocaleDateString()}
+          {isTokenExpiringSoon && !isTokenExpired && (
+            <span className="ml-2 text-amber-600 font-medium">
+              ({daysUntilTokenExpiry} days left)
+            </span>
+          )}
+          {isTokenExpired && (
+            <span className="ml-2 text-red-600 font-medium">
+              (Expired)
+            </span>
+          )}
         </div>
       )}
 

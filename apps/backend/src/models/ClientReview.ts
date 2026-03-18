@@ -42,6 +42,7 @@ export interface IClientPortal extends Document {
   clientName: string;
   clientCompany?: string;
   accessToken: string; // 256-bit secure token
+  tokenExpiresAt: Date; // Token expiry date
   allowedActions: {
     view: boolean;
     approve: boolean;
@@ -145,6 +146,11 @@ const ClientPortalSchema = new Schema<IClientPortal>(
       unique: true,
       index: true,
     },
+    tokenExpiresAt: {
+      type: Date,
+      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      index: true,
+    },
     allowedActions: {
       view: { type: Boolean, default: true },
       approve: { type: Boolean, default: true },
@@ -244,6 +250,11 @@ ClientPortalSchema.pre('save', function (next) {
     }
   });
   next();
+});
+
+// Virtual for checking if token is expired
+ClientPortalSchema.virtual('isExpired').get(function() {
+  return this.tokenExpiresAt && this.tokenExpiresAt < new Date();
 });
 
 // Keep old ClientReview schema for backward compatibility

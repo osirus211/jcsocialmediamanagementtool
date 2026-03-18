@@ -54,6 +54,21 @@ export interface IScheduledPost extends Document {
   rejectedAt?: Date;
   rejectionReason?: string;
   
+  // Multi-step approval stages
+  approvalStages: {
+    stageName: string;        // e.g. "Editor Review"
+    stageOrder: number;       // 1, 2, 3...
+    assignedTo: mongoose.Types.ObjectId[];   // who can approve this stage
+    status: 'pending' | 'approved' | 'rejected' | 'skipped';
+    approvedBy?: mongoose.Types.ObjectId;
+    approvedAt?: Date;
+    rejectedBy?: mongoose.Types.ObjectId;
+    rejectedAt?: Date;
+    rejectionReason?: string;
+  }[];
+  currentStage: number;  // index of active stage
+  requiresApproval: boolean; // default: from workspace setting
+  
   queuedAt?: Date;
   publishingStartedAt?: Date;
   publishedAt?: Date;
@@ -154,6 +169,52 @@ const ScheduledPostSchema = new Schema<IScheduledPost>(
     },
     rejectionReason: {
       type: String,
+    },
+    
+    // Multi-step approval stages
+    approvalStages: [{
+      stageName: {
+        type: String,
+        required: true,
+      },
+      stageOrder: {
+        type: Number,
+        required: true,
+      },
+      assignedTo: [{
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      }],
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected', 'skipped'],
+        default: 'pending',
+      },
+      approvedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      approvedAt: {
+        type: Date,
+      },
+      rejectedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      rejectedAt: {
+        type: Date,
+      },
+      rejectionReason: {
+        type: String,
+      },
+    }],
+    currentStage: {
+      type: Number,
+      default: 0,
+    },
+    requiresApproval: {
+      type: Boolean,
+      default: false,
     },
     
     queuedAt: {

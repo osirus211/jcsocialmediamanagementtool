@@ -267,4 +267,104 @@ router.post('/bulk-reject', async (req, res, next): Promise<any> => {
   }
 });
 
+/**
+ * @route   POST /api/v1/approvals/:postId/stage-approve
+ * @desc    Approve current stage
+ * @access  Private
+ */
+router.post('/:postId/stage-approve', async (req, res, next) => {
+  try {
+    const postId = new mongoose.Types.ObjectId(req.params.postId);
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const { comment } = req.body;
+
+    await approvalQueueService.approveCurrentStage({
+      postId,
+      userId,
+      comment,
+    });
+
+    res.json({
+      success: true,
+      message: 'Stage approved successfully',
+    });
+  } catch (error: unknown) {
+    logger.error('Approve stage error:', error);
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/v1/approvals/:postId/stage-reject
+ * @desc    Reject current stage
+ * @access  Private
+ */
+router.post('/:postId/stage-reject', validateRequest(rejectPostRequestSchema), async (req, res, next) => {
+  try {
+    const postId = new mongoose.Types.ObjectId(req.params.postId);
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const { reason } = req.body;
+
+    await approvalQueueService.rejectCurrentStage({
+      postId,
+      userId,
+      reason,
+    });
+
+    res.json({
+      success: true,
+      message: 'Stage rejected',
+    });
+  } catch (error: unknown) {
+    logger.error('Reject stage error:', error);
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/v1/approvals/stages/config
+ * @desc    Get workspace approval stage configuration
+ * @access  Private
+ */
+router.get('/stages/config', async (req, res, next) => {
+  try {
+    const workspaceId = new mongoose.Types.ObjectId(req.workspace!.workspaceId);
+
+    // This would fetch from workspace settings
+    // For now, return empty config
+    res.json({
+      success: true,
+      data: { stages: [] },
+    });
+  } catch (error: unknown) {
+    logger.error('Get stage config error:', error);
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/v1/approvals/stages/config
+ * @desc    Configure approval stages for workspace
+ * @access  Private
+ */
+router.post('/stages/config', async (req, res, next) => {
+  try {
+    const workspaceId = new mongoose.Types.ObjectId(req.workspace!.workspaceId);
+    const { stages } = req.body;
+
+    await approvalQueueService.configureApprovalStages({
+      workspaceId,
+      stages,
+    });
+
+    res.json({
+      success: true,
+      message: 'Approval stages configured',
+    });
+  } catch (error: unknown) {
+    logger.error('Configure stages error:', error);
+    next(error);
+  }
+});
+
 export default router;

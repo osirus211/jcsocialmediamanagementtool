@@ -262,6 +262,11 @@ export class ClientPortalService {
       throw new Error('Portal has expired');
     }
 
+    // Check if token is expired
+    if (portal.tokenExpiresAt && portal.tokenExpiresAt < new Date()) {
+      throw new Error('Portal access token has expired');
+    }
+
     // Check if active
     if (portal.status !== ClientPortalStatus.ACTIVE) {
       throw new Error('Portal is not active');
@@ -685,6 +690,8 @@ export class ClientPortalService {
     }
 
     portal.accessToken = generateAccessToken();
+    // Reset token expiry to 30 days from now
+    portal.tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await portal.save();
 
     logger.info('Portal access token regenerated', { portalId });

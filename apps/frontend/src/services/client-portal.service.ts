@@ -16,6 +16,7 @@ export interface ClientPortal {
   clientName: string;
   clientCompany?: string;
   accessToken: string;
+  tokenExpiresAt?: string;
   allowedActions: {
     view: boolean;
     approve: boolean;

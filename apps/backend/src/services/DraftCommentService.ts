@@ -8,7 +8,10 @@ import mongoose from 'mongoose';
 import { DraftComment, IDraftComment } from '../models/DraftComment';
 import { Post, PostStatus } from '../models/Post';
 import { User } from '../models/User';
+import { WorkspaceMember } from '../models/WorkspaceMember';
 import { getDraftSocket } from './DraftCollaborationSocket';
+import { notificationQueue } from '../queue/NotificationQueue';
+import { SystemEvent } from '../services/EventService';
 import { logger } from '../utils/logger';
 
 export interface CreateDraftCommentData {
@@ -132,6 +135,11 @@ export class DraftCommentService {
         draftSocket.notifyCommentAdded(draftId, comment);
       }
 
+      // Send mention notifications
+      if (mentions && mentions.length > 0) {
+        await this.notifyMentionedUsers(mentions, comment._id.toString(), workspaceId, authorId);
+      }
+
       logger.debug('Draft comment added', {
         commentId: comment._id,
         draftId,
@@ -180,6 +188,11 @@ export class DraftCommentService {
       const draftSocket = getDraftSocket();
       if (draftSocket) {
         draftSocket.notifyCommentAdded(comment.draftId.toString(), comment);
+      }
+
+      // Send mention notifications for new mentions
+      if (mentions && mentions.length > 0) {
+        await this.notifyMentionedUsers(mentions, comment._id.toString(), comment.workspaceId.toString(), authorId);
       }
 
       logger.debug('Draft comment edited', { commentId, authorId });
@@ -345,6 +358,62 @@ export class DraftCommentService {
     }
 
     return [...new Set(mentions)]; // Remove duplicates
+  }
+
+  /**
+   * Notify mentioned users via queue
+   */
+  private static async notifyMentionedUsers(
+    mentions: string[],
+    commentId: string,
+    workspaceId: string,
+    authorId: string
+  ): Promise<void> {
+    try {
+      // Resolve mention usernames to user IDs
+      const workspaceMembers = await WorkspaceMember.find({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        isActive: true,
+      }).populate('userId', 'firstName lastName email');
+
+      for (const username of mentions) {
+        // Find member by matching username against firstName, lastName, or email
+        const member = workspaceMembers.find(m => {
+          const user = m.userId as any;
+          if (!user) return false;
+          
+          const firstName = user.firstName?.toLowerCase() || '';
+          const lastName = user.lastName?.toLowerCase() || '';
+          const email = user.email?.toLowerCase() || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+          
+          return firstName === username.toLowerCase() ||
+                 lastName === username.toLowerCase() ||
+                 fullName === username.toLowerCase() ||
+                 email === username.toLowerCase();
+        });
+
+        if (member && member.userId._id.toString() !== authorId) {
+          await (notificationQueue as any).add('notification', {
+            eventType: SystemEvent.MENTION_IN_COMMENT,
+            workspaceId,
+            userId: member.userId._id.toString(),
+            payload: {
+              commentId,
+              draftId: commentId, // For draft comments, we use commentId as reference
+              mentionedBy: authorId,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error notifying mentioned users in draft comment', {
+        mentions,
+        commentId,
+        workspaceId,
+        error,
+      });
+    }
   }
 
   /**
