@@ -23,12 +23,19 @@ export const RegisterPage = () => {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setLocalError(null);
-      await registerUser({
+      const submitData: any = {
         email: data.email,
         password: data.password,
         firstName: data.firstName,
         lastName: data.lastName,
-      });
+      };
+      
+      // Only include marketingConsent if it's true
+      if (data.marketingConsent) {
+        submitData.marketingConsent = data.marketingConsent;
+      }
+      
+      await registerUser(submitData);
       navigate('/onboarding');
     } catch (err: any) {
       setLocalError(err.message || 'Registration failed');
@@ -189,6 +196,38 @@ export const RegisterPage = () => {
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Must be 8+ characters with uppercase, lowercase, and number
           </p>
+        </div>
+
+        <div className="space-y-3">
+          <label className="flex items-start gap-3">
+            <input
+              {...register('termsAccepted')}
+              type="checkbox"
+              tabIndex={-1}
+              aria-required="true"
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              I agree to the Terms of Service and Privacy Policy
+            </span>
+          </label>
+          {errors.termsAccepted && (
+            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              {errors.termsAccepted.message}
+            </p>
+          )}
+
+          <label className="flex items-start gap-3">
+            <input
+              {...register('marketingConsent')}
+              type="checkbox"
+              tabIndex={-1}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              I'd like to receive product updates and news (optional)
+            </span>
+          </label>
         </div>
 
         <button

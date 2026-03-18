@@ -18,6 +18,427 @@ import { TimezoneSettings } from '@/components/settings/TimezoneSettings';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { formatTimeWithTimezone, getUserTimezone } from '@/utils/timezones';
 
+// SSO Configuration Section Component
+const SSOConfigurationSection = ({ workspaceId }: { workspaceId: string }) => {
+  const [samlConfig, setSamlConfig] = useState({
+    entryPoint: '',
+    issuer: '',
+    cert: '',
+    emailDomain: '',
+    autoProvision: true,
+    defaultRole: 'MEMBER'
+  });
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [showTestConnection, setShowTestConnection] = useState(false);
+
+  const handleSaveSAML = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/v1/saml/configure`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify(samlConfig)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to configure SAML');
+      }
+
+      setIsEnabled(true);
+      setSuccess('SAML SSO configured successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to configure SAML SSO');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownloadMetadata = async () => {
+    try {
+      const response = await fetch(`/api/v1/saml/metadata`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download metadata');
+      }
+
+      const metadata = await response.text();
+      const blob = new Blob([metadata], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'saml-metadata.xml';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'Failed to download metadata');
+    }
+  };
+
+  const handleTestConnection = () => {
+    if (!samlConfig.emailDomain) {
+      setError('Please configure email domain first');
+      return;
+    }
+    
+    const testUrl = `/api/v1/saml/login?domain=${samlConfig.emailDomain}`;
+    window.open(testUrl, '_blank', 'width=600,height=700');
+  };
+
+  const handleDisableSSO = async () => {
+    if (!confirm('Are you sure you want to disable SSO? Users will need to use regular login.')) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/v1/saml/configure`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disable SSO');
+      }
+
+      setIsEnabled(false);
+      setSuccess('SSO disabled successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to disable SSO');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 text-sm">{success}</p>
+        </div>
+      )}
+
+      {/* SAML Configuration Form */}
+      <div className="space-y-4">
+        <h3 className="text-md font-medium text-gray-900 dark:text-white">
+          SAML 2.0 Configuration
+        </h3>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Identity Provider SSO URL
+          </label>
+          <input
+            type="url"
+            value={samlConfig.entryPoint}
+            onChange={(e) => setSamlConfig({ ...samlConfig, entryPoint: e.target.value })}
+            placeholder="https://your-idp.com/sso/saml"
+            aria-label="Identity Provider SSO URL"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Entity ID / Issuer
+          </label>
+          <input
+            type="text"
+            value={samlConfig.issuer}
+            onChange={(e) => setSamlConfig({ ...samlConfig, issuer: e.target.value })}
+            placeholder="urn:your-app:saml"
+            aria-label="Entity ID or Issuer"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            X.509 Certificate
+          </label>
+          <textarea
+            value={samlConfig.cert}
+            onChange={(e) => setSamlConfig({ ...samlConfig, cert: e.target.value })}
+            placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+            rows={6}
+            aria-label="X.509 Certificate"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Email Domain
+          </label>
+          <input
+            type="text"
+            value={samlConfig.emailDomain}
+            onChange={(e) => setSamlConfig({ ...samlConfig, emailDomain: e.target.value })}
+            placeholder="company.com"
+            aria-label="Email domain for SSO"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Users with this email domain will be redirected to SSO login
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={samlConfig.autoProvision}
+            onChange={(e) => setSamlConfig({ ...samlConfig, autoProvision: e.target.checked })}
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Auto-provision new users
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Default role for new users
+          </label>
+          <select
+            value={samlConfig.defaultRole}
+            onChange={(e) => setSamlConfig({ ...samlConfig, defaultRole: e.target.value })}
+            aria-label="Default role for new users"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="VIEWER">Viewer</option>
+            <option value="MEMBER">Member</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleSaveSAML}
+          disabled={isLoading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {isLoading ? 'Saving...' : 'Configure SAML SSO'}
+        </button>
+
+        {isEnabled && (
+          <>
+            <button
+              onClick={handleDownloadMetadata}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            >
+              Download SP Metadata
+            </button>
+
+            <button
+              onClick={handleTestConnection}
+              className="px-4 py-2 border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
+            >
+              Test SSO Connection
+            </button>
+
+            <button
+              onClick={handleDisableSSO}
+              disabled={isLoading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              Disable SSO
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* SSO Status */}
+      {isEnabled && (
+        <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-medium text-green-800 dark:text-green-200">
+              SSO is enabled for {samlConfig.emailDomain}
+            </span>
+          </div>
+          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+            Users can sign in at: /auth/login (will auto-redirect for {samlConfig.emailDomain} emails)
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// IP Allowlist Section Component
+const IPAllowlistSection = ({ workspaceId }: { workspaceId: string }) => {
+  const [ipList, setIpList] = useState<string[]>([]);
+  const [enabled, setEnabled] = useState(false);
+  const [newIp, setNewIp] = useState('');
+  const [currentIp, setCurrentIp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleAddIp = () => {
+    if (!newIp.trim()) return;
+    
+    // Basic IP validation
+    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    if (!ipv4Regex.test(newIp.trim())) {
+      setError('Invalid IP address format');
+      return;
+    }
+
+    if (ipList.includes(newIp.trim())) {
+      setError('IP address already in list');
+      return;
+    }
+
+    setIpList([...ipList, newIp.trim()]);
+    setNewIp('');
+    setError(null);
+  };
+
+  const handleRemoveIp = (ip: string) => {
+    setIpList(ipList.filter(item => item !== ip));
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/v1/workspaces/${workspaceId}/ip-allowlist`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({
+          ipAllowlist: ipList,
+          enabled
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update IP allowlist');
+      }
+
+      const result = await response.json();
+      setCurrentIp(result.data.currentIp);
+      setSuccess('IP allowlist updated successfully');
+    } catch (err: any) {
+      setError(err.message || 'Failed to update IP allowlist');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+
+      {success && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 text-sm">{success}</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+        />
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Enable IP Allowlist
+        </label>
+      </div>
+
+      {currentIp && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-700 text-sm">
+            Your current IP: <code className="font-mono">{currentIp}</code>
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Allowed IP Addresses
+        </label>
+        
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newIp}
+            onChange={(e) => setNewIp(e.target.value)}
+            placeholder="192.168.1.1"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+          <button
+            onClick={handleAddIp}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Add
+          </button>
+        </div>
+
+        {ipList.length > 0 && (
+          <div className="space-y-2">
+            {ipList.map((ip) => (
+              <div key={ip} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                <code className="font-mono text-sm">{ip}</code>
+                <button
+                  onClick={() => handleRemoveIp(ip)}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={isLoading}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+      >
+        {isLoading ? 'Saving...' : 'Save IP Allowlist'}
+      </button>
+    </div>
+  );
+};
+
 /**
  * Workspace Settings Page
  * 
@@ -648,6 +1069,34 @@ export const WorkspaceSettingsPage = () => {
                 )}
               </form>
             </div>
+
+            {/* IP Allowlist (Owner only) */}
+            {isOwner && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  IP Allowlist
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Restrict workspace access to specific IP addresses. When enabled, only requests from allowed IPs can access this workspace.
+                </p>
+                
+                <IPAllowlistSection workspaceId={workspace._id} />
+              </div>
+            )}
+
+            {/* Single Sign-On (SSO) Configuration (Owner only) */}
+            {isOwner && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Single Sign-On (SSO)
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Configure SAML 2.0 or OIDC authentication for enterprise single sign-on.
+                </p>
+                
+                <SSOConfigurationSection workspaceId={workspace._id} />
+              </div>
+            )}
 
             {/* Danger Zone */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-red-200 dark:border-red-800 p-6">

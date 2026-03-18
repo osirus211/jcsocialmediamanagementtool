@@ -30,6 +30,10 @@ export interface IWorkspace extends Document {
     industry?: string;
   };
   
+  // IP Allowlisting (Enterprise feature)
+  ipAllowlist: string[];
+  ipAllowlistEnabled: boolean;
+  
   // Queue Pause Settings (beats Buffer & Hootsuite)
   queuePause: {
     // Global workspace pause
@@ -343,6 +347,25 @@ const WorkspaceSchema = new Schema<IWorkspace>(
     },
     subscriptionStatus: {
       type: String,
+    },
+    
+    // IP Allowlisting (Enterprise feature)
+    ipAllowlist: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function(ips: string[]) {
+          // Validate each IP is valid IPv4 or IPv6
+          const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+          const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+          return ips.every(ip => ipv4Regex.test(ip) || ipv6Regex.test(ip));
+        },
+        message: 'Invalid IP address format'
+      }
+    },
+    ipAllowlistEnabled: {
+      type: Boolean,
+      default: false,
     },
     
     // Status

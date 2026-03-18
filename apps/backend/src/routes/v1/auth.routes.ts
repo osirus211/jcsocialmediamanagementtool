@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '../../controllers/AuthController';
+import { DeviceTrustController } from '../../controllers/DeviceTrustController';
 import { requireAuth } from '../../middleware/auth';
 import { validateRequest } from '../../middleware/validate';
 import { getCsrfToken } from '../../middleware/csrf';
@@ -83,6 +84,17 @@ router.post(
   AuthController.completeLogin
 );
 
+// Step-up authentication for high-risk logins
+if (process.env.NODE_ENV !== 'test') {
+  const { StepUpAuthController } = require('../../controllers/StepUpAuthController');
+  router.post(
+    '/step-up',
+    requireAuth,
+    authRateLimiter,
+    StepUpAuthController.stepUpAuth
+  );
+}
+
 /**
  * Protected routes (authentication required)
  */
@@ -142,11 +154,22 @@ router.get('/trusted-devices', requireAuth, AuthController.getTrustedDevices);
 router.delete('/trusted-devices/:deviceId', requireAuth, AuthController.revokeTrustedDevice);
 router.get('/account-status', requireAuth, AuthController.getAccountStatus);
 
+// Device trust endpoints
+router.post('/devices/trust', requireAuth, DeviceTrustController.trustDevice);
+router.get('/devices', requireAuth, DeviceTrustController.getTrustedDevices);
+router.delete('/devices/:deviceId', requireAuth, DeviceTrustController.removeTrustedDevice);
+
 // Data export endpoint
 router.get('/export-data', requireAuth, AuthController.exportAccountData);
 
 // Account deactivation
 router.post('/deactivate-account', requireAuth, validateRequest(deactivateAccountSchema), AuthController.deactivateAccount);
+
+// WebAuthn / Passkey routes
+router.post('/webauthn/register/options', requireAuth, AuthController.generateWebAuthnRegistrationOptions);
+router.post('/webauthn/register/verify', requireAuth, AuthController.verifyWebAuthnRegistration);
+router.post('/webauthn/authenticate/options', AuthController.generateWebAuthnAuthenticationOptions);
+router.post('/webauthn/authenticate/verify', AuthController.verifyWebAuthnAuthentication);
 
 // Magic link routes
 router.use('/magic-link', magicLinkRoutes);

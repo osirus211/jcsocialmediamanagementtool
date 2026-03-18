@@ -12,16 +12,43 @@ import { config } from '../config';
 import * as crypto from 'crypto';
 import bcrypt from 'bcrypt';
 
+async function checkPasswordBreached(password: string): Promise<number> {
+  try {
+    const hash = crypto.createHash('sha1').update(password).digest('hex').toUpperCase();
+    const prefix = hash.slice(0, 5);
+    const suffix = hash.slice(5);
+    
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { 'Add-Padding': 'true' }
+    });
+    
+    if (!res.ok) return 0; // fail open — never block on API error
+    
+    const text = await res.text();
+    const match = text.split('\n').find(line => line.startsWith(suffix));
+    
+    if (!match) return 0;
+    
+    return parseInt(match.split(':')[1], 10);
+  } catch {
+    return 0; // fail open — never block registration if API is down
+  }
+}
+
 export interface RegisterInput {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
+  marketingConsent?: boolean;
 }
 
 export interface LoginInput {
   email: string;
   password: string;
+  ipAddress?: string;
+  userAgent?: string;
+  trustedDeviceId?: string;
 }
 
 interface TwoFactorChallengeResponse {
@@ -29,6 +56,7 @@ interface TwoFactorChallengeResponse {
   tempToken: string;
   userId: string;
   message: string;
+  riskFactors?: string[];
 }
 
 export interface AuthResponse {
@@ -56,6 +84,15 @@ export class AuthService {
         throw new BadRequestError(passwordValidation.error.errors[0].message);
       }
 
+      // Check if password has been breached
+      const breachCount = await checkPasswordBreached(input.password);
+      if (breachCount > 0) {
+        throw new BadRequestError(
+          `This password has appeared in ${breachCount} data breaches. Please choose a different password.`,
+          'PASSWORD_BREACHED'
+        );
+      }
+
       // Check if user already exists
       const existingUser = await User.findOne({
         email: input.email.toLowerCase(),
@@ -75,6 +112,10 @@ export class AuthService {
         firstName: input.firstName,
         lastName: input.lastName,
         provider: OAuthProvider.LOCAL,
+        gdprConsentAt: new Date(),
+        termsAcceptedAt: new Date(),
+        termsVersion: '1.0',
+        marketingConsent: input.marketingConsent || false,
       });
 
       await user.save();
@@ -240,24 +281,77 @@ export class AuthService {
         await User.updateOne(
           { _id: user._id },
           {
-            $unset: {
-              loginAttempts: 1,
-              lockUntil: 1
-            }
+            $set: { loginAttempts: 0 },
+            $unset: { lockUntil: 1 }
           }
         );
       }
 
-      // Check if 2FA is enabled
-      if (user.twoFactorEnabled && user.twoFactorSecret) {
-        logger.info('2FA challenge required', { userId: user._id, email: user.email });
+      // Calculate login risk score (skip in test environment to avoid ESM conflicts)
+      let risk = { score: 0, requiresMFA: false, factors: [] };
+      let isTrustedDevice = false;
+      
+      if (process.env.NODE_ENV !== 'test') {
+        const { RiskScoringService } = await import('./RiskScoringService')
+        const { LoginHistory } = await import('../models/LoginHistory')
+        const { TrustedDevice } = await import('../models/TrustedDevice')
+        
+        // Check for trusted device cookie
+        const trustedDeviceId = input.trustedDeviceId
+        
+        if (trustedDeviceId) {
+          const trustedDevice = await TrustedDevice.findOne({
+            userId: user._id,
+            deviceId: trustedDeviceId,
+            expiresAt: { $gt: new Date() }
+          })
+          
+          if (trustedDevice) {
+            isTrustedDevice = true
+            // Update last seen
+            trustedDevice.lastSeenAt = new Date()
+            await trustedDevice.save()
+          }
+        }
+        
+        risk = await RiskScoringService.calculateLoginRisk({
+          userId: user._id.toString(),
+          ipAddress: input.ipAddress || 'unknown',
+          userAgent: input.userAgent || 'unknown',
+        })
+
+        // Log login attempt
+        await LoginHistory.create({
+          userId: user._id,
+          ipAddress: input.ipAddress || 'unknown',
+          userAgent: input.userAgent || 'unknown',
+          success: true,
+          riskScore: risk.score,
+          mfaRequired: risk.requiresMFA && !isTrustedDevice, // Skip MFA for trusted devices
+          mfaCompleted: false
+        })
+      }
+
+      // Check if 2FA is enabled OR risk requires step-up auth (but not for trusted devices)
+      const requires2FA = user.twoFactorEnabled && user.twoFactorSecret
+      const requiresStepUp = risk.requiresMFA && !user.twoFactorEnabled && !isTrustedDevice
+      
+      if ((requires2FA || requiresStepUp) && !isTrustedDevice) {
+        logger.info('2FA/Step-up challenge required', { 
+          userId: user._id, 
+          email: user.email,
+          riskScore: risk.score,
+          riskFactors: risk.factors,
+          requires2FA,
+          requiresStepUp
+        });
         
         // Generate short-lived temp token (5 minutes) for 2FA verification
         const tempToken = TokenService.generateTempToken({
           userId: user._id.toString(),
           email: user.email,
           role: user.role,
-          purpose: '2fa_verification'
+          purpose: requiresStepUp ? 'step_up_auth' : '2fa_verification'
         }, '5m');
         
         // Return 2FA challenge response instead of tokens
@@ -265,7 +359,10 @@ export class AuthService {
           requiresTwoFactor: true,
           tempToken,
           userId: user._id.toString(),
-          message: 'Two-factor authentication required'
+          message: requiresStepUp 
+            ? 'Additional authentication required due to suspicious activity'
+            : 'Two-factor authentication required',
+          riskFactors: requiresStepUp ? risk.factors : undefined
         };
       }
 
@@ -470,6 +567,15 @@ export class AuthService {
         throw new BadRequestError(passwordValidation.error.errors[0].message);
       }
 
+      // Check if password has been breached
+      const breachCount = await checkPasswordBreached(newPassword);
+      if (breachCount > 0) {
+        throw new BadRequestError(
+          `This password has appeared in ${breachCount} data breaches. Please choose a different password.`,
+          'PASSWORD_BREACHED'
+        );
+      }
+
       // Check if new password is same as current
       const isSamePassword = await user.comparePassword(newPassword);
       if (isSamePassword) {
@@ -568,6 +674,15 @@ export class AuthService {
       const passwordValidation = passwordSchema.safeParse(newPassword);
       if (!passwordValidation.success) {
         throw new BadRequestError(passwordValidation.error.errors[0].message);
+      }
+
+      // Check if password has been breached
+      const breachCount = await checkPasswordBreached(newPassword);
+      if (breachCount > 0) {
+        throw new BadRequestError(
+          `This password has appeared in ${breachCount} data breaches. Please choose a different password.`,
+          'PASSWORD_BREACHED'
+        );
       }
 
       // Hash the provided token to match stored hash

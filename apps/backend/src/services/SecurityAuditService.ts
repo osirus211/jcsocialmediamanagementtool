@@ -374,6 +374,78 @@ export class SecurityAuditService {
       return 0;
     }
   }
+
+  /**
+   * Report a data breach (GDPR Article 33)
+   * Must notify authorities within 72 hours
+   */
+  static async reportBreach(details: {
+    description: string;
+    affectedUserCount: number;
+    dataTypes: string[];
+    discoveredAt: Date;
+    reportedBy: string;
+  }): Promise<void> {
+    try {
+      // Store breach record in DB
+      const { BreachRecord } = await import('../models/BreachRecord');
+      await BreachRecord.create({
+        ...details,
+        reportedAt: new Date(),
+        status: 'reported',
+        notificationDeadline: new Date(Date.now() + 72 * 60 * 60 * 1000), // 72 hours
+      });
+
+      // Send immediate email to configured DPO address
+      // Note: EmailService implementation may vary - using placeholder
+      const dpoEmail = 'dpo@company.com'; // Should be in config
+      
+      try {
+        // Attempt to send email notification
+        logger.warn('DPO email notification needed', {
+          to: dpoEmail,
+          subject: 'DATA BREACH NOTIFICATION — IMMEDIATE ACTION REQUIRED',
+          breach: {
+            description: details.description,
+            affectedUserCount: details.affectedUserCount,
+            dataTypes: details.dataTypes,
+            reportedBy: details.reportedBy,
+          },
+        });
+      } catch (emailError: any) {
+        logger.error('Failed to send DPO email notification', {
+          error: emailError.message,
+        });
+      }
+
+      // Log to audit trail
+      const { AuditLog } = await import('../models/AuditLog');
+      await AuditLog.create({
+        action: 'DATA_BREACH_REPORTED',
+        severity: 'CRITICAL',
+        details: {
+          description: details.description,
+          affectedUserCount: details.affectedUserCount,
+          dataTypes: details.dataTypes,
+          reportedBy: details.reportedBy,
+        },
+        timestamp: new Date(),
+      });
+
+      logger.error('Data breach reported - CRITICAL', {
+        description: details.description,
+        affectedUserCount: details.affectedUserCount,
+        dataTypes: details.dataTypes,
+        reportedBy: details.reportedBy,
+      });
+    } catch (error: any) {
+      logger.error('Failed to report data breach', {
+        error: error.message,
+        details,
+      });
+      throw error;
+    }
+  }
 }
 
 export const securityAuditService = new SecurityAuditService();

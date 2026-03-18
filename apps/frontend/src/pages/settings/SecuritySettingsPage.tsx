@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { TwoFactorService } from '@/services/two-factor.service';
 import { useAuthStore } from '@/store/auth.store';
+import { useWebAuthn } from '@/hooks/useWebAuthn';
 
 interface DisableModalProps {
   isOpen: boolean;
@@ -246,6 +247,66 @@ function BackupCodesModal({ isOpen, onClose, codes }: BackupCodesModalProps) {
   );
 }
 
+function PasskeySection() {
+  const { registerPasskey } = useWebAuthn();
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleRegisterPasskey = async () => {
+    try {
+      setIsRegistering(true);
+      setError(null);
+      
+      await registerPasskey();
+      
+      setSuccess('Passkey registered successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to register passkey');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <p className="text-green-700 text-sm">{success}</p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={handleRegisterPasskey}
+        disabled={isRegistering}
+        aria-label="Add a new passkey for passwordless authentication"
+        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+      >
+        {isRegistering ? (
+          <div className="flex items-center gap-2">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Registering...
+          </div>
+        ) : (
+          'Add Passkey'
+        )}
+      </button>
+    </div>
+  );
+}
+
 export function SecuritySettingsPage() {
   const navigate = useNavigate();
   const { user, fetchMe } = useAuthStore();
@@ -459,6 +520,36 @@ export function SecuritySettingsPage() {
                     )}
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Passkey / WebAuthn Section */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-lg bg-purple-100">
+              <Key className="h-6 w-6 text-purple-600" />
+            </div>
+            
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Security Keys (Passkeys)
+                </h3>
+                <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                  New
+                </span>
+              </div>
+              
+              <p className="text-gray-600 mb-4">
+                Use your device's built-in security (Face ID, Touch ID, Windows Hello) or a hardware security key for passwordless authentication.
+              </p>
+
+              <div className="flex flex-wrap gap-3">
+                <PasskeySection />
               </div>
             </div>
           </div>

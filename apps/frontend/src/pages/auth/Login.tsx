@@ -12,6 +12,8 @@ export const LoginPage = () => {
   const { login, isLoading } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSSOInput, setShowSSOInput] = useState(false);
+  const [ssoEmail, setSSOEmail] = useState('');
 
   const {
     register,
@@ -75,6 +77,27 @@ export const LoginPage = () => {
       window.location.href = url;
     } catch (err: any) {
       setError(`${platform} login failed: ${err.message}`);
+    }
+  };
+
+  const handleSSOLogin = async () => {
+    try {
+      setError(null);
+      if (!ssoEmail) {
+        setError('Please enter your work email');
+        return;
+      }
+      
+      const domain = ssoEmail.split('@')[1];
+      if (!domain) {
+        setError('Please enter a valid email address');
+        return;
+      }
+      
+      // Redirect to SAML login endpoint
+      window.location.href = `/api/v1/saml/login?domain=${domain}`;
+    } catch (err: any) {
+      setError(`SSO login failed: ${err.message}`);
     }
   };
 
@@ -260,6 +283,45 @@ export const LoginPage = () => {
               Continue with Apple
             </button>
           </div>
+          
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500">Enterprise SSO?</p>
+            <button
+              type="button"
+              onClick={() => setShowSSOInput(true)}
+              className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+              aria-label="Continue with SSO"
+            >
+              Continue with SSO
+            </button>
+          </div>
+
+          {showSSOInput && (
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <input
+                type="email"
+                value={ssoEmail}
+                onChange={(e) => setSSOEmail(e.target.value)}
+                placeholder="your@company.com"
+                aria-label="Work email for SSO"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white mb-3"
+              />
+              <div className="flex space-x-2">
+                <button 
+                  onClick={handleSSOLogin}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Continue with SSO
+                </button>
+                <button 
+                  onClick={() => setShowSSOInput(false)}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           </div>
         </div>
       </div>

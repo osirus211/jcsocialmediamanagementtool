@@ -58,5 +58,54 @@ router.post('/dlq/replay-batch', (req, res) => getDLQReplayController().replayBa
 // POST /api/admin/dlq/replay-all - Replay all jobs
 router.post('/dlq/replay-all', (req, res) => getDLQReplayController().replayAll(req, res));
 
+/**
+ * Security Dashboard
+ */
+
+// GET /api/admin/security/dashboard - Get security dashboard data
+if (process.env.NODE_ENV !== 'test') {
+  const { SecurityDashboardController } = require('../controllers/SecurityDashboardController');
+  router.get('/security/dashboard', SecurityDashboardController.getSecurityDashboard);
+}
+
+/**
+ * GDPR Breach Notification Routes
+ */
+
+// POST /api/admin/breach-report - Report a data breach (GDPR Article 33)
+router.post('/breach-report', async (req, res, next): Promise<void> => {
+  try {
+    const { SecurityAuditService } = await import('../services/SecurityAuditService');
+    const { description, affectedUserCount, dataTypes, discoveredAt, reportedBy } = req.body;
+
+    // Validate required fields
+    if (!description || !affectedUserCount || !dataTypes || !discoveredAt || !reportedBy) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: description, affectedUserCount, dataTypes, discoveredAt, reportedBy'
+      });
+      return;
+    }
+
+    await SecurityAuditService.reportBreach({
+      description,
+      affectedUserCount: Number(affectedUserCount),
+      dataTypes: Array.isArray(dataTypes) ? dataTypes : [dataTypes],
+      discoveredAt: new Date(discoveredAt),
+      reportedBy,
+    });
+
+    const notificationDeadline = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
+    res.json({
+      success: true,
+      message: 'Data breach reported successfully',
+      notificationDeadline: notificationDeadline.toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
 

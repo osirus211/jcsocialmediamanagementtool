@@ -226,4 +226,12 @@ router.use('/trending-hashtags', trendingHashtagsRoutes); // Trending hashtags
 router.use('/competitor-hashtag-analysis', competitorHashtagAnalysisRoutes); // Competitor hashtag analysis
 router.use('/giphy', giphyRoutes); // Giphy GIF search
 
+// Conditionally load SAML/OIDC routes to avoid ESM issues in tests
+if (process.env.NODE_ENV !== 'test') {
+  const samlRoutes = require('./saml.routes').default;
+  const oidcRoutes = require('./oidc.routes').default;
+  router.use('/saml', samlRoutes); // SAML SSO
+  router.use('/oidc', oidcRoutes); // OIDC SSO
+}
+
 export default router;

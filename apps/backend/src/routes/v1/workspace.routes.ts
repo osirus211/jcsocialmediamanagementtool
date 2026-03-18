@@ -8,6 +8,7 @@ import {
   requireAdmin,
   requireOwner,
 } from '../../middleware/tenant';
+import { workspaceIpAllowlist } from '../../middleware/ipAllowlist';
 import { validateRequest } from '../../middleware/validate';
 import { csrfProtection } from '../../middleware/csrf';
 import {
@@ -79,6 +80,7 @@ router.get(
   '/:workspaceId',
   requireAuth,
   requireWorkspace,
+  workspaceIpAllowlist,
   WorkspaceController.getWorkspace
 );
 
@@ -87,6 +89,7 @@ router.patch(
   '/:workspaceId',
   requireAuth,
   requireWorkspace,
+  workspaceIpAllowlist,
   requireAdmin,
   csrfProtection,
   workspaceUpdateRateLimiter,
@@ -294,6 +297,74 @@ router.get(
 
 // Mount blackout dates routes
 router.use('/', blackoutDatesRoutes);
+
+// IP Allowlist Management (Owner only)
+router.patch(
+  '/:workspaceId/ip-allowlist',
+  requireAuth,
+  requireWorkspace,
+  requireOwner,
+  csrfProtection,
+  async (req, res, next): Promise<void> => {
+    try {
+      const { ipAllowlist, enabled } = req.body;
+      const workspaceContext = req.workspace!;
+
+      // Fetch full workspace object
+      const { Workspace } = await import('../../models/Workspace');
+      const workspace = await Workspace.findById(workspaceContext.workspaceId);
+      
+      if (!workspace) {
+        res.status(404).json({
+          success: false,
+          message: 'Workspace not found'
+        });
+        return;
+      }
+
+      // Validate IP addresses
+      if (ipAllowlist && Array.isArray(ipAllowlist)) {
+        const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+        
+        for (const ip of ipAllowlist) {
+          if (!ipv4Regex.test(ip) && !ipv6Regex.test(ip)) {
+            res.status(400).json({
+              success: false,
+              message: `Invalid IP address format: ${ip}`
+            });
+            return;
+          }
+        }
+        
+        workspace.ipAllowlist = ipAllowlist;
+      }
+
+      if (typeof enabled === 'boolean') {
+        workspace.ipAllowlistEnabled = enabled;
+      }
+
+      await workspace.save();
+
+      // Get current IP for user feedback
+      const currentIp = req.ip || 
+        req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
+        'unknown';
+
+      res.json({
+        success: true,
+        message: 'IP allowlist updated successfully',
+        data: {
+          ipAllowlist: workspace.ipAllowlist,
+          ipAllowlistEnabled: workspace.ipAllowlistEnabled,
+          currentIp,
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;
 

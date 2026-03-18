@@ -14,7 +14,7 @@ module.exports = {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(nanoid|uuid|chalk|@bull-board)/)'
+    'node_modules/(?!(@scure|@noble|@otplib|otplib|@node-saml|openid-client|oauth4webapi|nanoid|uuid|chalk|@bull-board)/)'
   ],
   globalSetup: '<rootDir>/src/__tests__/globalSetup.ts',
   globalTeardown: '<rootDir>/src/__tests__/globalTeardown.ts',

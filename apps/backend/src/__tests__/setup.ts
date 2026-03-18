@@ -169,3 +169,42 @@ global.console = {
   warn: jest.fn(),
   error: jest.fn(),
 };
+
+// Mock SAML and OIDC services to prevent ESM module loading
+jest.mock('../services/SAMLService', () => ({
+  SAMLService: jest.fn().mockImplementation(() => ({
+    generateAuthorizeUrl: jest.fn(),
+    validateResponse: jest.fn(),
+    generateMetadataXml: jest.fn(),
+  })),
+}));
+
+jest.mock('../services/OIDCService', () => ({
+  OIDCService: {
+    create: jest.fn(() => Promise.resolve({
+      generateAuthorizationUrl: jest.fn(),
+      handleCallback: jest.fn(),
+    })),
+  },
+}));
+
+// Mock @node-saml/node-saml to prevent ESM loading
+jest.mock('@node-saml/node-saml', () => ({
+  SAML: jest.fn().mockImplementation(() => ({
+    getAuthorizeUrlAsync: jest.fn(),
+    validatePostResponseAsync: jest.fn(),
+    generateServiceProviderMetadata: jest.fn(),
+  })),
+}));
+
+// Mock openid-client to prevent ESM loading
+jest.mock('openid-client', () => ({
+  discovery: jest.fn(),
+  randomState: jest.fn(() => 'mock-state'),
+  randomNonce: jest.fn(() => 'mock-nonce'),
+  randomPKCECodeVerifier: jest.fn(() => 'mock-verifier'),
+  calculatePKCECodeChallenge: jest.fn(() => Promise.resolve('mock-challenge')),
+  buildAuthorizationUrl: jest.fn(() => new URL('https://example.com/auth')),
+  authorizationCodeGrant: jest.fn(),
+  fetchUserInfo: jest.fn(),
+}));

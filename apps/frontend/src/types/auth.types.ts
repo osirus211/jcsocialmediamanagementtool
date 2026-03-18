@@ -58,6 +58,7 @@ export interface RegisterData {
   password: string;
   firstName: string;
   lastName: string;
+  marketingConsent?: boolean;
 }
 
 export interface LoginResponse {

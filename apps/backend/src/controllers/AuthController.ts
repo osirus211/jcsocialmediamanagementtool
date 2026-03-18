@@ -726,5 +726,149 @@ export class AuthController {
       next(error);
     }
   }
+
+  /**
+   * Generate WebAuthn registration options
+   * POST /api/v1/auth/webauthn/register/options
+   */
+  static async generateWebAuthnRegistrationOptions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { WebAuthnService } = await import('../services/WebAuthnService');
+      const { User } = await import('../models/User');
+      
+      const user = await User.findById(req.user!.userId);
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found' });
+        return;
+      }
+      
+      const options = await WebAuthnService.generateRegistrationOptions(user);
+      
+      res.json({
+        success: true,
+        data: options
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Verify WebAuthn registration
+   * POST /api/v1/auth/webauthn/register/verify
+   */
+  static async verifyWebAuthnRegistration(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { WebAuthnService } = await import('../services/WebAuthnService');
+      const { User } = await import('../models/User');
+      
+      const user = await User.findById(req.user!.userId);
+      if (!user) {
+        res.status(404).json({ success: false, message: 'User not found' });
+        return;
+      }
+      
+      const { response } = req.body;
+      
+      const result = await WebAuthnService.verifyRegistration(user, response);
+      
+      res.json({
+        success: true,
+        verified: result.verified
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Generate WebAuthn authentication options
+   * POST /api/v1/auth/webauthn/authenticate/options
+   */
+  static async generateWebAuthnAuthenticationOptions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { WebAuthnService } = await import('../services/WebAuthnService');
+      const { User } = await import('../models/User');
+      const { email } = req.body;
+      
+      const user = await User.findOne({ email: email.toLowerCase(), softDeletedAt: null });
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+        return;
+      }
+      
+      const options = await WebAuthnService.generateAuthenticationOptions(user);
+      
+      res.json({
+        success: true,
+        data: options
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Verify WebAuthn authentication
+   * POST /api/v1/auth/webauthn/authenticate/verify
+   */
+  static async verifyWebAuthnAuthentication(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { WebAuthnService } = await import('../services/WebAuthnService');
+      const { AuthTokenService } = await import('../services/AuthTokenService');
+      const { User } = await import('../models/User');
+      const { email, response } = req.body;
+      
+      const user = await User.findOne({ email: email.toLowerCase(), softDeletedAt: null });
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+        return;
+      }
+      
+      const result = await WebAuthnService.verifyAuthentication(user, response);
+      
+      if (result.verified) {
+        // Generate tokens
+        const tokens = AuthTokenService.generateTokenPair({
+          userId: user._id.toString(),
+          email: user.email,
+          role: user.role,
+        });
+
+        // Store refresh token
+        await user.addRefreshToken(tokens.refreshToken);
+
+        // Set refresh token in httpOnly cookie
+        res.cookie('refreshToken', tokens.refreshToken, {
+          httpOnly: true,
+          secure: config.env === 'production',
+          sameSite: 'strict',
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          path: '/api/v1/auth',
+        });
+
+        res.json({
+          success: true,
+          verified: true,
+          accessToken: tokens.accessToken,
+          user
+        });
+      } else {
+        res.json({
+          success: false,
+          verified: false,
+          message: 'Authentication failed'
+        });
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

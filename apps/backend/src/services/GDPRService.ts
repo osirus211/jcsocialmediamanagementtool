@@ -17,6 +17,10 @@ export interface GDPRExportData {
     lastLoginAt?: Date;
     isEmailVerified: boolean;
     twoFactorEnabled: boolean;
+    gdprConsentAt?: Date;
+    termsAcceptedAt?: Date;
+    termsVersion?: string;
+    marketingConsent: boolean;
   };
   workspaces: any[];
   posts: any[];
@@ -131,6 +135,10 @@ export class GDPRService {
           lastLoginAt: user.lastLoginAt,
           isEmailVerified: user.isEmailVerified,
           twoFactorEnabled: user.twoFactorEnabled,
+          gdprConsentAt: user.gdprConsentAt,
+          termsAcceptedAt: user.termsAcceptedAt,
+          termsVersion: user.termsVersion,
+          marketingConsent: user.marketingConsent,
         },
         workspaces,
         posts,

@@ -56,6 +56,15 @@ export interface IUser extends Document {
   twoFactorBackupCodes: string[];
   twoFactorVerifiedAt?: Date;
   
+  // WebAuthn / Passkey authentication
+  webauthnChallenge?: string;
+  webauthnCredentials: Array<{
+    credentialID: string;
+    credentialPublicKey: Buffer;
+    counter: number;
+    transports?: string[];
+  }>;
+  
   // Magic link / passwordless authentication
   magicLinkToken?: string;
   magicLinkExpiresAt?: Date;
@@ -71,6 +80,12 @@ export interface IUser extends Document {
   // Account lockout
   loginAttempts: number;
   lockUntil?: Date;
+  
+  // GDPR Consent tracking
+  gdprConsentAt?: Date;
+  termsAcceptedAt?: Date;
+  termsVersion?: string;
+  marketingConsent: boolean;
   
   // Notification preferences
   notificationPreferences: {
@@ -203,6 +218,15 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     twoFactorSecret: { type: String, default: null, select: false },
     twoFactorBackupCodes: { type: [String], default: [], select: false },
     twoFactorVerifiedAt: { type: Date, default: null },
+    
+    // WebAuthn fields
+    webauthnChallenge: { type: String, select: false },
+    webauthnCredentials: [{
+      credentialID: { type: String, required: true },
+      credentialPublicKey: { type: Buffer, required: true },
+      counter: { type: Number, required: true },
+      transports: [{ type: String }]
+    }],
     magicLinkToken: { type: String, default: null, select: false },
     magicLinkExpiresAt: { type: Date, default: null, select: false },
     emailVerificationToken: { type: String, default: null, select: false },
@@ -211,6 +235,12 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     passwordResetExpiresAt: { type: Date, default: null, select: false },
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
+    
+    // GDPR Consent fields
+    gdprConsentAt: { type: Date },
+    termsAcceptedAt: { type: Date },
+    termsVersion: { type: String },
+    marketingConsent: { type: Boolean, default: false },
     notificationPreferences: {
       type: {
         email: {

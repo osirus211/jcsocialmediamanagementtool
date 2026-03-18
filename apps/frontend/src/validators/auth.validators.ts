@@ -23,6 +23,8 @@ export const registerSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
+  termsAccepted: z.boolean().optional(),
+  marketingConsent: z.boolean().optional().default(false),
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;

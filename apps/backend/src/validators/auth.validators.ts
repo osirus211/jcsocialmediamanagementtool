@@ -18,6 +18,7 @@ export const registerSchema = z.object({
       .min(1, 'Last name is required')
       .max(50, 'Last name cannot exceed 50 characters')
       .trim(),
+    marketingConsent: z.boolean().default(false),
   }),
 });
 
