@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, TaskPriority, tasksService } from '@/services/tasks.service';
 import { toast } from '@/lib/notifications';
+import { useWorkspaceStore } from '@/store/workspace.store';
 
 interface TaskDetailDrawerProps {
   task: Task;
@@ -12,11 +13,14 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({ task, onClos
   const [loading, setLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [showAssignMenu, setShowAssignMenu] = useState(false);
+
+  const { members } = useWorkspaceStore();
 
   const handleStatusChange = async (status: TaskStatus) => {
     try {
       setLoading(true);
-      await tasksService.updateStatus(task._id, status);
+      await tasksService.updateTaskStatus(task._id, status);
       onUpdate();
       toast.success('Task status updated');
     } catch (error) {
@@ -29,11 +33,38 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({ task, onClos
   const handlePriorityChange = async (priority: TaskPriority) => {
     try {
       setLoading(true);
-      await tasksService.updatePriority(task._id, priority);
+      await tasksService.updateTaskPriority(task._id, priority);
       onUpdate();
       toast.success('Task priority updated');
     } catch (error) {
       toast.error('Failed to update priority');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignUser = async (userId: string) => {
+    try {
+      setLoading(true);
+      await tasksService.assignTask(task._id, [userId]);
+      onUpdate();
+      toast.success('User assigned');
+      setShowAssignMenu(false);
+    } catch (error) {
+      toast.error('Failed to assign user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnassignUser = async (userId: string) => {
+    try {
+      setLoading(true);
+      await tasksService.unassignTask(task._id, userId);
+      onUpdate();
+      toast.success('User unassigned');
+    } catch (error) {
+      toast.error('Failed to unassign user');
     } finally {
       setLoading(false);
     }
@@ -84,6 +115,11 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({ task, onClos
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const isOverdue = () => {
+    if (!task.dueDate || task.status === TaskStatus.DONE) return false;
+    return new Date(task.dueDate) < new Date();
   };
 
   const getPriorityColor = (priority: TaskPriority) => {
@@ -169,7 +205,41 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({ task, onClos
 
           {/* Assignees */}
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Assigned To</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-gray-700">Assigned To</h4>
+              <div className="relative">
+                <button
+                  onClick={() => setShowAssignMenu(!showAssignMenu)}
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  aria-label="Assign user"
+                >
+                  Assign
+                </button>
+                {showAssignMenu && members && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                    {(members as any[])
+                      .filter((member: any) => {
+                        const memberId = member.userId?._id || member.userId || member._id;
+                        return !task.assignedTo.some(a => a._id === memberId);
+                      })
+                      .map((member: any) => {
+                        const user = member.userId?._id ? member.userId : member;
+                        const memberId = member.userId?._id || member.userId || member._id;
+                        
+                        return (
+                          <button
+                            key={memberId}
+                            onClick={() => handleAssignUser(memberId)}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+                          >
+                            {user.firstName} {user.lastName}
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {task.assignedTo.map((assignee) => (
                 <div key={assignee._id} className="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-1">
@@ -189,6 +259,15 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({ task, onClos
                   <span className="text-sm text-gray-900">
                     {assignee.firstName} {assignee.lastName}
                   </span>
+                  <button
+                    onClick={() => handleUnassignUser(assignee._id)}
+                    className="text-gray-400 hover:text-red-600"
+                    aria-label={`Remove ${assignee.firstName} ${assignee.lastName}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
@@ -215,7 +294,14 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({ task, onClos
           {task.dueDate && (
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">Due Date</h4>
-              <p className="text-gray-900">{formatDate(task.dueDate)}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-gray-900">{formatDate(task.dueDate)}</p>
+                {isOverdue() && (
+                  <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded">
+                    Overdue
+                  </span>
+                )}
+              </div>
             </div>
           )}
 

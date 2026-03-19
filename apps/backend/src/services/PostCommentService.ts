@@ -18,14 +18,51 @@ export interface PopulatedComment extends Omit<IPostComment, 'authorId'> {
 
 export class PostCommentService {
   /**
-   * Get comments for a post with nested replies
+   * Get comments for a post with nested replies and pagination
    */
-  static async getComments(postId: string, workspaceId: string, requesterId?: string): Promise<PopulatedComment[]> {
+  static async getComments(
+    postId: string, 
+    workspaceId: string, 
+    requesterId?: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ comments: PopulatedComment[]; total: number; page: number; limit: number }> {
     try {
-      // Get all comments for the post
-      const comments = await PostComment.find({
+      const skip = (page - 1) * limit;
+
+      // Get total count
+      const total = await PostComment.countDocuments({
         postId: new Types.ObjectId(postId),
         workspaceId: new Types.ObjectId(workspaceId),
+        parentId: null, // Only count top-level comments for pagination
+        $or: [
+          { isDeleted: false },
+          { authorId: new Types.ObjectId(requesterId), isDeleted: true }
+        ]
+      });
+
+      // Get paginated top-level comments
+      const topLevelComments = await PostComment.find({
+        postId: new Types.ObjectId(postId),
+        workspaceId: new Types.ObjectId(workspaceId),
+        parentId: null,
+        $or: [
+          { isDeleted: false },
+          { authorId: new Types.ObjectId(requesterId), isDeleted: true }
+        ]
+      })
+      .populate('authorId', 'firstName lastName avatar')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+      // Get all replies for the paginated top-level comments
+      const topLevelIds = topLevelComments.map(c => c._id);
+      const replies = await PostComment.find({
+        postId: new Types.ObjectId(postId),
+        workspaceId: new Types.ObjectId(workspaceId),
+        parentId: { $in: topLevelIds },
         $or: [
           { isDeleted: false },
           { authorId: new Types.ObjectId(requesterId), isDeleted: true }
@@ -37,10 +74,11 @@ export class PostCommentService {
 
       // Build nested structure
       const commentMap = new Map<string, PopulatedComment>();
-      const topLevelComments: PopulatedComment[] = [];
+      const result: PopulatedComment[] = [];
 
       // First pass: create all comments
-      for (const comment of comments) {
+      const allComments = [...topLevelComments, ...replies];
+      for (const comment of allComments) {
         const populatedComment: PopulatedComment = {
           ...comment,
           authorId: {
@@ -55,7 +93,7 @@ export class PostCommentService {
       }
 
       // Second pass: build hierarchy
-      for (const comment of comments) {
+      for (const comment of allComments) {
         const populatedComment = commentMap.get(comment._id.toString())!;
         
         if (comment.parentId) {
@@ -64,11 +102,16 @@ export class PostCommentService {
             parent.replies!.push(populatedComment);
           }
         } else {
-          topLevelComments.push(populatedComment);
+          result.push(populatedComment);
         }
       }
 
-      return topLevelComments;
+      return {
+        comments: result,
+        total,
+        page,
+        limit
+      };
     } catch (error: any) {
       logger.error('Error getting comments', {
         postId,

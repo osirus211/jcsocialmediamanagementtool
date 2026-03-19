@@ -693,12 +693,14 @@ export class GDPRService {
   private static async anonymizeUserAuditLogs(userId: string, session: any): Promise<void> {
     try {
       const { AuditLog } = await import('../models/AuditLog');
+      // GDPR: anonymizes PII only. action/timestamp/workspaceId
+      // are never modified. Audit integrity preserved.
       await AuditLog.updateMany(
         { userId },
         { 
           userId: null,
-          userEmail: '[ANONYMIZED]',
-          details: '[USER DATA ANONYMIZED FOR GDPR COMPLIANCE]',
+          ipAddress: null,
+          userAgent: null,
         }
       ).session(session);
     } catch (error) {

@@ -549,6 +549,42 @@ export class EmailNotificationService {
       throw error;
     }
   }
+
+  /**
+   * Send account deletion confirmation email
+   */
+  async sendAccountDeletionConfirmation(params: {
+    to: string;
+    userName: string;
+    deletedAt: Date;
+    dataRetentionInfo: string;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: 'Account Deletion Confirmation',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #ef4444;">Account Deletion Confirmation</h2>
+            <p>Hi ${params.userName},</p>
+            <p>This email confirms that your account has been permanently deleted on ${params.deletedAt.toLocaleDateString()}.</p>
+            <p><strong>Data Retention Information:</strong></p>
+            <p>${params.dataRetentionInfo}</p>
+            <p>All your personal data, posts, analytics, and settings have been permanently removed from our systems in compliance with GDPR Article 17 (Right to Erasure).</p>
+            <p>If you did not request this deletion or believe this was done in error, please contact our support team immediately at support@example.com.</p>
+            <p>Thank you for using our service.</p>
+            <p>Best regards,<br>Your Social Media Team</p>
+          </div>
+        `,
+        text: `Hi ${params.userName}, this email confirms that your account has been permanently deleted on ${params.deletedAt.toLocaleDateString()}. ${params.dataRetentionInfo} All your personal data has been permanently removed from our systems in compliance with GDPR Article 17.`,
+      });
+
+      logger.info('Account deletion confirmation email sent', { to: params.to });
+    } catch (error: any) {
+      logger.error('Failed to send account deletion confirmation email', { error: error.message, to: params.to });
+      throw error;
+    }
+  }
 }
 
 export const emailNotificationService = new EmailNotificationService();

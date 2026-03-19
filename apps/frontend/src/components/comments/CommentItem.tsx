@@ -298,6 +298,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                 onClick={handleResolve}
                 disabled={loading}
                 className={`hover:underline ${comment.isResolved ? 'text-green-600' : 'text-gray-500'}`}
+                aria-label={comment.isResolved ? 'Unresolve comment' : 'Resolve comment'}
               >
                 {comment.isResolved ? 'Unresolve' : 'Resolve'}
               </button>
@@ -306,6 +307,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                 <button
                   onClick={() => setIsReplying(!isReplying)}
                   className="text-gray-500 hover:underline"
+                  aria-label="Reply to comment"
                 >
                   Reply
                 </button>
@@ -315,6 +317,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                 <button
                   onClick={() => setIsEditing(true)}
                   className="text-gray-500 hover:underline"
+                  aria-label="Edit comment"
                 >
                   Edit
                 </button>
@@ -325,6 +328,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                   onClick={handleDelete}
                   disabled={loading}
                   className="text-red-500 hover:underline"
+                  aria-label="Delete comment"
                 >
                   Delete
                 </button>
@@ -347,6 +351,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
                 onClick={handleReply}
                 disabled={loading || !replyContent.trim()}
                 className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                aria-label="Post reply"
               >
                 Reply
               </button>

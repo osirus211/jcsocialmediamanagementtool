@@ -47,9 +47,12 @@ describe('ApprovalQueueService', () => {
       const { WorkspaceMember } = await import('../../models/WorkspaceMember');
       const { workspacePermissionService } = await import('../../services/WorkspacePermissionService');
       
+      // Use a different user for approval (not the post creator) to avoid self-approval check
+      const approverId = new mongoose.Types.ObjectId();
+      
       // Mock WorkspaceMember to return a member with permissions
       (WorkspaceMember.findOne as jest.Mock).mockResolvedValue({
-        userId: mockUserId,
+        userId: approverId,
         workspaceId: mockWorkspaceId,
         role: 'admin',
       });
@@ -57,17 +60,18 @@ describe('ApprovalQueueService', () => {
       // Mock permission service to allow approval
       (workspacePermissionService.hasPermission as jest.Mock).mockReturnValue(true);
       
-      // Mock findById to return a pending post
+      // Mock findById to return a pending post - createdBy is a different user than approver
       (ScheduledPost.findById as jest.Mock).mockResolvedValue({
         _id: mockPostId,
         workspaceId: mockWorkspaceId,
+        createdBy: mockUserId, // Different from approverId to avoid self-approval
         status: PostStatus.PENDING_APPROVAL,
         save: jest.fn().mockResolvedValue({}),
       });
 
       await approvalService.approvePost({
         postId: mockPostId,
-        userId: mockUserId,
+        userId: approverId, // Different user for approval
       });
 
       // The service modifies the post object and calls save()

@@ -251,11 +251,25 @@ class TasksService {
   }
 
   /**
+   * Update task status (alias for tests)
+   */
+  async updateTaskStatus(taskId: string, status: TaskStatus): Promise<Task> {
+    return this.updateStatus(taskId, status);
+  }
+
+  /**
    * Update task priority
    */
   async updatePriority(taskId: string, priority: TaskPriority): Promise<Task> {
     const response = await apiClient.patch(`/tasks/${taskId}/priority`, { priority });
     return response.data;
+  }
+
+  /**
+   * Update task priority (alias for tests)
+   */
+  async updateTaskPriority(taskId: string, priority: TaskPriority): Promise<Task> {
+    return this.updatePriority(taskId, priority);
   }
 
   /**

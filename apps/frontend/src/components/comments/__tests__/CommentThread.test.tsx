@@ -17,6 +17,11 @@ vi.mock('@/services/post-comments.service', () => ({
   },
 }));
 
+// Mock the auth store
+vi.mock('@/store/auth.store', () => ({
+  useAuthStore: vi.fn(),
+}));
+
 // Mock the workspace store
 vi.mock('@/store/workspace.store', () => ({
   useWorkspaceStore: vi.fn(),
@@ -32,10 +37,12 @@ const renderWithRouter = (component: React.ReactElement) => {
 
 describe('CommentThread', () => {
   let mockPostCommentsService: any;
+  let mockUseAuthStore: any;
   let mockUseWorkspaceStore: any;
 
   beforeAll(async () => {
     mockPostCommentsService = (await vi.importMock('@/services/post-comments.service')).postCommentsService;
+    mockUseAuthStore = (await vi.importMock('@/store/auth.store')).useAuthStore;
     mockUseWorkspaceStore = (await vi.importMock('@/store/workspace.store')).useWorkspaceStore;
   });
 
@@ -97,6 +104,32 @@ describe('CommentThread', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
+    // Mock auth store to return user
+    vi.mocked(mockUseAuthStore).mockReturnValue({
+      user: {
+        _id: 'user-1',
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john@example.com',
+        avatar: null,
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      authChecked: true,
+      accessToken: 'mock-token',
+      setUser: vi.fn(),
+      setAccessToken: vi.fn(),
+      setLoading: vi.fn(),
+      setAuthChecked: vi.fn(),
+      login: vi.fn(),
+      register: vi.fn(),
+      completeLogin: vi.fn(),
+      logout: vi.fn(),
+      fetchMe: vi.fn(),
+      refreshToken: vi.fn(),
+      clearAuth: vi.fn(),
+    });
+    
     vi.mocked(mockUseWorkspaceStore).mockReturnValue({
       currentWorkspace: {
         _id: 'workspace-1',
@@ -123,7 +156,10 @@ describe('CommentThread', () => {
       expect(screen.getByText('This is a test comment')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('This is another comment with @jane mention')).toBeInTheDocument();
+    // Use a function matcher for text split across elements
+    expect(screen.getByText((content, element) => {
+      return element?.textContent === 'This is another comment with @jane mention';
+    })).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
   });
@@ -138,7 +174,11 @@ describe('CommentThread', () => {
       />
     );
 
-    const commentInput = screen.getByPlaceholderText(/add a comment/i);
+    await waitFor(() => {
+      expect(screen.getByText('This is a test comment')).toBeInTheDocument();
+    });
+
+    const commentInput = screen.getByPlaceholderText(/write a comment/i);
     const submitButton = screen.getByRole('button', { name: /post comment/i });
 
     fireEvent.change(commentInput, { target: { value: 'New test comment' } });
@@ -159,7 +199,11 @@ describe('CommentThread', () => {
       />
     );
 
-    const commentInput = screen.getByPlaceholderText(/add a comment/i);
+    await waitFor(() => {
+      expect(screen.getByText('This is a test comment')).toBeInTheDocument();
+    });
+
+    const commentInput = screen.getByPlaceholderText(/write a comment/i);
     
     fireEvent.change(commentInput, { target: { value: 'Hello @j' } });
     fireEvent.keyUp(commentInput, { key: 'j' });
@@ -231,8 +275,8 @@ describe('CommentThread', () => {
       expect(screen.getByText('This is a test comment')).toBeInTheDocument();
     });
 
-    const resolveButton = screen.getByRole('button', { name: /resolve comment/i });
-    fireEvent.click(resolveButton);
+    const resolveButtons = screen.getAllByRole('button', { name: /resolve comment/i });
+    fireEvent.click(resolveButtons[0]); // Click the first comment's resolve button
 
     await waitFor(() => {
       expect(vi.mocked(mockPostCommentsService.resolveComment)).toHaveBeenCalledWith('post-1', 'comment-1');
@@ -253,10 +297,14 @@ describe('CommentThread', () => {
       expect(screen.getByText('This is a test comment')).toBeInTheDocument();
     });
 
-    const replyButton = screen.getByRole('button', { name: /reply to comment/i });
-    fireEvent.click(replyButton);
+    const replyButtons = screen.getAllByRole('button', { name: /reply to comment/i });
+    fireEvent.click(replyButtons[0]); // Click the first comment's reply button
 
-    const replyInput = screen.getByPlaceholderText(/reply to john doe/i);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/write a reply/i)).toBeInTheDocument();
+    });
+
+    const replyInput = screen.getByPlaceholderText(/write a reply/i);
     const submitReplyButton = screen.getByRole('button', { name: /post reply/i });
 
     fireEvent.change(replyInput, { target: { value: 'This is a reply' } });
@@ -282,9 +330,10 @@ describe('CommentThread', () => {
       expect(screen.getByText('This is a test comment')).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('button', { name: /edit comment/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /delete comment/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /resolve comment/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /reply to comment/i })).toBeInTheDocument();
+    // Use getAllByRole since there are multiple comments
+    expect(screen.getAllByRole('button', { name: /edit comment/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /delete comment/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /resolve comment/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /reply to comment/i }).length).toBeGreaterThan(0);
   });
 });

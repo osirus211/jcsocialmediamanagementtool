@@ -5,6 +5,11 @@ import { toast } from '@/lib/notifications';
 export const MyTasksWidget: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'me'>('all');
+  const [dueDateFilter, setDueDateFilter] = useState<'all' | 'overdue' | 'today' | 'week' | 'none'>('all');
 
   useEffect(() => {
     loadMyTasks();
@@ -62,7 +67,52 @@ export const MyTasksWidget: React.FC = () => {
     task.status !== TaskStatus.DONE && task.status !== TaskStatus.CANCELLED
   );
 
-  const urgentTasks = activeTasks.filter(task => {
+  // Apply filters
+  const filteredTasks = activeTasks.filter(task => {
+    // Status filter
+    if (statusFilter !== 'all' && task.status !== statusFilter) {
+      return false;
+    }
+    
+    // Assignee filter (me filter assumes current user)
+    if (assigneeFilter === 'me') {
+      // This would need actual user ID comparison in real implementation
+      // For now, we'll show all tasks
+    }
+    
+    // Due date filter
+    if (dueDateFilter !== 'all') {
+      if (dueDateFilter === 'none' && task.dueDate) {
+        return false;
+      }
+      if (dueDateFilter === 'none' && !task.dueDate) {
+        return true;
+      }
+      if (!task.dueDate && dueDateFilter !== 'none') {
+        return false;
+      }
+      
+      if (task.dueDate) {
+        const date = new Date(task.dueDate);
+        const now = new Date();
+        const diffInDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (dueDateFilter === 'overdue' && diffInDays >= 0) {
+          return false;
+        }
+        if (dueDateFilter === 'today' && diffInDays !== 0) {
+          return false;
+        }
+        if (dueDateFilter === 'week' && (diffInDays < 0 || diffInDays > 7)) {
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  });
+
+  const urgentTasks = filteredTasks.filter(task => {
     if (task.priority === TaskPriority.URGENT) return true;
     if (task.dueDate) {
       const dueInfo = formatDueDate(task.dueDate);
@@ -98,13 +148,73 @@ export const MyTasksWidget: React.FC = () => {
             </span>
           )}
           <span className="text-sm text-gray-500">
-            {activeTasks.length} active
+            {filteredTasks.length} active
           </span>
         </div>
       </div>
 
+      {/* Filter Controls */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        {/* Status Filter */}
+        <div>
+          <label htmlFor="status-filter" className="block text-xs font-medium text-gray-700 mb-1">
+            Status
+          </label>
+          <select
+            id="status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            aria-label="Filter tasks by status"
+          >
+            <option value="all">All Statuses</option>
+            <option value={TaskStatus.TODO}>To Do</option>
+            <option value={TaskStatus.IN_PROGRESS}>In Progress</option>
+            <option value={TaskStatus.IN_REVIEW}>In Review</option>
+            <option value={TaskStatus.DONE}>Done</option>
+          </select>
+        </div>
+
+        {/* Assignee Filter */}
+        <div>
+          <label htmlFor="assignee-filter" className="block text-xs font-medium text-gray-700 mb-1">
+            Assignee
+          </label>
+          <select
+            id="assignee-filter"
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value as any)}
+            className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            aria-label="Filter tasks by assignee"
+          >
+            <option value="all">All Assignees</option>
+            <option value="me">Assigned to Me</option>
+          </select>
+        </div>
+
+        {/* Due Date Filter */}
+        <div>
+          <label htmlFor="duedate-filter" className="block text-xs font-medium text-gray-700 mb-1">
+            Due Date
+          </label>
+          <select
+            id="duedate-filter"
+            value={dueDateFilter}
+            onChange={(e) => setDueDateFilter(e.target.value as any)}
+            className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            aria-label="Filter tasks by due date"
+          >
+            <option value="all">All Dates</option>
+            <option value="overdue">Overdue</option>
+            <option value="today">Due Today</option>
+            <option value="week">Due This Week</option>
+            <option value="none">No Due Date</option>
+          </select>
+        </div>
+      </div>
+
       {/* Tasks List */}
-      {activeTasks.length === 0 ? (
+      {filteredTasks.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -113,7 +223,7 @@ export const MyTasksWidget: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3 max-h-80 overflow-y-auto">
-          {activeTasks.slice(0, 10).map((task) => {
+          {filteredTasks.slice(0, 10).map((task) => {
             const dueInfo = task.dueDate ? formatDueDate(task.dueDate) : null;
             
             return (
@@ -174,10 +284,10 @@ export const MyTasksWidget: React.FC = () => {
             );
           })}
 
-          {activeTasks.length > 10 && (
+          {filteredTasks.length > 10 && (
             <div className="text-center pt-2">
               <button className="text-sm text-blue-600 hover:text-blue-700">
-                View all {activeTasks.length} tasks
+                View all {filteredTasks.length} tasks
               </button>
             </div>
           )}

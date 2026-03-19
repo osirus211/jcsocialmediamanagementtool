@@ -8,6 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { workspaceService } from '../services/WorkspaceService';
 import { WorkspaceInvitation } from '../models/WorkspaceInvitation';
+import { MemberRole } from '../models/WorkspaceMember';
 import { logger } from '../utils/logger';
 import { logAudit } from '../utils/auditLogger';
 
@@ -267,6 +268,80 @@ export class InvitationController {
   }
 
   /**
+   * Bulk invite members
+   * POST /api/v1/workspaces/:workspaceId/invitations/bulk
+   */
+  static async bulkInvite(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const { invitations } = req.body;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!invitations || !Array.isArray(invitations) || invitations.length === 0) {
+        res.status(400).json({ error: 'Invitations array is required' });
+        return;
+      }
+
+      if (invitations.length > 20) {
+        res.status(400).json({ error: 'Cannot send more than 20 invitations at once' });
+        return;
+      }
+
+      // Validate all invitations
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      for (const inv of invitations) {
+        if (!inv.email || !emailRegex.test(inv.email)) {
+          res.status(400).json({ error: `Invalid email format: ${inv.email}` });
+          return;
+        }
+        if (!inv.role || !['admin', 'member', 'viewer'].includes(inv.role)) {
+          res.status(400).json({ error: `Invalid role for ${inv.email}. Must be admin, member, or viewer` });
+          return;
+        }
+      }
+
+      const results = await workspaceService.bulkInviteByEmail({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        invitedBy: new mongoose.Types.ObjectId(userId),
+        invitations,
+      });
+
+      // Audit log the bulk invitation
+      logAudit({
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        action: 'invitation.bulk_created',
+        entityType: 'invitation',
+        metadata: {
+          invitationsCount: invitations.length,
+          successCount: results.successCount,
+          failureCount: results.failureCount,
+        },
+        req,
+      });
+
+      res.status(201).json({
+        message: `Successfully sent ${results.successCount} invitations`,
+        results,
+      });
+    } catch (error: any) {
+      logger.error('Bulk invite error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
    * Bulk cancel invitations
    * DELETE /api/v1/workspaces/:workspaceId/invitations/bulk
    */
@@ -317,6 +392,75 @@ export class InvitationController {
       });
     } catch (error: any) {
       logger.error('Bulk cancel invitations error:', error);
+      
+      if (error.message.includes('Insufficient permissions')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+
+      next(error);
+    }
+  }
+
+  /**
+   * Bulk update invitation roles
+   * PATCH /api/v1/workspaces/:workspaceId/invitations/bulk
+   * GAP 18 FIX: Separate from bulk create - this is for editing existing invitations
+   */
+  static async bulkUpdateInvitations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { workspaceId } = req.params;
+      const { tokens, newRole } = req.body;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
+        res.status(400).json({ error: 'Tokens array is required' });
+        return;
+      }
+
+      if (!newRole || !['admin', 'member', 'viewer'].includes(newRole)) {
+        res.status(400).json({ error: 'Valid newRole is required (admin, member, viewer)' });
+        return;
+      }
+
+      if (tokens.length > 50) {
+        res.status(400).json({ error: 'Cannot update more than 50 invitations at once' });
+        return;
+      }
+
+      const results = await workspaceService.bulkUpdateInvites({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        tokens,
+        changedBy: new mongoose.Types.ObjectId(userId),
+        newRole: newRole as 'admin' | 'member' | 'viewer',
+      });
+
+      // Audit log the bulk update
+      logAudit({
+        userId: new mongoose.Types.ObjectId(userId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        action: 'invitation.bulk_role_updated',
+        entityType: 'invitation',
+        metadata: {
+          tokensCount: tokens.length,
+          newRole,
+          updatedCount: results.updated,
+          failedCount: results.failed.length,
+        },
+        req,
+      });
+
+      res.json({
+        message: `Successfully updated ${results.updated} invitation roles`,
+        results,
+      });
+    } catch (error: any) {
+      logger.error('Bulk update invitations error:', error);
       
       if (error.message.includes('Insufficient permissions')) {
         res.status(403).json({ error: error.message });

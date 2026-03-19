@@ -162,6 +162,9 @@ router.delete('/devices/:deviceId', requireAuth, DeviceTrustController.removeTru
 // Data export endpoint
 router.get('/export-data', requireAuth, AuthController.exportAccountData);
 
+// Get connected OAuth providers
+router.get('/connected-providers', requireAuth, AuthController.getConnectedProviders);
+
 // Account deactivation
 router.post('/deactivate-account', requireAuth, validateRequest(deactivateAccountSchema), AuthController.deactivateAccount);
 

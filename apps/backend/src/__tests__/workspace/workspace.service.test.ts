@@ -6,6 +6,14 @@ import mongoose from 'mongoose';
 jest.mock('../../models/Workspace');
 jest.mock('../../models/WorkspaceMember');
 jest.mock('../../models/WorkspaceActivityLog');
+jest.mock('../../models/ScheduledPost');
+jest.mock('../../models/Media');
+jest.mock('../../models/SocialAccount');
+jest.mock('../../models/WorkspaceInvitation');
+jest.mock('../../models/ClientReview');
+jest.mock('../../models/Task');
+jest.mock('../../models/PostAnalytics');
+jest.mock('../../models/AuditLog');
 jest.mock('../../utils/redisClient');
 
 describe('WorkspaceService', () => {
@@ -103,13 +111,34 @@ describe('WorkspaceService', () => {
         commitTransaction: jest.fn(),
         abortTransaction: jest.fn(),
         endSession: jest.fn(),
-      };
-      jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession as any);
+        inTransaction: jest.fn().mockReturnValue(false), // Added: required for session validation
+      } as any;
+      jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession);
 
       const { Workspace } = await import('../../models/Workspace');
       const { WorkspaceMember } = await import('../../models/WorkspaceMember');
+      const { ScheduledPost } = await import('../../models/ScheduledPost');
+      const { Media } = await import('../../models/Media');
+      const { SocialAccount } = await import('../../models/SocialAccount');
+      const { WorkspaceInvitation } = await import('../../models/WorkspaceInvitation');
+      const { ClientPortal, ClientReview } = await import('../../models/ClientReview');
+      const { Task } = await import('../../models/Task');
+      const { PostAnalytics } = await import('../../models/PostAnalytics');
+      const { AuditLog } = await import('../../models/AuditLog');
+      const { WorkspaceActivityLog } = await import('../../models/WorkspaceActivityLog');
+      
       (Workspace.findByIdAndUpdate as jest.Mock).mockResolvedValue({});
       (WorkspaceMember.updateMany as jest.Mock).mockResolvedValue({});
+      (ScheduledPost.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (Media.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (SocialAccount.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (WorkspaceInvitation.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (ClientPortal.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (ClientReview.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (Task.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (PostAnalytics.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (AuditLog.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (WorkspaceActivityLog.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
 
       await expect(
         workspaceService.deleteWorkspace({
@@ -147,14 +176,35 @@ describe('WorkspaceService', () => {
         commitTransaction: jest.fn(),
         abortTransaction: jest.fn(),
         endSession: jest.fn(),
-      };
-      jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession as any);
+        inTransaction: jest.fn().mockReturnValue(false), // Added: required for session validation
+      } as any;
+      jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession);
 
       const { Workspace } = await import('../../models/Workspace');
       const { WorkspaceMember } = await import('../../models/WorkspaceMember');
+      const { ScheduledPost } = await import('../../models/ScheduledPost');
+      const { Media } = await import('../../models/Media');
+      const { SocialAccount } = await import('../../models/SocialAccount');
+      const { WorkspaceInvitation } = await import('../../models/WorkspaceInvitation');
+      const { ClientPortal, ClientReview } = await import('../../models/ClientReview');
+      const { Task } = await import('../../models/Task');
+      const { PostAnalytics } = await import('../../models/PostAnalytics');
+      const { AuditLog } = await import('../../models/AuditLog');
+      const { WorkspaceActivityLog } = await import('../../models/WorkspaceActivityLog');
+      
       const updateSpy = jest.fn().mockResolvedValue({});
       (Workspace.findByIdAndUpdate as jest.Mock).mockImplementation(updateSpy);
       (WorkspaceMember.updateMany as jest.Mock).mockResolvedValue({});
+      (ScheduledPost.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (Media.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (SocialAccount.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (WorkspaceInvitation.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (ClientPortal.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (ClientReview.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (Task.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (PostAnalytics.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (AuditLog.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
+      (WorkspaceActivityLog.deleteMany as jest.Mock).mockResolvedValue({ deletedCount: 0 });
 
       await workspaceService.deleteWorkspace({
         workspaceId: mockWorkspaceId,

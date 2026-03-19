@@ -571,12 +571,14 @@ router.post('/public/portal/:slug/posts/:postId/approve', publicRateLimit, async
   try {
     const { slug, postId } = req.params;
     const { feedback } = req.body;
+    const workspaceId = req.headers['x-workspace-id'] as string;
 
     const portal = await clientPortalService.clientApprovePost({
       slug,
       postId: new mongoose.Types.ObjectId(postId),
       status: PostApprovalStatus.APPROVED,
       feedback,
+      workspaceId: workspaceId ? new mongoose.Types.ObjectId(workspaceId) : undefined,
     });
 
     sendSuccess(res, { message: 'Post approved successfully' });
@@ -585,7 +587,7 @@ router.post('/public/portal/:slug/posts/:postId/approve', publicRateLimit, async
     if (error.message.includes('not found') || error.message.includes('expired') || error.message.includes('not active')) {
       return sendError(res, 'PORTAL_ERROR', error.message, 404);
     }
-    if (error.message.includes('not allowed')) {
+    if (error.message.includes('not allowed') || error.code === 'PORTAL_WORKSPACE_MISMATCH') {
       return sendError(res, 'PERMISSION_ERROR', error.message, 403);
     }
     next(error);
@@ -608,12 +610,14 @@ router.post('/public/portal/:slug/posts/:postId/reject', publicRateLimit, valida
 
     const { slug, postId } = req.params;
     const { feedback } = req.body;
+    const workspaceId = req.headers['x-workspace-id'] as string;
 
     const portal = await clientPortalService.clientApprovePost({
       slug,
       postId: new mongoose.Types.ObjectId(postId),
       status: PostApprovalStatus.REJECTED,
       feedback,
+      workspaceId: workspaceId ? new mongoose.Types.ObjectId(workspaceId) : undefined,
     });
 
     sendSuccess(res, { message: 'Post rejected successfully' });
@@ -622,7 +626,7 @@ router.post('/public/portal/:slug/posts/:postId/reject', publicRateLimit, valida
     if (error.message.includes('not found') || error.message.includes('expired') || error.message.includes('not active')) {
       return sendError(res, 'PORTAL_ERROR', error.message, 404);
     }
-    if (error.message.includes('not allowed')) {
+    if (error.message.includes('not allowed') || error.code === 'PORTAL_WORKSPACE_MISMATCH') {
       return sendError(res, 'PERMISSION_ERROR', error.message, 403);
     }
     next(error);
@@ -645,9 +649,13 @@ router.post('/public/portal/:slug/posts/:postId/comment', publicRateLimit, valid
 
     const { slug, postId } = req.params;
     const { text } = req.body;
+    const workspaceId = req.headers['x-workspace-id'] as string;
 
     // Get portal to extract client email
-    const { portal } = await clientPortalService.getPortalBySlug(slug);
+    const { portal } = await clientPortalService.getPortalBySlug(
+      slug,
+      workspaceId ? new mongoose.Types.ObjectId(workspaceId) : undefined
+    );
 
     await clientPortalService.clientCommentOnPost({
       slug,
@@ -662,7 +670,7 @@ router.post('/public/portal/:slug/posts/:postId/comment', publicRateLimit, valid
     if (error.message.includes('not found') || error.message.includes('expired') || error.message.includes('not active')) {
       return sendError(res, 'PORTAL_ERROR', error.message, 404);
     }
-    if (error.message.includes('not allowed')) {
+    if (error.message.includes('not allowed') || error.code === 'PORTAL_WORKSPACE_MISMATCH') {
       return sendError(res, 'PERMISSION_ERROR', error.message, 403);
     }
     next(error);

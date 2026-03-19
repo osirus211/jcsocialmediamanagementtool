@@ -213,8 +213,16 @@ export class GDPRCleanupJob {
    */
   private static async sendDeletionConfirmationEmail(request: any): Promise<void> {
     try {
-      // TODO: Implement email service integration
-      logger.info('Deletion confirmation email would be sent', {
+      const { emailNotificationService } = await import('../services/EmailNotificationService');
+      
+      await emailNotificationService.sendAccountDeletionConfirmation({
+        to: request.userEmail || 'user@example.com',
+        userName: request.userName || 'User',
+        deletedAt: new Date(),
+        dataRetentionInfo: 'Your data has been permanently deleted per GDPR Article 17 (Right to Erasure).',
+      });
+      
+      logger.info('Deletion confirmation email sent', {
         requestId: request._id.toString(),
         userId: request.userId.toString(),
         deletedAt: new Date().toISOString(),

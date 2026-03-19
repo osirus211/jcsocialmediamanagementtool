@@ -870,5 +870,35 @@ export class AuthController {
       next(error);
     }
   }
+
+  /**
+   * Get connected OAuth providers
+   * GET /api/v1/auth/connected-providers
+   */
+  static async getConnectedProviders(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.userId;
+      
+      if (!userId) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      // Import SocialAccount model and enum
+      const { SocialAccount, SocialPlatform } = await import('../models/SocialAccount');
+      
+      // Find all social accounts for this user
+      const accounts = await SocialAccount.find({ userId });
+      
+      // Return which providers are connected
+      res.json({
+        google: false, // Google OAuth is not a social platform in this system
+        github: accounts.some(a => a.provider === SocialPlatform.GITHUB),
+        apple: accounts.some(a => a.provider === SocialPlatform.APPLE),
+      });
+    } catch (error) {
+      logger.error('Failed to get connected providers:', error);
+      next(error);
+    }
+  }
 }
 

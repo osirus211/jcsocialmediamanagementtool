@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 // import { CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ApprovalQueueItem as ApprovalItem } from '../../services/approvals.service';
 import { approvalsService } from '../../services/approvals.service';
+import { useAuthStore } from '../../store/auth.store';
 // import { toast } from 'react-hot-toast';
 
 interface ApprovalQueueItemProps {
@@ -27,8 +28,19 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [status, setStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  
+  const { user } = useAuthStore();
+  
+  // SECURITY: Prevent self-approval - disable approve button if user is post author
+  const isPostAuthor = user?._id === item.createdBy;
 
   const handleApprove = async () => {
+    // SECURITY: Prevent self-approval
+    if (isPostAuthor) {
+      console.error('Cannot approve your own post');
+      return;
+    }
+    
     setIsApproving(true);
     try {
       await approvalsService.approvePost(item.postId);
@@ -145,8 +157,13 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({
             <>
               <button
                 onClick={handleApprove}
-                disabled={isApproving}
-                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isApproving || isPostAuthor}
+                className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isPostAuthor 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+                title={isPostAuthor ? 'You cannot approve your own post' : 'Approve post'}
               >
                 {isApproving ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

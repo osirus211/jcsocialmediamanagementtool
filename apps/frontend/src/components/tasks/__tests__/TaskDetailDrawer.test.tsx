@@ -1,19 +1,25 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import { TaskDetailDrawer } from '../TaskDetailDrawer';
+import { tasksService } from '@/services/tasks.service';
+import { useWorkspaceStore } from '@/store/workspace.store';
 
-// Mock the task service
-vi.mock('@/services/tasks.service', () => ({
-  tasksService: {
-    assignTask: vi.fn(),
-    unassignTask: vi.fn(),
-    updateTaskStatus: vi.fn(),
-    updateTaskPriority: vi.fn(),
-    toggleChecklistItem: vi.fn(),
-    addComment: vi.fn(),
-  },
-}));
+// Mock the task service with enums
+vi.mock('@/services/tasks.service', async () => {
+  const actual = await vi.importActual('@/services/tasks.service');
+  return {
+    ...actual,
+    tasksService: {
+      assignTask: vi.fn(),
+      unassignTask: vi.fn(),
+      updateTaskStatus: vi.fn(),
+      updateTaskPriority: vi.fn(),
+      toggleChecklistItem: vi.fn(),
+      addComment: vi.fn(),
+    },
+  };
+});
 
 // Mock the workspace store
 vi.mock('@/store/workspace.store', () => ({
@@ -29,13 +35,6 @@ const renderWithRouter = (component: React.ReactElement) => {
 };
 
 describe('TaskDetailDrawer', () => {
-  let mockTasksService: any;
-  let mockUseWorkspaceStore: any;
-
-  beforeAll(async () => {
-    mockTasksService = (await vi.importMock('@/services/tasks.service')).tasksService;
-    mockUseWorkspaceStore = (await vi.importMock('@/store/workspace.store')).useWorkspaceStore;
-  });
 
   const mockTask = {
     _id: 'task-1',
@@ -75,7 +74,15 @@ describe('TaskDetailDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     
-    vi.mocked(mockUseWorkspaceStore).mockReturnValue({
+    // Reset mock implementations directly on the service methods
+    vi.mocked(tasksService.assignTask).mockResolvedValue(mockTask);
+    vi.mocked(tasksService.unassignTask).mockResolvedValue(mockTask);
+    vi.mocked(tasksService.updateTaskStatus).mockResolvedValue(mockTask);
+    vi.mocked(tasksService.updateTaskPriority).mockResolvedValue(mockTask);
+    vi.mocked(tasksService.toggleChecklistItem).mockResolvedValue(mockTask);
+    vi.mocked(tasksService.addComment).mockResolvedValue(mockTask);
+    
+    vi.mocked(useWorkspaceStore).mockReturnValue({
       currentWorkspace: {
         _id: 'workspace-1',
         name: 'Test Workspace',
@@ -91,7 +98,6 @@ describe('TaskDetailDrawer', () => {
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
@@ -100,16 +106,15 @@ describe('TaskDetailDrawer', () => {
     expect(screen.getByText('Test Task')).toBeInTheDocument();
     expect(screen.getByText('Test task description')).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
-    expect(screen.getByText('medium')).toBeInTheDocument();
+    // Check for select labels instead of values
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Priority')).toBeInTheDocument();
   });
 
   it('assign user calls POST /:id/assign', async () => {
-    vi.mocked(mockTasksService.assignTask).mockResolvedValue(mockTask);
-
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
@@ -123,17 +128,14 @@ describe('TaskDetailDrawer', () => {
     fireEvent.click(userOption);
 
     await waitFor(() => {
-      expect(vi.mocked(mockTasksService.assignTask)).toHaveBeenCalledWith('task-1', ['user-2']);
+      expect(tasksService.assignTask).toHaveBeenCalledWith('task-1', ['user-2']);
     });
   });
 
   it('unassign user calls POST /:id/unassign', async () => {
-    vi.mocked(mockTasksService.unassignTask).mockResolvedValue(mockTask);
-
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
@@ -143,57 +145,52 @@ describe('TaskDetailDrawer', () => {
     fireEvent.click(unassignButton);
 
     await waitFor(() => {
-      expect(vi.mocked(mockTasksService.unassignTask)).toHaveBeenCalledWith('task-1', 'user-1');
+      expect(tasksService.unassignTask).toHaveBeenCalledWith('task-1', 'user-1');
     });
   });
 
   it('status change calls PATCH /:id/status', async () => {
-    vi.mocked(mockTasksService.updateTaskStatus).mockResolvedValue(mockTask);
-
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
     );
 
-    const statusSelect = screen.getByDisplayValue('todo');
+    // Find select by label
+    const statusSelects = screen.getAllByRole('combobox');
+    const statusSelect = statusSelects[0]; // First select is status
     fireEvent.change(statusSelect, { target: { value: 'in_progress' } });
 
     await waitFor(() => {
-      expect(vi.mocked(mockTasksService.updateTaskStatus)).toHaveBeenCalledWith('task-1', 'in_progress');
+      expect(tasksService.updateTaskStatus).toHaveBeenCalledWith('task-1', 'in_progress');
     });
   });
 
   it('priority change calls PATCH /:id/priority', async () => {
-    vi.mocked(mockTasksService.updateTaskPriority).mockResolvedValue(mockTask);
-
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
     );
 
-    const prioritySelect = screen.getByDisplayValue('medium');
+    // Find select by label
+    const selects = screen.getAllByRole('combobox');
+    const prioritySelect = selects[1]; // Second select is priority
     fireEvent.change(prioritySelect, { target: { value: 'high' } });
 
     await waitFor(() => {
-      expect(vi.mocked(mockTasksService.updateTaskPriority)).toHaveBeenCalledWith('task-1', 'high');
+      expect(tasksService.updateTaskPriority).toHaveBeenCalledWith('task-1', 'high');
     });
   });
 
   it('checklist item toggle calls PATCH /:id/checklist/:itemId', async () => {
-    vi.mocked(mockTasksService.toggleChecklistItem).mockResolvedValue(mockTask);
-
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
@@ -203,30 +200,27 @@ describe('TaskDetailDrawer', () => {
     fireEvent.click(checklistItem);
 
     await waitFor(() => {
-      expect(vi.mocked(mockTasksService.toggleChecklistItem)).toHaveBeenCalledWith('task-1', 'item-1');
+      expect(tasksService.toggleChecklistItem).toHaveBeenCalledWith('task-1', 'item-1');
     });
   });
 
   it('add comment calls POST /:id/comments', async () => {
-    vi.mocked(mockTasksService.addComment).mockResolvedValue(mockTask);
-
     renderWithRouter(
       <TaskDetailDrawer 
         task={mockTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />
     );
 
     const commentInput = screen.getByPlaceholderText(/add a comment/i);
-    const submitButton = screen.getByRole('button', { name: /post comment/i });
+    const submitButton = screen.getByRole('button', { name: /add comment/i });
 
     fireEvent.change(commentInput, { target: { value: 'Test comment' } });
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(vi.mocked(mockTasksService.addComment)).toHaveBeenCalledWith('task-1', 'Test comment');
+      expect(tasksService.addComment).toHaveBeenCalledWith('task-1', 'Test comment');
     });
   });
 
@@ -239,7 +233,6 @@ describe('TaskDetailDrawer', () => {
     renderWithRouter(
       <TaskDetailDrawer 
         task={overdueTask} 
-        isOpen={true} 
         onClose={() => {}} 
         onUpdate={() => {}} 
       />

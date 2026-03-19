@@ -20,12 +20,16 @@ vi.mock('@/store/workspace.store', () => ({
 }));
 
 // Mock react-router-dom hooks
+const mockNavigate = vi.fn();
+const mockUseParams = vi.fn();
+const mockUseNavigate = vi.fn(() => mockNavigate);
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
-    useParams: vi.fn(),
-    useNavigate: vi.fn(),
+    useParams: () => mockUseParams(),
+    useNavigate: () => mockUseNavigate(),
   };
 });
 
@@ -40,22 +44,16 @@ const renderWithRouter = (component: React.ReactElement) => {
 describe('PendingInvitesPage', () => {
   let mockInvitationService: any;
   let mockUseWorkspaceStore: any;
-  let mockUseParams: any;
-  let mockUseNavigate: any;
-  const mockNavigate = vi.fn();
 
   beforeAll(async () => {
     mockInvitationService = (await vi.importMock('@/services/invitation.service')).invitationService;
     mockUseWorkspaceStore = (await vi.importMock('@/store/workspace.store')).useWorkspaceStore;
-    mockUseParams = (await vi.importMock('react-router-dom')).useParams;
-    mockUseNavigate = (await vi.importMock('react-router-dom')).useNavigate;
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
     
     mockUseParams.mockReturnValue({ workspaceId: 'workspace-1' });
-    mockUseNavigate.mockReturnValue(mockNavigate);
     
     vi.mocked(mockUseWorkspaceStore).mockReturnValue({
       currentWorkspace: {
@@ -177,7 +175,8 @@ describe('PendingInvitesPage', () => {
 
     renderWithRouter(<PendingInvitesPage />);
 
-    // Should show loading spinner initially
-    expect(screen.getByRole('generic', { name: /loading/i }) || screen.getByTestId('loading-spinner')).toBeInTheDocument();
+    // Should show loading spinner initially - look for the spinner element by class
+    const spinner = document.querySelector('.animate-spin');
+    expect(spinner).toBeInTheDocument();
   });
 });

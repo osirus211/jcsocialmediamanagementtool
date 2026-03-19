@@ -259,12 +259,15 @@ export const AuditActions = {
   WORKSPACE_CREATED: 'workspace.created',
   WORKSPACE_UPDATED: 'workspace.updated',
   WORKSPACE_DELETED: 'workspace.deleted',
+  WORKSPACE_SETTINGS_CHANGED: 'workspace.settings_changed',
 
   // Member actions
   MEMBER_ADDED: 'member.added',
   MEMBER_REMOVED: 'member.removed',
   MEMBER_ROLE_CHANGED: 'member.role_changed',
   MEMBER_INVITED: 'member.invited',
+  INVITE_SENT: 'invitation.sent',
+  INVITE_REVOKED: 'invitation.revoked',
 
   // Billing actions
   BILLING_UPDATED: 'billing.updated',

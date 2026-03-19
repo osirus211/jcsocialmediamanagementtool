@@ -62,6 +62,24 @@ export const requireWorkspace = async (
 
     const workspaceId = new mongoose.Types.ObjectId(workspaceIdStr);
 
+    // Check if user is blocked from this workspace
+    const { WorkspaceMemberBlocklist } = await import('../models/WorkspaceMemberBlocklist');
+    const blocked = await WorkspaceMemberBlocklist.findOne({
+      workspaceId,
+      userId: req.user.userId,
+    });
+
+    if (blocked) {
+      logger.warn('Blocked user attempted workspace access', {
+        userId: req.user.userId,
+        workspaceId: workspaceId.toString(),
+        removedAt: blocked.removedAt,
+        ip: req.ip,
+        securityEvent: true,
+      });
+      throw new ForbiddenError('Your access to this workspace has been revoked');
+    }
+
     // Check if workspace exists and is not deleted
     const workspace = await Workspace.findOne({
       _id: workspaceId,

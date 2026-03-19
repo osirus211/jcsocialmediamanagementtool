@@ -213,6 +213,7 @@ router.patch(
 // Check slug availability
 router.get(
   '/slug-availability/:slug',
+  requireAuth,
   slugAvailabilityRateLimiter,
   WorkspaceController.checkSlugAvailability
 );
@@ -245,6 +246,17 @@ router.post(
   requireAdmin,
   checkMemberLimit,
   InvitationController.createInvitation
+);
+
+// Bulk invite members (admin or owner only)
+router.post(
+  '/:workspaceId/invitations/bulk',
+  invitationCreateRateLimiter,
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  checkMemberLimit,
+  InvitationController.bulkInvite
 );
 
 // Get pending invitations (admin or owner only)
@@ -284,6 +296,17 @@ router.delete(
   requireWorkspace,
   requireAdmin,
   InvitationController.bulkCancelInvitations
+);
+
+// Bulk update invitation roles (admin or owner only)
+// GAP 18 FIX: Separate from bulk create - this is for editing existing invitations
+router.patch(
+  '/:workspaceId/invitations/bulk',
+  invitationRevokeRateLimiter,
+  requireAuth,
+  requireWorkspace,
+  requireAdmin,
+  InvitationController.bulkUpdateInvitations
 );
 
 // Get invitation stats (admin or owner only)

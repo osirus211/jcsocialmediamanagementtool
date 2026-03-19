@@ -97,6 +97,7 @@ interface ApprovePostParams {
   postId: mongoose.Types.ObjectId;
   status: PostApprovalStatus;
   feedback?: string;
+  workspaceId?: mongoose.Types.ObjectId;
 }
 
 interface CommentOnPostParams {
@@ -243,7 +244,10 @@ export class ClientPortalService {
   /**
    * Get portal by slug (public access)
    */
-  async getPortalBySlug(slug: string): Promise<{
+  async getPortalBySlug(
+    slug: string,
+    workspaceId?: mongoose.Types.ObjectId
+  ): Promise<{
     portal: IClientPortal;
     posts: any[];
   }> {
@@ -253,6 +257,22 @@ export class ClientPortalService {
 
     if (!portal) {
       throw new Error('Portal not found');
+    }
+
+    // SECURITY: Verify token belongs to requested workspace
+    if (!workspaceId) {
+      throw {
+        code: 'WORKSPACE_REQUIRED',
+        message: 'Workspace context is required',
+        details: {}
+      };
+    }
+    if (portal.workspaceId.toString() !== workspaceId.toString()) {
+      throw {
+        code: 'PORTAL_WORKSPACE_MISMATCH',
+        message: 'Invalid portal access',
+        details: {}
+      };
     }
 
     // Check if expired
@@ -491,11 +511,27 @@ export class ClientPortalService {
    * Client approve/reject post
    */
   async clientApprovePost(params: ApprovePostParams): Promise<IClientPortal> {
-    const { slug, postId, status, feedback } = params;
+    const { slug, postId, status, feedback, workspaceId } = params;
 
     const portal = await ClientPortal.findOne({ slug });
     if (!portal) {
       throw new Error('Portal not found');
+    }
+
+    // SECURITY: Verify token belongs to requested workspace
+    if (!workspaceId) {
+      throw {
+        code: 'WORKSPACE_REQUIRED',
+        message: 'Workspace context is required',
+        details: {}
+      };
+    }
+    if (portal.workspaceId.toString() !== workspaceId.toString()) {
+      throw {
+        code: 'PORTAL_WORKSPACE_MISMATCH',
+        message: 'Invalid portal access',
+        details: {}
+      };
     }
 
     // Check if expired or inactive

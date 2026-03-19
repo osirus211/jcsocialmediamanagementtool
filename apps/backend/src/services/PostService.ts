@@ -373,8 +373,49 @@ export class PostService {
     }
 
     // Only allow updates for scheduled posts
-    if (post.status !== PostStatus.SCHEDULED) {
+    if (post.status !== PostStatus.SCHEDULED && post.status !== PostStatus.APPROVED) {
       throw new Error(`Cannot update post with status: ${post.status}`);
+    }
+
+    // Check if post was approved and is being edited - reset approval
+    const wasApproved = post.status === PostStatus.APPROVED || post.approvedBy;
+    if (wasApproved && (input.content !== undefined || input.mediaUrls !== undefined)) {
+      // Reset approval status
+      post.status = PostStatus.PENDING_APPROVAL;
+      post.approvedBy = undefined;
+      post.approvedAt = undefined;
+      
+      // Reset approval stages if multi-step approval is enabled
+      if (post.approvalStages && post.approvalStages.length > 0) {
+        post.approvalStages = post.approvalStages.map(stage => ({
+          ...stage,
+          status: 'pending' as const,
+          approvedBy: undefined,
+          approvedAt: undefined,
+        }));
+        post.currentStage = 0;
+      }
+
+      // Log approval reset
+      await WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+        action: 'POST_APPROVAL_RESET' as any,
+        resourceType: 'ScheduledPost',
+        resourceId: post._id,
+        details: {
+          reason: 'Post edited after approval',
+          platform: post.platform,
+        },
+        ipAddress,
+        userAgent,
+      });
+
+      logger.info('Post approval reset due to edit', {
+        postId: post._id.toString(),
+        workspaceId,
+        userId,
+      });
     }
 
     // Update fields

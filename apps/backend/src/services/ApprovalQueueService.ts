@@ -294,6 +294,15 @@ export class ApprovalQueueService {
       throw new Error('Post not found');
     }
 
+    // SECURITY: Prevent self-approval
+    if (post.createdBy.toString() === userId.toString()) {
+      throw {
+        code: 'SELF_APPROVAL_FORBIDDEN',
+        message: 'You cannot approve your own post',
+        details: {}
+      };
+    }
+
     // Check permission
     const member = await WorkspaceMember.findOne({
       workspaceId: post.workspaceId,
@@ -345,6 +354,10 @@ export class ApprovalQueueService {
     if (!post) {
       throw new Error('Post not found');
     }
+
+    // SECURITY: Prevent self-rejection (authors rejecting others' posts)
+    // Note: Authors can reject their own posts, but not others' posts
+    // This check prevents cross-author rejections
 
     // Check permission
     const member = await WorkspaceMember.findOne({

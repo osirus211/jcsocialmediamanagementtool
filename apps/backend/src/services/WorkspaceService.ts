@@ -9,6 +9,14 @@ import { Workspace, IWorkspace, WorkspacePlan } from '../models/Workspace';
 import { WorkspaceMember, IWorkspaceMember, MemberRole } from '../models/WorkspaceMember';
 import { WorkspaceActivityLog, ActivityAction, IWorkspaceActivityLog } from '../models/WorkspaceActivityLog';
 import { WorkspaceInvitation, IWorkspaceInvitation, InvitationStatus } from '../models/WorkspaceInvitation';
+import { ScheduledPost } from '../models/ScheduledPost';
+import { Media } from '../models/Media';
+import { SocialAccount } from '../models/SocialAccount';
+import { ClientPortal, ClientReview } from '../models/ClientReview';
+import { Task } from '../models/Task';
+import { PostAnalytics } from '../models/PostAnalytics';
+import { AuditLog } from '../models/AuditLog';
+import { isOwner, isAdminOrOwner, requireOwner, requireAdminOrOwner } from '../utils/ownerGuard';
 import { workspacePermissionService, Permission } from './WorkspacePermissionService';
 import { emailService } from './EmailService';
 import { logger } from '../utils/logger';
@@ -260,6 +268,17 @@ export class WorkspaceService {
       details: updates,
     });
 
+    // Audit log WORKSPACE_SETTINGS_CHANGED
+    const { AuditLog, AuditActions } = await import('../models/AuditLog');
+    await AuditLog.log({
+      userId,
+      workspaceId,
+      action: AuditActions.WORKSPACE_SETTINGS_CHANGED,
+      entityType: 'workspace',
+      entityId: workspaceId.toString(),
+      metadata: updates,
+    });
+
     // Invalidate workspace cache
     await this.invalidateCache([`workspace:${workspaceId}`]);
 
@@ -278,9 +297,7 @@ export class WorkspaceService {
 
     // Check permission (only owner can generate delete token)
     const member = await this.getMember(workspaceId, userId);
-    if (!member || member.role !== MemberRole.OWNER) {
-      throw new Error('Only workspace owner can generate delete token');
-    }
+    requireOwner(member?.role, 'Only workspace owner can generate delete token');
 
     // Generate token
     const crypto = require('crypto');
@@ -305,9 +322,7 @@ export class WorkspaceService {
 
     // Check permission (only owner can delete)
     const member = await this.getMember(workspaceId, userId);
-    if (!member || member.role !== MemberRole.OWNER) {
-      throw new Error('Only workspace owner can delete workspace');
-    }
+    requireOwner(member?.role, 'Only workspace owner can delete workspace');
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -329,6 +344,37 @@ export class WorkspaceService {
         { isActive: false },
         { session }
       );
+
+      // CASCADE DELETE: Delete all related data
+      // 1. Delete all posts
+      await ScheduledPost.deleteMany({ workspaceId }, { session });
+      
+      // 2. Delete all media files
+      await Media.deleteMany({ workspaceId }, { session });
+      
+      // 3. Delete all social accounts
+      await SocialAccount.deleteMany({ workspaceId }, { session });
+      
+      // 4. Delete all invitations
+      await WorkspaceInvitation.deleteMany({ workspaceId }, { session });
+      
+      // 5. Delete all client portals
+      await ClientPortal.deleteMany({ workspaceId }, { session });
+      
+      // 6. Delete all client reviews
+      await ClientReview.deleteMany({ workspaceId }, { session });
+      
+      // 7. Delete all tasks
+      await Task.deleteMany({ workspaceId }, { session });
+      
+      // 8. Delete all analytics data
+      await PostAnalytics.deleteMany({ workspaceId }, { session });
+      
+      // 9. Delete all audit logs
+      await AuditLog.deleteMany({ workspaceId }, { session });
+      
+      // 10. Delete all activity logs
+      await WorkspaceActivityLog.deleteMany({ workspaceId }, { session });
 
       // Log activity
       await this.logActivity({
@@ -471,6 +517,7 @@ export class WorkspaceService {
       throw new Error('Member not found');
     }
 
+    // Prevent removing owners
     if (member.role === MemberRole.OWNER) {
       throw new Error('Cannot remove workspace owner');
     }
@@ -482,6 +529,13 @@ export class WorkspaceService {
 
     // Immediately deactivate member
     await WorkspaceMember.findByIdAndUpdate(member._id, { isActive: false });
+
+    // Invalidate workspace sessions for the removed member
+    const { SessionService } = await import('./SessionService');
+    await SessionService.invalidateWorkspaceSessions(
+      userId.toString(),
+      workspaceId.toString()
+    );
 
     // Update workspace usage if member was active
     if (member.isActive) {
@@ -593,9 +647,7 @@ export class WorkspaceService {
       throw new Error('Member not found');
     }
 
-    if (member.role === MemberRole.OWNER) {
-      throw new Error('Cannot deactivate workspace owner');
-    }
+    requireOwner(member.role, 'Cannot deactivate workspace owner');
 
     if (!member.isActive) {
       throw new Error('Member is already deactivated');
@@ -764,6 +816,7 @@ export class WorkspaceService {
       throw new Error('Member not found');
     }
 
+    // Prevent removing owners
     if (member.role === MemberRole.OWNER) {
       throw new Error('Cannot remove workspace owner');
     }
@@ -791,6 +844,31 @@ export class WorkspaceService {
 
       // Revoke active sessions for this user in this workspace
       await this.revokeUserSessions(userId, workspaceId);
+
+      // Add to blocklist to immediately revoke access
+      const { WorkspaceMemberBlocklist } = await import('../models/WorkspaceMemberBlocklist');
+      try {
+        await WorkspaceMemberBlocklist.create({
+          workspaceId,
+          userId,
+          removedBy,
+          removedAt: new Date(),
+          reason: 'Member removed from workspace',
+        });
+        logger.info('User added to workspace blocklist', { userId, workspaceId });
+      } catch (blocklistError: any) {
+        // Don't fail if blocklist entry already exists
+        if (blocklistError.code !== 11000) {
+          logger.warn('Failed to add user to blocklist:', blocklistError);
+        }
+      }
+
+      // Invalidate workspace sessions for the removed member
+      const { SessionService } = await import('./SessionService');
+      await SessionService.invalidateWorkspaceSessions(
+        userId.toString(),
+        workspaceId.toString()
+      );
 
       // Cancel any pending invitations for this user
       await this.cancelPendingInvitations(userId, workspaceId, session);
@@ -1244,8 +1322,154 @@ export class WorkspaceService {
       details: { email, role },
     });
 
+    // Audit log INVITE_SENT
+    const { AuditLog, AuditActions } = await import('../models/AuditLog');
+    await AuditLog.log({
+      userId: invitedBy,
+      workspaceId,
+      action: AuditActions.INVITE_SENT,
+      entityType: 'invitation',
+      entityId: invitation._id.toString(),
+      metadata: { email, role },
+    });
+
     logger.info(`Email invitation sent to ${email} for workspace ${workspaceId}`);
     return invitation;
+  }
+
+  /**
+   * Bulk invite users by email to workspace
+   */
+  async bulkInviteByEmail(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    invitedBy: mongoose.Types.ObjectId;
+    invitations: Array<{ email: string; role: 'admin' | 'member' | 'viewer' }>;
+  }): Promise<{ successCount: number; failureCount: number; results: Array<{ email: string; success: boolean; error?: string; invitation?: any }> }> {
+    const { workspaceId, invitedBy, invitations } = params;
+
+    // Check permission
+    const inviter = await this.getMember(workspaceId, invitedBy);
+    if (!inviter || !workspacePermissionService.hasPermission(inviter.role, Permission.INVITE_MEMBER)) {
+      throw new Error('Insufficient permissions to invite members');
+    }
+
+    // Get workspace and inviter details
+    const workspace = await this.getWorkspace(workspaceId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    const { User } = await import('../models/User');
+    const inviterUser = await User.findById(invitedBy);
+    if (!inviterUser) {
+      throw new Error('Inviter not found');
+    }
+
+    const results: Array<{ email: string; success: boolean; error?: string; invitation?: any }> = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const inv of invitations) {
+      try {
+        const email = inv.email.toLowerCase();
+        const role = inv.role;
+
+        // Check if there's already a pending invitation
+        const existingInvitation = await WorkspaceInvitation.findOne({
+          workspaceId,
+          invitedEmail: email,
+          status: InvitationStatus.PENDING,
+        });
+
+        if (existingInvitation) {
+          results.push({ email, success: false, error: 'User already has a pending invitation' });
+          failureCount++;
+          continue;
+        }
+
+        // Check if user is already a member
+        const existingMember = await WorkspaceMember.findOne({
+          workspaceId,
+          userId: { $exists: true },
+        }).populate('userId');
+
+        const existingUserMember = existingMember && 
+          typeof existingMember.userId === 'object' && 
+          'email' in existingMember.userId &&
+          existingMember.userId.email === email;
+
+        if (existingUserMember) {
+          results.push({ email, success: false, error: 'User is already a member' });
+          failureCount++;
+          continue;
+        }
+
+        // Generate secure token using crypto.randomBytes(32)
+        const crypto = await import('crypto');
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = WorkspaceInvitation.hashToken(token);
+
+        // Create invitation
+        const invitation = new WorkspaceInvitation({
+          workspaceId,
+          invitedEmail: email,
+          invitedBy,
+          role,
+          token,
+          tokenHash,
+          inviterName: `${inviterUser.firstName} ${inviterUser.lastName}`,
+          workspaceName: workspace.name,
+        });
+
+        await invitation.save();
+
+        // Send invitation email
+        try {
+          await emailService.sendInvitationEmail({
+            to: email,
+            inviterName: `${inviterUser.firstName} ${inviterUser.lastName}`,
+            workspaceName: workspace.name,
+            role,
+            inviteUrl: `${process.env.FRONTEND_URL}/accept-invite/${token}`,
+            expiresAt: invitation.expiresAt,
+          });
+        } catch (error) {
+          logger.error('Failed to send invitation email:', error);
+          // Don't fail the invitation creation if email fails
+        }
+
+        // Log activity
+        await this.logActivity({
+          workspaceId,
+          userId: invitedBy,
+          action: ActivityAction.MEMBER_INVITED,
+          resourceType: 'Invitation',
+          resourceId: invitation._id,
+          details: { email, role },
+        });
+
+        results.push({ 
+          email, 
+          success: true, 
+          invitation: {
+            _id: invitation._id,
+            email: invitation.invitedEmail,
+            role: invitation.role,
+            status: invitation.status,
+            expiresAt: invitation.expiresAt,
+          }
+        });
+        successCount++;
+
+      } catch (error: any) {
+        logger.error(`Failed to invite ${inv.email}:`, error);
+        results.push({ email: inv.email, success: false, error: error.message });
+        failureCount++;
+      }
+    }
+
+    logger.info(`Bulk invite completed: ${successCount} success, ${failureCount} failures`);
+    return { successCount, failureCount, results };
   }
 
   /**
@@ -1276,19 +1500,26 @@ export class WorkspaceService {
       throw new Error('Invitation not found or already processed');
     }
 
-    // Update expiry date (72 hours from now)
+    // Generate new token using crypto.randomBytes(32)
+    const crypto = await import('crypto');
+    const newToken = crypto.randomBytes(32).toString('hex');
+    const newTokenHash = WorkspaceInvitation.hashToken(newToken);
+
+    // Update invitation with new token and expiry date (72 hours from now)
+    invitation.token = newToken;
+    invitation.tokenHash = newTokenHash;
     invitation.expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     invitation.status = InvitationStatus.PENDING;
     await invitation.save();
 
-    // Resend email
+    // Resend email with new token
     try {
       await emailService.sendInvitationEmail({
         to: invitation.invitedEmail,
         inviterName: invitation.inviterName,
         workspaceName: invitation.workspaceName,
         role: invitation.role,
-        inviteUrl: `${process.env.FRONTEND_URL}/accept-invite/${token}`,
+        inviteUrl: `${process.env.FRONTEND_URL}/accept-invite/${newToken}`,
         expiresAt: invitation.expiresAt,
       });
     } catch (error) {
@@ -1337,6 +1568,17 @@ export class WorkspaceService {
       resourceType: 'Invitation',
       resourceId: invitation._id,
       details: { email: invitation.invitedEmail, action: 'revoked' },
+    });
+
+    // Audit log INVITE_REVOKED
+    const { AuditLog, AuditActions } = await import('../models/AuditLog');
+    await AuditLog.log({
+      userId,
+      workspaceId,
+      action: AuditActions.INVITE_REVOKED,
+      entityType: 'invitation',
+      entityId: invitation._id.toString(),
+      metadata: { email: invitation.invitedEmail },
     });
 
     logger.info(`Invitation revoked for ${invitation.invitedEmail} in workspace ${workspaceId}`);
@@ -1615,6 +1857,84 @@ export class WorkspaceService {
     } catch (error) {
       await session.abortTransaction();
       logger.error('Failed to bulk cancel invitations:', error);
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Bulk update invitation roles
+   * 
+   * GAP 18 FIX: Separate from bulk create - this is for editing existing invitations
+   */
+  async bulkUpdateInvites(params: {
+    workspaceId: mongoose.Types.ObjectId;
+    tokens: string[];
+    changedBy: mongoose.Types.ObjectId;
+    newRole: 'admin' | 'member' | 'viewer';
+  }): Promise<{ updated: number; failed: Array<{ token: string; reason: string }> }> {
+    const { workspaceId, tokens, changedBy, newRole } = params;
+
+    // Check permissions
+    const member = await this.getMember(workspaceId, changedBy);
+    if (!member || !workspacePermissionService.hasPermission(member.role, Permission.MANAGE_TEAM)) {
+      throw new Error('Insufficient permissions to update invitations');
+    }
+
+    const results = {
+      updated: 0,
+      failed: [] as Array<{ token: string; reason: string }>,
+    };
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      for (const token of tokens) {
+        try {
+          const tokenHash = WorkspaceInvitation.hashToken(token);
+          const invitation = await WorkspaceInvitation.findOne({
+            workspaceId,
+            tokenHash,
+            status: InvitationStatus.PENDING,
+          }).session(session);
+
+          if (!invitation) {
+            results.failed.push({ token: token.substring(0, 8) + '...', reason: 'Invitation not found or already accepted' });
+            continue;
+          }
+
+          // Update role
+          invitation.role = newRole;
+          await invitation.save({ session });
+
+          results.updated++;
+
+          // Log activity
+          await this.logActivity({
+            workspaceId,
+            userId: changedBy,
+            action: ActivityAction.MEMBER_ROLE_CHANGED,
+            details: {
+              invitedEmail: invitation.invitedEmail,
+              oldRole: invitation.role,
+              newRole,
+              token: token.substring(0, 8) + '...',
+            },
+            session,
+          });
+        } catch (error: any) {
+          results.failed.push({ token: token.substring(0, 8) + '...', reason: error.message });
+        }
+      }
+
+      await session.commitTransaction();
+      logger.info(`Bulk updated ${results.updated} invitation roles for workspace ${workspaceId}`);
+      return results;
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Failed to bulk update invitations:', error);
       throw error;
     } finally {
       session.endSession();
