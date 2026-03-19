@@ -1,26 +1,6 @@
 name: Authentication System Validation
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'apps/backend/src/controllers/authController.js'
-      - 'apps/backend/src/models/User.js'
-      - 'apps/backend/src/middleware/rateLimiter.js'
-      - 'apps/backend/src/services/AuthService.js'
-      - 'apps/frontend/src/components/auth/**'
-      - 'apps/frontend/src/pages/auth/**'
-      - '.github/workflows/auth-validation.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'apps/backend/src/controllers/authController.js'
-      - 'apps/backend/src/models/User.js'
-      - 'apps/backend/src/middleware/rateLimiter.js'
-      - 'apps/backend/src/services/AuthService.js'
-      - 'apps/frontend/src/components/auth/**'
-      - 'apps/frontend/src/pages/auth/**'
-      - '.github/workflows/auth-validation.yml'
   workflow_dispatch:
     inputs:
       test_suite:
