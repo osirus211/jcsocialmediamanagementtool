@@ -17,6 +17,10 @@ export class TwitterAdapter implements PlatformAdapter {
   private clientId: string;
   private clientSecret: string;
   private readonly API_BASE = 'https://api.twitter.com/2';
+/**
+ * @deprecated This adapter is not used. Use TwitterOAuthProvider instead.
+ * SECURITY WARNING: This contains a PKCE placeholder and should not be used in production.
+ */
 
   constructor(clientId: string, clientSecret: string) {
     this.clientId = clientId;
@@ -25,19 +29,10 @@ export class TwitterAdapter implements PlatformAdapter {
 
   /**
    * Get OAuth authorization URL
+   * @deprecated Use TwitterOAuthProvider.getAuthorizationUrl() instead
    */
   getAuthUrl(redirectUri: string, state: string): string {
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: this.clientId,
-      redirect_uri: redirectUri,
-      state,
-      scope: 'tweet.read tweet.write users.read offline.access',
-      code_challenge: 'challenge', // TODO: Implement PKCE
-      code_challenge_method: 'S256',
-    });
-
-    return `https://twitter.com/i/oauth2/authorize?${params.toString()}`;
+    throw new Error('TwitterAdapter is deprecated. Use TwitterOAuthProvider instead.');
   }
 
   /**

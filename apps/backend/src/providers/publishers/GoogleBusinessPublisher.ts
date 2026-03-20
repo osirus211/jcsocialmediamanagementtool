@@ -85,10 +85,31 @@ export interface LocationInsights {
 
 export class GoogleBusinessPublisher implements IPublisher {
   readonly platform = 'google-business';
+  protected readonly requiredScopes = ['https://www.googleapis.com/auth/business.manage'];
   private readonly baseUrl = 'https://mybusiness.googleapis.com/v4';
   private readonly performanceUrl = 'https://businessprofileperformance.googleapis.com/v1';
 
+  /**
+   * Validate platform scopes before publishing
+   */
+  protected validatePlatformScopes(account: ISocialAccount): void {
+    const grantedScopes: string[] = account.scopes || [];
+    const missingScopes = this.requiredScopes.filter(scope => !grantedScopes.includes(scope));
+
+    if (missingScopes.length > 0) {
+      const error: any = new Error(`Missing required scopes: ${missingScopes.join(', ')}`);
+      error.code = 'INSUFFICIENT_SCOPES';
+      error.details = {
+        missing: missingScopes,
+        granted: grantedScopes,
+        required: this.requiredScopes,
+      };
+      throw error;
+    }
+  }
+
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     try {
       logger.info('Publishing Google Business Profile post', {
         accountId: account._id,

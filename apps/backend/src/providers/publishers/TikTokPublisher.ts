@@ -27,6 +27,7 @@ const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
 
 export class TikTokPublisher extends BasePublisher {
   readonly platform = 'tiktok';
+  protected readonly requiredScopes = ['user.info.basic', 'video.upload', 'video.publish'];
   private provider: TikTokProvider;
 
   constructor() {
@@ -39,6 +40,7 @@ export class TikTokPublisher extends BasePublisher {
   }
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [] } = options;
 
     this.validateContentLength(content, MAX_CONTENT_LENGTH);

@@ -631,6 +631,57 @@ export class FacebookTokenRefreshWorker {
         pageId: orphanedPage.providerUserId,
         pageName: orphanedPage.accountName,
       });
+
+      // Pause all scheduled/queued posts for this disconnected account
+      try {
+        const { Post } = await import('../models/Post');
+        await Post.updateMany(
+          {
+            socialAccountId: orphanedPage._id,
+            status: { $in: ['SCHEDULED', 'QUEUED'] },
+            scheduledAt: { $gt: new Date() },
+          },
+          {
+            $set: {
+              status: 'PAUSED',
+              pausedReason: 'ACCOUNT_DISCONNECTED',
+              pausedAt: new Date(),
+            },
+          }
+        );
+      } catch (pauseErr: any) {
+        logger.warn('Failed to pause posts on account disconnect', {
+          accountId: orphanedPage._id,
+          provider: orphanedPage.provider,
+          error: pauseErr.message,
+        });
+      }
+
+      // Send disconnect email notification
+      try {
+        const { User } = await import('../models/User');
+        const { Workspace } = await import('../models/Workspace');
+        const { emailNotificationService } = await import('../services/EmailNotificationService');
+        
+        const workspace = await Workspace.findById(orphanedPage.workspaceId);
+        if (workspace) {
+          const user = await User.findById(workspace.ownerId).select('email firstName');
+          if (user?.email) {
+            await emailNotificationService.sendAccountDisconnectedEmail({
+              to: user.email,
+              userName: user.firstName || 'there',
+              platform: orphanedPage.provider,
+              accountName: orphanedPage.accountName || orphanedPage.providerUserId || orphanedPage.provider,
+              reconnectUrl: `${process.env.FRONTEND_URL}/settings/accounts`,
+            });
+          }
+        }
+      } catch (emailErr: any) {
+        logger.warn('Failed to send disconnect email', {
+          accountId: orphanedPage._id,
+          error: emailErr.message,
+        });
+      }
     }
   }
 }

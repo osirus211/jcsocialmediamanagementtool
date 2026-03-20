@@ -73,9 +73,30 @@ export interface PinterestIdeaPin {
 
 export class PinterestPublisher implements IPublisher {
   readonly platform = 'pinterest';
+  protected readonly requiredScopes = ['user_accounts:read', 'pins:write', 'boards:read'];
   private readonly apiBaseUrl = 'https://api.pinterest.com/v5';
 
+  /**
+   * Validate platform scopes before publishing
+   */
+  protected validatePlatformScopes(account: ISocialAccount): void {
+    const grantedScopes: string[] = account.scopes || [];
+    const missingScopes = this.requiredScopes.filter(scope => !grantedScopes.includes(scope));
+
+    if (missingScopes.length > 0) {
+      const error: any = new Error(`Missing required scopes: ${missingScopes.join(', ')}`);
+      error.code = 'INSUFFICIENT_SCOPES';
+      error.details = {
+        missing: missingScopes,
+        granted: grantedScopes,
+        required: this.requiredScopes,
+      };
+      throw error;
+    }
+  }
+
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     // Convert options to IPost format for compatibility with existing method
     const altTexts = (options.metadata?.altTexts as string[]) || [];
     const post = {

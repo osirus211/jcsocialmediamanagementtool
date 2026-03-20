@@ -37,11 +37,13 @@ export interface MastodonMediaUpload {
 
 export class MastodonPublisher extends BasePublisher {
   readonly platform = 'mastodon';
+  protected readonly requiredScopes = ['read', 'write'];
 
   /**
    * Publish post to Mastodon
    */
   async publishPost(account: ISocialAccount, options: MastodonPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     try {
       const instanceUrl = account.metadata?.instanceUrl;
       if (!instanceUrl) {

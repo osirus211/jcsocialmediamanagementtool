@@ -5,6 +5,8 @@
 
 import { PinterestOAuthProvider, PinterestTokenResponse, PinterestUserProfile, PinterestBoard } from '../../providers/oauth/PinterestOAuthProvider';
 import { SocialAccount, SocialPlatform, ISocialAccount } from '../../models/SocialAccount';
+import { securityAuditService } from '../SecurityAuditService';
+import { SecurityEventType } from '../../models/SecurityEvent';
 import { logger } from '../../utils/logger';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
 
@@ -38,7 +40,7 @@ export class PinterestOAuthService {
   /**
    * Handle OAuth callback and exchange code for tokens
    */
-  async handleCallback(code: string, state: string, userId: string, workspaceId: string): Promise<ISocialAccount> {
+  async handleCallback(code: string, state: string, userId: string, workspaceId: string, ipAddress: string = '0.0.0.0'): Promise<ISocialAccount> {
     try {
       // Exchange code for tokens
       const tokenData = await this.exchangeCodeForToken(code);
@@ -58,6 +60,22 @@ export class PinterestOAuthService {
         boardCount: boards.length,
       });
 
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        workspaceId: workspaceId,
+        userId: userId,
+        ipAddress: ipAddress,
+        resource: profile.id,
+        success: true,
+        metadata: {
+          provider: SocialPlatform.PINTEREST,
+          userId: profile.id,
+          username: profile.username,
+          boardCount: boards.length,
+        },
+      });
+
       return account;
     } catch (error: any) {
       logger.error('Pinterest OAuth callback failed', {
@@ -65,6 +83,21 @@ export class PinterestOAuthService {
         workspaceId,
         error: error.message,
       });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        workspaceId: workspaceId,
+        userId: userId,
+        ipAddress: ipAddress || '0.0.0.0',
+        resource: 'pinterest',
+        success: false,
+        errorMessage: error.message,
+        metadata: {
+          provider: SocialPlatform.PINTEREST,
+        },
+      });
+
       throw error;
     }
   }

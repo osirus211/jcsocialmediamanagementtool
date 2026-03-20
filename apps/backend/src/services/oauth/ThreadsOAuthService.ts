@@ -7,6 +7,8 @@
 
 import { ThreadsProvider } from './ThreadsProvider';
 import { SocialAccount, SocialPlatform, AccountStatus } from '../../models/SocialAccount';
+import { securityAuditService } from '../SecurityAuditService';
+import { SecurityEventType } from '../../models/SecurityEvent';
 import { logger } from '../../utils/logger';
 import axios from 'axios';
 
@@ -85,7 +87,7 @@ export class ThreadsOAuthService {
   /**
    * Handle OAuth callback and exchange code for tokens
    */
-  async handleCallback(code: string, state: string, userId: string, workspaceId: string): Promise<void> {
+  async handleCallback(code: string, state: string, userId: string, workspaceId: string, ipAddress: string = '0.0.0.0'): Promise<void> {
     try {
       logger.info('[Threads] Starting OAuth callback', { workspaceId, userId, state });
 
@@ -102,8 +104,38 @@ export class ThreadsOAuthService {
       await this.saveAccount(userId, workspaceId, longTokenData, profile);
       
       logger.info('[Threads] OAuth callback completed successfully', { workspaceId, userId });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        workspaceId: workspaceId,
+        userId: userId,
+        ipAddress: ipAddress,
+        resource: profile.id,
+        success: true,
+        metadata: {
+          provider: SocialPlatform.THREADS,
+          userId: profile.id,
+          username: profile.username,
+        },
+      });
     } catch (error: any) {
       logger.error('[Threads] OAuth callback failed', { workspaceId, userId, error: error.message });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        workspaceId: workspaceId,
+        userId: userId,
+        ipAddress: ipAddress,
+        resource: 'threads',
+        success: false,
+        errorMessage: error.message,
+        metadata: {
+          provider: SocialPlatform.THREADS,
+        },
+      });
+
       throw error;
     }
   }
@@ -275,6 +307,57 @@ export class ThreadsOAuthService {
       await account.save();
       
       logger.info('[Threads] Account disconnected', { accountId });
+
+      // Pause all scheduled/queued posts for this disconnected account
+      try {
+        const { Post } = await import('../../models/Post');
+        await Post.updateMany(
+          {
+            socialAccountId: account._id,
+            status: { $in: ['SCHEDULED', 'QUEUED'] },
+            scheduledAt: { $gt: new Date() },
+          },
+          {
+            $set: {
+              status: 'PAUSED',
+              pausedReason: 'ACCOUNT_DISCONNECTED',
+              pausedAt: new Date(),
+            },
+          }
+        );
+      } catch (pauseErr: any) {
+        logger.warn('Failed to pause posts on account disconnect', {
+          accountId: account._id,
+          provider: account.provider,
+          error: pauseErr.message,
+        });
+      }
+
+      // Send disconnect email notification
+      try {
+        const { User } = await import('../../models/User');
+        const { Workspace } = await import('../../models/Workspace');
+        const { emailNotificationService } = await import('../EmailNotificationService');
+        
+        const workspace = await Workspace.findById(account.workspaceId);
+        if (workspace) {
+          const user = await User.findById(workspace.ownerId).select('email firstName');
+          if (user?.email) {
+            await emailNotificationService.sendAccountDisconnectedEmail({
+              to: user.email,
+              userName: user.firstName || 'there',
+              platform: account.provider,
+              accountName: account.accountName || account.providerUserId || account.provider,
+              reconnectUrl: `${process.env.FRONTEND_URL}/settings/accounts`,
+            });
+          }
+        }
+      } catch (emailErr: any) {
+        logger.warn('Failed to send disconnect email', {
+          accountId: account._id,
+          error: emailErr.message,
+        });
+      }
     } catch (error: any) {
       logger.error('[Threads] Failed to disconnect account', { accountId, error: error.message });
       throw error;

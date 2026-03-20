@@ -413,6 +413,57 @@ export class TikTokOAuthService {
 
       logger.info('TikTok account disconnected', { accountId });
 
+      // Pause all scheduled/queued posts for this disconnected account
+      try {
+        const { Post } = await import('../../models/Post');
+        await Post.updateMany(
+          {
+            socialAccountId: account._id,
+            status: { $in: ['SCHEDULED', 'QUEUED'] },
+            scheduledAt: { $gt: new Date() },
+          },
+          {
+            $set: {
+              status: 'PAUSED',
+              pausedReason: 'ACCOUNT_DISCONNECTED',
+              pausedAt: new Date(),
+            },
+          }
+        );
+      } catch (pauseErr: any) {
+        logger.warn('Failed to pause posts on account disconnect', {
+          accountId: account._id,
+          provider: account.provider,
+          error: pauseErr.message,
+        });
+      }
+
+      // Send disconnect email notification
+      try {
+        const { User } = await import('../../models/User');
+        const { Workspace } = await import('../../models/Workspace');
+        const { emailNotificationService } = await import('../EmailNotificationService');
+        
+        const workspace = await Workspace.findById(account.workspaceId);
+        if (workspace) {
+          const user = await User.findById(workspace.ownerId).select('email firstName');
+          if (user?.email) {
+            await emailNotificationService.sendAccountDisconnectedEmail({
+              to: user.email,
+              userName: user.firstName || 'there',
+              platform: account.provider,
+              accountName: account.accountName || account.providerUserId || account.provider,
+              reconnectUrl: `${process.env.FRONTEND_URL}/settings/accounts`,
+            });
+          }
+        }
+      } catch (emailErr: any) {
+        logger.warn('Failed to send disconnect email', {
+          accountId: account._id,
+          error: emailErr.message,
+        });
+      }
+
       // Log security event
       await securityAuditService.logEvent({
         type: SecurityEventType.OAUTH_DISCONNECT,

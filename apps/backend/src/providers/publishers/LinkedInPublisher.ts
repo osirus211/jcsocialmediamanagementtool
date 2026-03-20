@@ -44,8 +44,10 @@ interface LinkedInUploadResponse {
 
 export class LinkedInPublisher extends BasePublisher {
   readonly platform = 'linkedin';
+  protected readonly requiredScopes = ['w_member_social', 'r_liteprofile'];
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [], metadata } = options;
 
     this.validateContentLength(content, MAX_CONTENT_LENGTH);

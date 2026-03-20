@@ -1,4 +1,6 @@
 import { ISocialAccount, SocialAccount, SocialPlatform } from '../../models/SocialAccount';
+import { securityAuditService } from '../SecurityAuditService';
+import { SecurityEventType } from '../../models/SecurityEvent';
 import { OAuthStateService } from './OAuthStateService';
 import axios from 'axios';
 import mongoose from 'mongoose';
@@ -98,7 +100,7 @@ export class RedditOAuthService {
   /**
    * Handle OAuth callback and connect Reddit account
    */
-  async handleCallback(params: RedditConnectParams): Promise<ISocialAccount> {
+  async handleCallback(params: RedditConnectParams, ipAddress: string = '0.0.0.0'): Promise<ISocialAccount> {
     try {
       // Verify state
       const stateData = await this.oauthStateService.validateState(params.state);
@@ -126,6 +128,21 @@ export class RedditOAuthService {
         redditUsername: user.name
       });
 
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        workspaceId: params.workspaceId.toString(),
+        userId: params.userId.toString(),
+        ipAddress: ipAddress,
+        resource: user.id,
+        success: true,
+        metadata: {
+          provider: SocialPlatform.REDDIT,
+          userId: user.id,
+          username: user.name,
+        },
+      });
+
       return account;
     } catch (error) {
       logger.error('Failed to handle Reddit OAuth callback', {
@@ -133,6 +150,21 @@ export class RedditOAuthService {
         userId: params.userId,
         workspaceId: params.workspaceId
       });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        workspaceId: params.workspaceId.toString(),
+        userId: params.userId.toString(),
+        ipAddress: ipAddress,
+        resource: 'reddit',
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        metadata: {
+          provider: SocialPlatform.REDDIT,
+        },
+      });
+
       throw error;
     }
   }

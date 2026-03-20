@@ -40,6 +40,7 @@ interface Facet {
 
 export class BlueskyPublisher extends BasePublisher {
   readonly platform = 'bluesky';
+  protected readonly requiredScopes = ['atproto', 'com.atproto.repo.createRecord'];
   private readonly service = 'https://bsky.social';
   private readonly videoService = 'https://video.bsky.app';
   private tokenEncryption: TokenEncryptionService;
@@ -50,6 +51,7 @@ export class BlueskyPublisher extends BasePublisher {
   }
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [], threadPosts = [] } = options;
 
     this.validateContentLength(content, MAX_CONTENT_LENGTH);

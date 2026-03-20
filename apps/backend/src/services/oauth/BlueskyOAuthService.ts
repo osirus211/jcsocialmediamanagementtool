@@ -6,7 +6,9 @@
  */
 
 import { BskyAgent } from '@atproto/api';
-import { ISocialAccount, SocialAccount } from '../../models/SocialAccount';
+import { ISocialAccount, SocialAccount, SocialPlatform } from '../../models/SocialAccount';
+import { securityAuditService } from '../SecurityAuditService';
+import { SecurityEventType } from '../../models/SecurityEvent';
 import { logger } from '../../utils/logger';
 import { TokenEncryptionService } from '../TokenEncryptionService';
 import { OAuthStateService } from './OAuthStateService';
@@ -47,7 +49,8 @@ export class BlueskyOAuthService {
     handle: string,
     appPassword: string,
     userId: string,
-    workspaceId: string
+    workspaceId: string,
+    ipAddress: string = '0.0.0.0'
   ): Promise<ISocialAccount> {
     try {
       // Create session with Bluesky
@@ -66,6 +69,22 @@ export class BlueskyOAuthService {
         did: sessionData.did
       });
 
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        workspaceId: workspaceId,
+        userId: userId,
+        ipAddress: ipAddress,
+        resource: profile.did,
+        success: true,
+        metadata: {
+          provider: SocialPlatform.BLUESKY,
+          userId: profile.did,
+          handle: profile.handle,
+          displayName: profile.displayName,
+        },
+      });
+
       return account;
     } catch (error: any) {
       logger.error('Failed to connect Bluesky account', {
@@ -74,6 +93,22 @@ export class BlueskyOAuthService {
         handle,
         error: error.message
       });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        workspaceId: workspaceId,
+        userId: userId,
+        ipAddress: ipAddress || '0.0.0.0',
+        resource: 'bluesky',
+        success: false,
+        errorMessage: error.message,
+        metadata: {
+          provider: SocialPlatform.BLUESKY,
+          handle,
+        },
+      });
+
       throw new Error(`Failed to connect Bluesky account: ${error.message}`);
     }
   }

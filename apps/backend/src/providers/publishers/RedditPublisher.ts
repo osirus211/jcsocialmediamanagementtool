@@ -48,6 +48,7 @@ export interface RedditPostResponse {
 
 export class RedditPublisher implements IPublisher {
   readonly platform = 'reddit';
+  protected readonly requiredScopes = ['identity', 'submit', 'read'];
   private userAgent: string;
 
   constructor(userAgent: string) {
@@ -55,9 +56,29 @@ export class RedditPublisher implements IPublisher {
   }
 
   /**
+   * Validate platform scopes before publishing
+   */
+  protected validatePlatformScopes(account: ISocialAccount): void {
+    const grantedScopes: string[] = account.scopes || [];
+    const missingScopes = this.requiredScopes.filter(scope => !grantedScopes.includes(scope));
+
+    if (missingScopes.length > 0) {
+      const error: any = new Error(`Missing required scopes: ${missingScopes.join(', ')}`);
+      error.code = 'INSUFFICIENT_SCOPES';
+      error.details = {
+        missing: missingScopes,
+        granted: grantedScopes,
+        required: this.requiredScopes,
+      };
+      throw error;
+    }
+  }
+
+  /**
    * Publish post to Reddit
    */
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const redditOptions = options as RedditPostOptions;
     
     if (!redditOptions.subreddit || !redditOptions.title) {

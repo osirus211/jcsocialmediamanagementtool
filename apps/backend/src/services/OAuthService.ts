@@ -1,4 +1,6 @@
 import { SocialAccount, SocialPlatform, AccountStatus } from '../models/SocialAccount';
+import { securityAuditService } from './SecurityAuditService';
+import { SecurityEventType } from '../models/SecurityEvent';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { encrypt } from '../utils/encryption';
@@ -176,6 +178,21 @@ export class OAuthService {
         providerUserId: profileResult.userId,
       });
 
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        workspaceId: workspaceId,
+        userId: workspaceId, // Using workspaceId as userId since we don't have userId in params
+        ipAddress: '0.0.0.0',
+        resource: profileResult.userId!,
+        success: true,
+        metadata: {
+          provider: provider,
+          userId: profileResult.userId,
+          username: profileResult.username,
+        },
+      });
+
       return { success: true, account };
 
     } catch (error: any) {
@@ -184,6 +201,21 @@ export class OAuthService {
         workspaceId,
         error: error.message,
       });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        workspaceId: workspaceId,
+        userId: workspaceId, // Using workspaceId as userId since we don't have userId in params
+        ipAddress: '0.0.0.0',
+        resource: provider,
+        success: false,
+        errorMessage: error.message,
+        metadata: {
+          provider: provider,
+        },
+      });
+
       return { success: false, error: error.message };
     }
   }

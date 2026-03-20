@@ -42,11 +42,13 @@ interface TwitterQuoteOptions {
 
 export class TwitterPublisher extends BasePublisher {
   readonly platform = 'twitter';
+  protected readonly requiredScopes = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'];
 
   /**
    * Publish post to Twitter (single tweet, thread, or poll)
    */
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [], metadata } = options;
 
     // Check if this is a thread

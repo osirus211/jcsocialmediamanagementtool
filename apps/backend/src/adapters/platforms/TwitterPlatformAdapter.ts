@@ -12,26 +12,20 @@ import {
   PlatformCapabilities,
 } from './PlatformAdapter';
 
+/**
+ * @deprecated This adapter is not used. Use TwitterOAuthProvider instead.
+ * SECURITY WARNING: This contains a PKCE placeholder and should not be used in production.
+ */
 export class TwitterPlatformAdapter extends BasePlatformAdapter {
   constructor(clientId: string, clientSecret: string) {
     super('twitter', clientId, clientSecret);
   }
 
+  /**
+   * @deprecated Use TwitterOAuthProvider.getAuthorizationUrl() instead
+   */
   async generateAuthUrl(redirectUri: string, state: string, scopes: string[]): Promise<AuthUrlResult> {
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: this.clientId,
-      redirect_uri: redirectUri,
-      state,
-      scope: scopes.join(' ') || 'tweet.read tweet.write users.read offline.access',
-      code_challenge: 'challenge',
-      code_challenge_method: 'S256',
-    });
-
-    return {
-      authUrl: `https://twitter.com/i/oauth2/authorize?${params.toString()}`,
-      codeVerifier: 'challenge',
-    };
+    throw new Error('TwitterPlatformAdapter is deprecated. Use TwitterOAuthProvider instead.');
   }
 
   async exchangeCodeForToken(code: string, redirectUri: string, codeVerifier?: string): Promise<PlatformToken> {

@@ -44,8 +44,10 @@ interface CarouselItem {
 
 export class InstagramPublisher extends BasePublisher {
   readonly platform = 'instagram';
+  protected readonly requiredScopes = ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'];
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [] } = options;
     const post = (options as any).post;
 

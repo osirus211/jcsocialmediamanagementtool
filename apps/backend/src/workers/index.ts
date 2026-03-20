@@ -59,6 +59,12 @@ import { InstagramPublisherWorker } from './InstagramPublisherWorker';
 import { TwitterPublisherWorker } from './TwitterPublisherWorker';
 import { LinkedInPublisherWorker } from './LinkedInPublisherWorker';
 import { TikTokPublisherWorker } from './TikTokPublisherWorker';
+import { YouTubePublisherWorker } from './YouTubePublisherWorker';
+import { ThreadsPublisherWorker } from './ThreadsPublisherWorker';
+import { PinterestPublisherWorker } from './PinterestPublisherWorker';
+import { BlueskyPublisherWorker } from './BlueskyPublisherWorker';
+import { MastodonPublisherWorker } from './MastodonPublisherWorker';
+import { RedditPublisherWorker } from './RedditPublisherWorker';
 // import { GoogleBusinessPublisherWorker } from './GoogleBusinessPublisherWorker';
 import { TokenRefreshWorker } from './TokenRefreshWorker';
 import { DistributedTokenRefreshWorker } from './DistributedTokenRefreshWorker';
@@ -128,6 +134,42 @@ export function initializeWorkers(): WorkerManager {
     'tiktok-publisher-worker',
     new WorkerAdapter(new TikTokPublisherWorker(), 'tiktok-publisher-worker'),
     workerConfigs['tiktok-publisher-worker']
+  );
+
+  manager.registerWorker(
+    'youtube-publisher-worker',
+    new WorkerAdapter(new YouTubePublisherWorker(), 'youtube-publisher-worker'),
+    workerConfigs['youtube-publisher-worker']
+  );
+
+  manager.registerWorker(
+    'threads-publisher-worker',
+    new WorkerAdapter(new ThreadsPublisherWorker(), 'threads-publisher-worker'),
+    workerConfigs['threads-publisher-worker']
+  );
+
+  manager.registerWorker(
+    'pinterest-publisher-worker',
+    new WorkerAdapter(new PinterestPublisherWorker(), 'pinterest-publisher-worker'),
+    workerConfigs['pinterest-publisher-worker']
+  );
+
+  manager.registerWorker(
+    'bluesky-publisher-worker',
+    new WorkerAdapter(new BlueskyPublisherWorker(), 'bluesky-publisher-worker'),
+    workerConfigs['bluesky-publisher-worker']
+  );
+
+  manager.registerWorker(
+    'mastodon-publisher-worker',
+    new WorkerAdapter(new MastodonPublisherWorker(), 'mastodon-publisher-worker'),
+    workerConfigs['mastodon-publisher-worker']
+  );
+
+  manager.registerWorker(
+    'reddit-publisher-worker',
+    new WorkerAdapter(new RedditPublisherWorker(), 'reddit-publisher-worker'),
+    workerConfigs['reddit-publisher-worker']
   );
 
   // TODO: Add Google Business Publisher Worker when module import is fixed

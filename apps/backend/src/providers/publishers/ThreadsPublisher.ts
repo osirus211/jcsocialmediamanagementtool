@@ -37,8 +37,10 @@ interface MediaItem {
 
 export class ThreadsPublisher extends BasePublisher {
   readonly platform = 'threads';
+  protected readonly requiredScopes = ['threads_basic', 'threads_content_publish', 'threads_manage_insights'];
 
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [], metadata } = options;
 
     this.validateContentLength(content, MAX_CONTENT_LENGTH);

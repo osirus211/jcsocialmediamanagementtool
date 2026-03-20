@@ -31,11 +31,13 @@ export interface FacebookPublishOptions extends PublishPostOptions {
 
 export class FacebookPublisher extends BasePublisher {
   readonly platform = 'facebook';
+  protected readonly requiredScopes = ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'];
 
   /**
    * Publish post to Facebook
    */
   async publishPost(account: ISocialAccount, options: FacebookPublishOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     const { content, mediaIds = [], postType = 'feed', link, scheduledPublishTime, published = true } = options;
 
     this.validateContentLength(content, MAX_CONTENT_LENGTH);

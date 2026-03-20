@@ -45,10 +45,35 @@ export interface YouTubeUploadProgress {
 
 export class YouTubePublisher implements IPublisher {
   readonly platform = 'youtube';
+  protected readonly requiredScopes = [
+    'https://www.googleapis.com/auth/youtube',
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.force-ssl'
+  ];
   private readonly apiBaseUrl = 'https://www.googleapis.com/youtube/v3';
   private readonly uploadBaseUrl = 'https://www.googleapis.com/upload/youtube/v3';
 
+  /**
+   * Validate platform scopes before publishing
+   */
+  protected validatePlatformScopes(account: ISocialAccount): void {
+    const grantedScopes: string[] = account.scopes || [];
+    const missingScopes = this.requiredScopes.filter(scope => !grantedScopes.includes(scope));
+
+    if (missingScopes.length > 0) {
+      const error: any = new Error(`Missing required scopes: ${missingScopes.join(', ')}`);
+      error.code = 'INSUFFICIENT_SCOPES';
+      error.details = {
+        missing: missingScopes,
+        granted: grantedScopes,
+        required: this.requiredScopes,
+      };
+      throw error;
+    }
+  }
+
   async publishPost(account: ISocialAccount, options: PublishPostOptions): Promise<PublishPostResult> {
+    this.validatePlatformScopes(account);
     // Convert options to IPost format for compatibility with existing method
     const post = {
       content: options.content,

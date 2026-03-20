@@ -12,6 +12,7 @@ import axios, { AxiosInstance } from 'axios';
 
 export abstract class BasePublisher implements IPublisher {
   abstract readonly platform: string;
+  protected abstract readonly requiredScopes: string[];
   protected httpClient: AxiosInstance;
 
   constructor() {
@@ -21,6 +22,25 @@ export abstract class BasePublisher implements IPublisher {
         'User-Agent': 'SocialMediaScheduler/1.0',
       },
     });
+  }
+
+  /**
+   * Validate platform scopes before publishing
+   */
+  protected validatePlatformScopes(account: ISocialAccount): void {
+    const grantedScopes: string[] = account.scopes || [];
+    const missingScopes = this.requiredScopes.filter(scope => !grantedScopes.includes(scope));
+
+    if (missingScopes.length > 0) {
+      const error: any = new Error(`Missing required scopes: ${missingScopes.join(', ')}`);
+      error.code = 'INSUFFICIENT_SCOPES';
+      error.details = {
+        missing: missingScopes,
+        granted: grantedScopes,
+        required: this.requiredScopes,
+      };
+      throw error;
+    }
   }
 
   /**

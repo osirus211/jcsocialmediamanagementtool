@@ -146,7 +146,7 @@ export class FacebookOAuthService {
         workspaceId: params.workspaceId,
         userId: params.userId,
         ipAddress: params.ipAddress,
-        resource: 'facebook',
+        resource: profile.id,
         success: true,
         metadata: {
           provider: SocialPlatform.FACEBOOK,
@@ -199,6 +199,10 @@ export class FacebookOAuthService {
         resource: 'facebook',
         success: false,
         errorMessage: error.message,
+        metadata: {
+          provider: SocialPlatform.FACEBOOK,
+          duration,
+        },
       });
 
       throw error;

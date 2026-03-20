@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import { BadRequestError } from '../utils/errors';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import { getRedisClient } from '../config/redis';
 
 /**
  * Reconnect Service
@@ -10,6 +11,8 @@ import crypto from 'crypto';
  * Handles OAuth reconnection flows and account status management
  */
 export class ReconnectService {
+  private redis = getRedisClient();
+
   /**
    * Generate OAuth URL for account reconnection
    */
@@ -22,7 +25,11 @@ export class ReconnectService {
     const state = this.generateOAuthState(accountId, workspaceId);
     
     // Store state in Redis for validation (expires in 10 minutes)
-    // await redis.setex(`oauth_state:${state}`, 600, JSON.stringify({ accountId, workspaceId, platform }));
+    await this.redis.setex(
+      `oauth_state:${state}`,
+      600,
+      JSON.stringify({ accountId, workspaceId, platform })
+    );
 
     const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
     const redirectUri = `${baseUrl}/api/v1/accounts/reconnect-callback/${platform}`;
@@ -35,7 +42,7 @@ export class ReconnectService {
         return this.generateInstagramOAuthUrl(redirectUri, state);
       
       case SocialPlatform.TWITTER:
-        return this.generateTwitterOAuthUrl(redirectUri, state);
+        return await this.generateTwitterOAuthUrl(redirectUri, state);
       
       case SocialPlatform.LINKEDIN:
         return this.generateLinkedInOAuthUrl(redirectUri, state);
@@ -225,15 +232,25 @@ export class ReconnectService {
     return this.generateFacebookOAuthUrl(redirectUri, state);
   }
 
-  private generateTwitterOAuthUrl(redirectUri: string, state: string): string {
+  private async generateTwitterOAuthUrl(redirectUri: string, state: string): Promise<string> {
+    // Generate PKCE parameters (S256 method)
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto
+      .createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64url');
+
+    // Store code verifier in Redis (same TTL as state: 10 minutes)
+    await this.redis.setex(`pkce:${state}`, 600, codeVerifier);
+
     const params = new URLSearchParams({
       client_id: process.env.TWITTER_CLIENT_ID || '',
       redirect_uri: redirectUri,
       state,
       scope: 'tweet.read tweet.write users.read offline.access',
       response_type: 'code',
-      code_challenge_method: 'plain',
-      code_challenge: 'challenge' // In production, use proper PKCE
+      code_challenge_method: 'S256',
+      code_challenge: codeChallenge
     });
 
     return `https://twitter.com/i/oauth2/authorize?${params.toString()}`;

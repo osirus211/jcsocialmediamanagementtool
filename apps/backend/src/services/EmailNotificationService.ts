@@ -336,6 +336,41 @@ export class EmailNotificationService {
   }
 
   /**
+   * Send account disconnected notification
+   */
+  async sendAccountDisconnectedEmail(params: {
+    to: string;
+    userName: string;
+    platform: string;
+    accountName: string;
+    reconnectUrl: string;
+  }): Promise<void> {
+    try {
+      await this.emailProvider.sendEmail({
+        to: params.to,
+        subject: `${params.platform} Account Disconnected`,
+        html: `
+          <h2>Account Disconnected</h2>
+          <p>Hi ${params.userName},</p>
+          <p>Your <strong>${params.platform}</strong> account <strong>${params.accountName}</strong> has been disconnected.</p>
+          <p>All scheduled posts for this account have been paused. To resume posting, please reconnect your account.</p>
+          <a href="${params.reconnectUrl}" style="background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reconnect Account</a>
+        `,
+        text: `Hi ${params.userName}, Your ${params.platform} account ${params.accountName} has been disconnected. All scheduled posts have been paused. Please reconnect at: ${params.reconnectUrl}`,
+      });
+
+      logger.info('Account disconnected email sent', {
+        to: params.to,
+        platform: params.platform,
+        accountName: params.accountName,
+      });
+    } catch (error: any) {
+      logger.error('Failed to send account disconnected email:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Send magic link email for passwordless authentication
    */
   async sendMagicLink(params: {

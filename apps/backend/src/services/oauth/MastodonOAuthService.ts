@@ -8,6 +8,8 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
 import { SocialAccount, SocialPlatform } from '../../models/SocialAccount';
+import { securityAuditService } from '../SecurityAuditService';
+import { SecurityEventType } from '../../models/SecurityEvent';
 import { OAuthStateService } from './OAuthStateService';
 import { TokenEncryptionService } from '../TokenEncryptionService';
 
@@ -159,6 +161,22 @@ export class MastodonOAuthService {
         accountInfo
       );
 
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_SUCCESS,
+        workspaceId: params.workspaceId,
+        userId: params.userId,
+        ipAddress: '0.0.0.0',
+        resource: accountInfo.id,
+        success: true,
+        metadata: {
+          provider: SocialPlatform.MASTODON,
+          userId: accountInfo.id,
+          username: accountInfo.username,
+          instanceUrl: instanceUrl,
+        },
+      });
+
       return {
         success: true,
         account
@@ -168,6 +186,22 @@ export class MastodonOAuthService {
         error: error.message,
         instanceUrl: params.instanceUrl
       });
+
+      // Log security event
+      await securityAuditService.logEvent({
+        type: SecurityEventType.OAUTH_CONNECT_FAILURE,
+        workspaceId: params.workspaceId,
+        userId: params.userId,
+        ipAddress: '0.0.0.0',
+        resource: 'mastodon',
+        success: false,
+        errorMessage: error.message,
+        metadata: {
+          provider: SocialPlatform.MASTODON,
+          instanceUrl: params.instanceUrl,
+        },
+      });
+
       return {
         success: false,
         error: error.message
