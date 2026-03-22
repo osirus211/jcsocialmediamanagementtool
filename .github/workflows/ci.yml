@@ -27,6 +27,26 @@ jobs:
         run: cd apps/backend && npm test -- --passWithNoTests || true
         continue-on-error: true
 
+  load-test:
+    name: Load Tests (k6)
+    runs-on: ubuntu-latest
+    needs: [test-backend]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+      - name: Run k6 smoke load test
+        run: k6 run --vus 5 --duration 30s apps/backend/k6/k6.config.js
+        env:
+          K6_BASE_URL: ${{ secrets.STAGING_URL || 'http://localhost:3000' }}
+
   test-frontend:
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -93,7 +113,7 @@ jobs:
 
   status:
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, security-scan]
+    needs: [test-backend, test-frontend, security-scan, load-test]
     if: always()
     steps:
       - name: All checks completed
@@ -102,4 +122,5 @@ jobs:
           echo "Backend tests: ${{ needs.test-backend.result }}"
           echo "Frontend tests: ${{ needs.test-frontend.result }}"
           echo "Security scan: ${{ needs.security-scan.result }}"
+          echo "Load tests: ${{ needs.load-test.result }}"
           exit 0

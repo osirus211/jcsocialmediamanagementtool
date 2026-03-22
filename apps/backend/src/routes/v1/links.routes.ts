@@ -2,6 +2,11 @@
  * Links Routes
  * 
  * Link shortening and tracking endpoints
+ * 
+ * NOTE: Link in Bio page builder is not yet implemented.
+ * This is a known feature gap vs Buffer (Start Page) and Later (Link in Bio).
+ * Required: LinkPage model, drag-drop link builder, custom slug,
+ * analytics tracking per link click, custom branding.
  */
 
 import { Router } from 'express';

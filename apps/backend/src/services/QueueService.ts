@@ -19,6 +19,7 @@ import { Post, IPost, PostStatus } from '../models/Post';
 import { QueueSlot, IQueueSlot } from '../models/QueueSlot';
 import { SocialAccount } from '../models/SocialAccount';
 import { Workspace } from '../models/Workspace';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 import { queueSlotService } from './QueueSlotService';
 import { logger } from '../utils/logger';
 import { BadRequestError, NotFoundError } from '../utils/errors';
@@ -761,6 +762,18 @@ export class QueueService {
       }
 
       await workspace.save();
+
+      await WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+        action: ActivityAction.QUEUE_PAUSED,
+        metadata: {
+          accountId: options.accountId || null,
+          resumeAt: options.resumeAt || null,
+          reason: options.reason || null,
+        },
+      });
+
       return this.getQueueStatus(workspaceId);
     } catch (error: any) {
       logger.error('Failed to pause queue', {
@@ -813,6 +826,16 @@ export class QueueService {
       }
 
       await workspace.save();
+
+      await WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(userId),
+        action: ActivityAction.QUEUE_RESUMED,
+        metadata: {
+          accountId: accountId || null,
+        },
+      });
+
       return this.getQueueStatus(workspaceId);
     } catch (error: any) {
       logger.error('Failed to resume queue', {

@@ -65,7 +65,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
  * Requires user to have one of the specified roles
  */
 export const requireRole = (...allowedRoles: UserRole[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         throw new UnauthorizedError('Authentication required');
@@ -75,6 +75,19 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
         throw new ForbiddenError(
           `Access denied. Required role: ${allowedRoles.join(' or ')}`
         );
+      }
+
+      // ADMIN and OWNER must have 2FA enabled
+      if (allowedRoles.includes(UserRole.ADMIN) || allowedRoles.includes(UserRole.OWNER)) {
+        const fullUser = await User.findById(req.user.userId).select('twoFactorEnabled');
+        if (fullUser && !fullUser.twoFactorEnabled) {
+          res.status(403).json({
+            code: 'TWO_FA_REQUIRED',
+            message: 'Admin and Owner accounts must enable two-factor authentication to access this resource.',
+            details: { redirectTo: '/settings/security' },
+          });
+          return;
+        }
       }
 
       next();

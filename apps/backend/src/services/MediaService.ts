@@ -15,6 +15,7 @@ import mongoose from 'mongoose';
 import { Media, IMedia, MediaStatus, MediaType, UploadStatus, ProcessingStatus } from '../models/Media';
 import { mediaStorageService, StorageProvider } from './MediaStorageService';
 import { logger } from '../utils/logger';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 
 export interface CreateMediaInput {
   workspaceId: string;
@@ -97,6 +98,16 @@ export class MediaService {
         filename: input.filename,
         size: input.size,
       });
+
+      // Audit log (non-blocking)
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+        userId: new mongoose.Types.ObjectId(input.userId),
+        action: ActivityAction.MEDIA_UPLOADED,
+        resourceType: 'Media',
+        resourceId: media._id,
+        details: { filename: input.originalFilename, size: input.size, mimeType: input.mimeType },
+      }).catch(() => {});
 
       return media;
     } catch (error: any) {
@@ -316,6 +327,16 @@ export class MediaService {
         workspaceId,
         storageKey: media.storageKey,
       });
+
+      // Audit log (non-blocking)
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: media.userId,
+        action: ActivityAction.MEDIA_DELETED,
+        resourceType: 'Media',
+        resourceId: media._id,
+        details: { filename: media.filename },
+      }).catch(() => {});
     } catch (error: any) {
       logger.error('Failed to delete media', {
         mediaId,

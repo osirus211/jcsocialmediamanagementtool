@@ -1,0 +1,924 @@
+=== CMD 6 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\models\ScheduledPost.ts"
+
+/**
+ * Scheduled Post Model
+ * 
+ * Stores posts scheduled for publishing to social media platforms
+ */
+
+import mongoose, { Schema, Document } from 'mongoose';
+
+export enum PostStatus {
+  DRAFT = 'draft',
+  PENDING_APPROVAL = 'pending_approval',
+  APPROVED = 'approved',
+  SCHEDULED = 'scheduled',
+  QUEUED = 'queued',
+  PUBLISHING = 'publishing',
+  PUBLISHED = 'published',
+  FAILED = 'failed',
+  REJECTED = 'rejected',
+}
+
+export enum SocialPlatform {
+  TWITTER = 'twitter',
+  LINKEDIN = 'linkedin',
+  FACEBOOK = 'facebook',
+  INSTAGRAM = 'instagram',
+  YOUTUBE = 'youtube',
+  THREADS = 'threads',
+  TIKTOK = 'tiktok',
+  BLUESKY = 'bluesky',
+  MASTODON = 'mastodon',
+  REDDIT = 'reddit',
+  GOOGLE_BUSINESS = 'google-business',
+  PINTEREST = 'pinterest',
+  GITHUB = 'github',
+  APPLE = 'apple',
+}
+
+export interface IScheduledPost extends Document {
+  _id: mongoose.Types.ObjectId;
+  workspaceId: mongoose.Types.ObjectId;
+  socialAccountId: mongoose.Types.ObjectId;
+  platform: SocialPlatform;
+  content: string;
+  mediaUrls: string[];
+  scheduledAt: Date;
+  status: PostStatus;
+
+  // Approval workflow
+  createdBy: mongoose.Types.ObjectId;
+  submittedForApprovalAt?: Date;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
+  rejectedBy?: mongoose.Types.ObjectId;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+
+  // Multi-step approval stages
+  approvalStages: {
+    stageName: string;        // e.g. "Editor Review"
+    stageOrder: number;       // 1, 2, 3...
+    assignedTo: mongoose.Types.ObjectId[];   // who can approve this stage      
+    status: 'pending' | 'approved' | 'rejected' | 'skipped';
+    approvedBy?: mongoose.Types.ObjectId;
+    approvedAt?: Date;
+    rejectedBy?: mongoose.Types.ObjectId;
+    rejectedAt?: Date;
+    rejectionReason?: string;
+  }[];
+  currentStage: number;  // index of active stage
+  requiresApproval: boolean; // default: from workspace setting
+
+  queuedAt?: Date;
+  publishingStartedAt?: Date;
+  publishedAt?: Date;
+  failedAt?: Date;
+  failureReason?: string;
+  errorMessage?: string; // Added missing property
+  platformPostId?: string;
+  metadata?: Record<string, any>;
+
+  // Queue and versioning
+  queueJobId?: string; // Added missing property
+  version?: number; // Added missing property for optimistic locking
+
+  // Content organization
+  categoryId?: mongoose.Types.ObjectId;
+  campaignId?: mongoose.Types.ObjectId;
+  tags: string[];
+
+  // First comment fields
+  firstComment?: {
+    enabled: boolean;
+    content: string;
+    platforms: string[];
+    delay?: number;
+  };
+  firstCommentId?: string;
+  firstCommentPostedAt?: Date;
+  firstCommentStatus?: 'pending' | 'posted' | 'failed';
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+[Schema definition and remaining ScheduledPost.ts content truncated for brevity - full file shown in terminal output]
+
+=== END CMD 6 ===
+
+=== CMD 7 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\services\QueueService.ts" | Select-Object -First 80
+
+/**
+ * Queue Service
+ * 
+ * Comprehensive queue management system that beats Buffer, Hootsuite, Sprout Social, Later
+ * 
+ * Features:
+ * - View all queued posts with drag-drop reordering
+ * - Move posts up/down, to top/bottom
+ * - Remove posts from queue
+ * - Shuffle queue order (with smart distribution)
+ * - Platform filtering
+ * - Bulk operations
+ * - Queue slot time display
+ * - Smart queue optimization
+ */
+
+import mongoose from 'mongoose';
+import { Post, IPost, PostStatus } from '../models/Post';
+import { QueueSlot, IQueueSlot } from '../models/QueueSlot';
+import { SocialAccount } from '../models/SocialAccount';
+import { Workspace } from '../models/Workspace';
+import { queueSlotService } from './QueueSlotService';
+import { logger } from '../utils/logger';
+import { BadRequestError, NotFoundError } from '../utils/errors';
+
+export interface QueuedPost {
+  id: string;
+  workspaceId: string;
+  content: string;
+  platform: string;
+  socialAccountId: string;
+  socialAccountName: string;
+  scheduledAt: Date;
+  queueSlot?: string;
+  mediaIds: string[];
+  status: PostStatus;
+  createdAt: Date;
+  createdBy: string;
+  order: number; // Position in queue
+}
+
+export interface QueueStats {
+  totalPosts: number;
+  postsByPlatform: Record<string, number>;
+  nextPostTime?: Date;
+  averageInterval: number; // Minutes between posts
+  queueHealth: 'good' | 'warning' | 'critical';
+}
+
+export interface ReorderQueueInput {
+  postId: string;
+  newPosition: number;
+}
+
+export interface ShuffleQueueOptions {
+  platform?: string;
+  preserveTimeSlots?: boolean;
+  distributionStrategy?: 'random' | 'balanced' | 'optimal';
+}
+
+export interface QueuePauseStatus {
+  isPaused: boolean;
+  pausedAt?: Date;
+  pausedBy?: string;
+  resumeAt?: Date;
+  reason?: string;
+  accountPauses: Array<{
+    socialAccountId: string;
+    socialAccountName: string;
+    platform: string;
+    isPaused: boolean;
+    pausedAt: Date;
+    pausedBy: string;
+    resumeAt?: Date;
+    reason?: string;
+  }>;
+}
+
+export interface PauseQueueOptions {
+  accountId?: string; // Pause specific account only
+
+=== END CMD 7 ===
+
+=== CMD 8 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\services\SchedulerService.ts" | Select-Object -First 80
+
+import { postService } from './PostService';
+import { PostingQueue } from '../queue/PostingQueue';
+import { Post, PostStatus } from '../models/Post';
+import { logger } from '../utils/logger';
+import { getRedisClient } from '../config/redis';
+import { blackoutDateService } from './BlackoutDateService';
+
+/**
+ * Scheduler Service
+ *
+ * FALLBACK/RECOVERY MECHANISM for scheduled posts
+ * 
+ * PRIMARY SCHEDULING: Posts are scheduled via delayed BullMQ jobs created in PostService.schedulePost()
+ * 
+ * THIS SERVICE: Provides backup polling for:
+ * 1. Recovery: Posts scheduled before delayed-queue implementation
+ * 2. Missed executions: Worker was down when delayed job should have executed
+ * 3. Orphaned posts: Posts marked SCHEDULED but no queue job exists
+ * 4. Safety net: Catches any edge cases where queue job creation failed
+ * 
+ * NORMAL OPERATION: This service should find ZERO eligible posts (all handled by delayed jobs)
+ * 
+ * HEARTBEAT ADDED (proof of execution)
+ * NO LOGIC CHANGED
+ */
+
+export class SchedulerService {
+  private intervalId: NodeJS.Timeout | null = null;
+  private isRunning: boolean = false;
+  private readonly POLL_INTERVAL = 30000;
+  private readonly LOCK_KEY = 'scheduler:lock';
+  private readonly LOCK_TTL = 60;
+  private postingQueue: PostingQueue | null = null;
+
+  // Metrics tracking
+  private metrics = {
+    scheduler_runs_total: 0,
+    scheduler_drift_total: 0,
+    scheduler_drift_sum_ms: 0,
+    scheduler_drift_max_ms: 0,
+    scheduler_delayed_executions_total: 0,
+  };
+
+  private checkRedisAvailability(): boolean {
+    try {
+      getRedisClient();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private getPostingQueue(): PostingQueue {
+    if (!this.postingQueue) {
+      if (!this.checkRedisAvailability()) {
+        throw new Error('Redis not available - cannot create posting queue');   
+      }
+      this.postingQueue = new PostingQueue();
+    }
+    return this.postingQueue;
+  }
+
+  start(): void {
+    if (this.isRunning) {
+      logger.warn('Scheduler already running');
+      return;
+    }
+
+    if (!this.checkRedisAvailability()) {
+      throw new Error('Cannot start scheduler - Redis not available');
+    }
+
+    this.isRunning = true;
+
+    console.log('📅 Scheduler Service STARTED');
+    logger.info('Scheduler started', {
+      pollInterval: this.POLL_INTERVAL,
+    });
+
+    // Immediate execution
+
+=== END CMD 8 ===
+
+=== CMD 9 OUTPUT ===
+Get-ChildItem -Recurse -Path "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__" -Include "*.ts" -File | Select-Object FullName,Length | Format-List
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\ai\ai-generate.test.ts
+Length   : 2573
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\analytics-export.test.ts
+Length   : 508
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\analytics-store-integration.test.ts
+Length   : 3697
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\analytics.test.ts
+Length   : 4720
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\dashboard.test.ts
+Length   : 16424
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\post-metrics-simple.test.ts
+Length   : 1176
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\post-metrics.test.ts
+Length   : 19291
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\simple-test.test.ts
+Length   : 100
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\analytics\test-app.ts
+Length   : 1900
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\auth\auth.routes.test.ts
+Length   : 4425
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\auth\auth.service.test.ts
+Length   : 4513
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\auth\GDPRService.test.ts
+Length   : 1042
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\auth\oauth.controller.test.ts
+Length   : 4502
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\helpers\auth.ts
+Length   : 305
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\helpers\dbSetup.ts
+Length   : 1138
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\helpers\seed.ts
+Length   : 1055
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\helpers\testDb.ts
+Length   : 894
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\posts\bulk-schedule.test.ts
+Length   : 2443
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\rss\rss-articles.test.ts
+Length   : 6441
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\rss\rss-feeds.test.ts
+Length   : 5057
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\activity.test.ts
+Length   : 7703
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\approvals.test.ts
+Length   : 8959
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\invite.integration.test.ts
+Length   : 4030
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\tasks.test.ts
+Length   : 6688
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\tenancy-isolation.test.ts
+Length   : 3105
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\workspace.routes.test.ts
+Length   : 5231
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\workspace\workspace.service.test.ts
+Length   : 12773
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\globalSetup.ts
+Length   : 534
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\globalTeardown.ts
+Length   : 197
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\setup.ts
+Length   : 6246
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\simple.test.ts
+Length   : 100
+
+=== END CMD 9 ===
+
+=== CMD 10 OUTPUT ===
+Get-ChildItem -Recurse -Path "D:\My projects\jcsocialmediamanagementtool\apps\frontend\src" -Include "*.test.tsx","*.test.ts" -File | Select-Object FullName,Length | Format-List
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\AnalyticsDashboard.test.tsx
+Length   : 25750
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\BestTimeHeatmap.test.tsx
+Length   : 2403
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\EngagementChart.test.tsx
+Length   : 979
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\ExportReportModal.test.tsx
+Length   : 4420
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\FollowerGrowthChart.test.tsx
+Length   : 1350
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\GoogleAnalyticsIntegration.test.tsx
+Length   : 3456
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\PostMetrics.test.tsx
+Length   : 12770
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\analytics\__tests__\TopPostsGrid.test.tsx
+Length   : 2310
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\calendar\__tests__\CalendarAutoFill.test.tsx
+Length   : 2632
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\calendar\__tests__\CalendarFilter.test.tsx
+Length   : 6129
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\comments\__tests__\CommentThread.test.tsx
+Length   : 10217
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\tasks\__tests__\TaskDetailDrawer.test.tsx
+Length   : 7464
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\workspace\__tests__\InviteMemberModal.test.tsx
+Length   : 3712
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\workspace\__tests__\InviteModal.test.tsx
+Length   : 2754
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\workspace\__tests__\MemberList.test.tsx
+Length   : 4793
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\workspace\__tests__\WorkspaceSettings.test.tsx
+Length   : 16383
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\pages\approvals\__tests__\ApprovalsPage.test.tsx
+Length   : 3527
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\pages\workspaces\__tests__\PendingInvitesPage.test.tsx
+Length   : 5636
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\store\__tests__\analytics.store.test.ts
+Length   : 2463
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\__tests__\auth\ForgotPassword.test.tsx
+Length   : 8214
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\__tests__\auth\Login.test.tsx
+Length   : 8051
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\__tests__\auth\Register.test.tsx
+Length   : 9785
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\__tests__\auth\ResetPassword.test.tsx
+Length   : 10641
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\__tests__\settings\TwoFactorSetupPage.test.tsx
+Length   : 1255
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\rss\RSSPage.test.tsx
+Length   : 5703
+
+FullName : D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\tests\composer\PlatformOverridePanel.test.tsx
+Length   : 8289
+
+=== END CMD 10 ===
+
+=== CMD 11 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\models\Post.ts" | Select-String -Pattern "schedule|scheduledAt|publishAt|nextSendAt|status|queue|recycle|timezone|blackout" -CaseSensitive:$false | Format-List LineNumber,Line
+
+LineNumber : 6
+Line       :  * Stores social media posts with scheduling and publishing status
+
+LineNumber : 10
+Line       :  * - Multiple status states
+
+LineNumber : 16
+Line       : export enum PostStatus {
+
+LineNumber : 18
+Line       :   SCHEDULED = 'scheduled',
+
+LineNumber : 19
+Line       :   QUEUED = 'queued',
+
+LineNumber : 28
+Line       :   SCHEDULE = 'schedule',
+
+LineNumber : 29
+Line       :   QUEUE = 'queue',
+
+LineNumber : 109
+Line       :   status: PostStatus;
+
+LineNumber : 116
+Line       :    * Scheduled publish time (ALWAYS stored in UTC)
+
+LineNumber : 118
+Line       :    * IMPORTANT: This field MUST be stored in UTC timezone.
+
+LineNumber : 119
+Line       :    * - Frontend should send ISO 8601 string with timezone (e.g., "2024-01-15T14:00:00-08:00")
+
+LineNumber : 126
+Line       :    * const scheduledAtUTC = new Date(userInput.toISOString());
+
+LineNumber : 130
+Line       :    * if (scheduledAtUTC <= nowUTC) {
+
+LineNumber : 131
+Line       :    *   throw new Error('Scheduled time must be in the future');
+
+LineNumber : 135
+Line       :   scheduledAt?: Date;
+
+LineNumber : 137
+Line       :    * BullMQ job ID for scheduled posts
+
+LineNumber : 139
+Line       :    * When a post is scheduled, a delayed BullMQ job is created.
+
+LineNumber : 142
+Line       :    * - Cancelling (remove job from queue)
+
+LineNumber : 143
+Line       :    * - Status tracking (check if job exists)
+
+LineNumber : 145
+Line       :   queueJobId?: string;
+
+LineNumber : 146
+Line       :   queueSlot?: string; // NEW: Queue slot identifier
+
+LineNumber : 153
+Line       :     publishAttemptedAt?: Date; // When external publish was attempted
+
+LineNumber : 169
+Line       :   firstCommentStatus?: 'pending' | 'posted' | 'failed';
+
+LineNumber : 191
+Line       :   canBeScheduled(): boolean;
+
+LineNumber : 193
+Line       :   isEligibleForQueue(): boolean;
+
+LineNumber : 283
+Line       :     status: {
+
+LineNumber : 285
+Line       :       enum: Object.values(PostStatus),
+
+LineNumber : 286
+Line       :       default: PostStatus.DRAFT,
+
+LineNumber : 338
+Line       :     scheduledAt: {
+
+LineNumber : 342
+Line       :     queueJobId: {
+
+LineNumber : 346
+Line       :     queueSlot: {
+
+LineNumber : 424
+Line       : PostSchema.index({ workspaceId: 1, status: 1 });
+
+LineNumber : 426
+Line       : PostSchema.index({ workspaceId: 1, scheduledAt: 1 });
+
+LineNumber : 427
+Line       : PostSchema.index({ status: 1, scheduledAt: 1 }); // For scheduler polling
+
+LineNumber : 428
+Line       : PostSchema.index({ socialAccountId: 1, status: 1 });
+
+LineNumber : 431
+Line       : PostSchema.index({ workspaceId: 1, scheduledAt: 1, status: 1 });
+
+LineNumber : 440
+Line       :  * Only drafts and scheduled posts can be edited
+
+LineNumber : 443
+Line       :   return [PostStatus.DRAFT, PostStatus.SCHEDULED].includes(this.status);
+
+LineNumber : 451
+Line       :   return ![PostStatus.PUBLISHING, PostStatus.PUBLISHED].includes(this.status);
+
+LineNumber : 455
+Line       :  * Check if post can be scheduled
+
+LineNumber : 456
+Line       :  * Only drafts can be scheduled
+
+LineNumber : 458
+Line       : PostSchema.methods.canBeScheduled = function (): boolean {
+
+LineNumber : 459
+Line       :   return this.status === PostStatus.DRAFT;
+
+LineNumber : 467
+Line       :   return [PostStatus.DRAFT, PostStatus.FAILED].includes(this.status);
+
+LineNumber : 471
+Line       :  * Check if post is eligible to be moved to queue
+
+LineNumber : 472
+Line       :  * Scheduled posts with scheduledAt <= now
+
+LineNumber : 474
+Line       : PostSchema.methods.isEligibleForQueue = function (): boolean {
+
+LineNumber : 475
+Line       :   if (this.status !== PostStatus.SCHEDULED) {
+
+LineNumber : 479
+Line       :   if (!this.scheduledAt) {
+
+LineNumber : 483
+Line       :   return this.scheduledAt <= new Date();
+
+LineNumber : 499
+Line       :  * Validate scheduledAt is in the future when scheduling
+
+LineNumber : 502
+Line       :   if (this.isModified('scheduledAt') && this.scheduledAt) {
+
+LineNumber : 503
+Line       :     if (this.status === PostStatus.SCHEDULED && this.scheduledAt <= new Date()) {
+
+LineNumber : 504
+Line       :       return next(new Error('Scheduled time must be in the future'));
+
+=== END CMD 11 ===
+
+=== CMD 12 OUTPUT ===
+Get-ChildItem -Recurse -Path "D:\My projects\jcsocialmediamanagementtool\" -Include "package.json" -File | Where-Object { $_.FullName -notmatch "node_modules" } | ForEach-Object { Write-Host "FILE: $($_.FullName)"; Get-Content $_.FullName | Select-String -Pattern "bull|agenda|cron|node-cron|rss-parser|rrule|luxon|date-fns-tz|moment-timezone" -CaseSensitive:$false | ForEach-Object { Write-Host $_.Line } }
+
+FILE: D:\My projects\jcsocialmediamanagementtool\apps\backend\chaos-testing\package.json
+FILE: D:\My projects\jcsocialmediamanagementtool\apps\backend\package.json
+    "@types/luxon": "^3.7.1",
+    "bullmq": "^5.1.0",
+    "cron": "^3.1.6",
+    "luxon": "^3.7.2",
+    "moment-timezone": "^0.6.0",
+    "rss-parser": "^3.13.0",
+    "@types/moment-timezone": "^0.5.13",
+FILE: D:\My projects\jcsocialmediamanagementtool\apps\extension\package.json
+FILE: D:\My projects\jcsocialmediamanagementtool\apps\frontend\package.json
+FILE: D:\My projects\jcsocialmediamanagementtool\package.json
+
+=== END CMD 12 ===
+
+=== CMD 13 OUTPUT ===
+Get-ChildItem -Recurse -Path "D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\stores" -Include "*.ts" -ErrorAction SilentlyContinue -File | Select-Object Name,Length | Format-List
+
+[ERROR: Command failed with exit code 1]
+
+=== END CMD 13 ===
+
+=== CMD 14 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\pages\posts\Calendar.tsx" | Select-Object -First 60
+
+import { useNavigate } from 'react-router-dom';
+import { useWorkspaceStore } from '@/store/workspace.store';
+import { useCalendarData } from '@/hooks/useCalendarData';
+import { CalendarHeader } from '@/components/calendar/CalendarHeader';
+import { MonthGrid } from '@/components/calendar/MonthGrid';
+import { WeekView } from '@/components/calendar/WeekView';
+import { ListView } from '@/components/calendar/ListView';
+import { DragDropProvider } from '@/components/calendar/DragDropProvider';
+import { Post } from '@/types/post.types';
+import { AlertCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { logger } from '@/lib/logger';
+
+type ViewMode = 'month' | 'week' | 'list';
+
+/**
+ * CalendarPage Component
+ *
+ * Production-grade calendar view for scheduled posts
+ *
+ * Features:
+ * - Monthly view (primary)
+ * - Weekly view (secondary)
+ * - Lazy-load by date range
+ * - Drag & drop reschedule
+ * - Click post to edit
+ * - Status indicators
+ * - Timezone handling (user local time)
+ * - Performance optimized
+ *
+ * Safety:
+ * - Only fetches visible range
+ * - Caches fetched data
+ * - Optimistic updates
+ * - Rollback on failure
+ * - No backend modifications
+ */
+export const CalendarPage = () => {
+  const navigate = useNavigate();
+  const { currentWorkspace, currentWorkspaceId, fetchMembers } = useWorkspaceStore();
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(() => {
+    // Get start of current week (Sunday)
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day;
+    return new Date(now.setDate(diff));
+  });
+
+  const {
+    posts,
+    allPosts,
+    selectedMemberIds,
+    platformCounts,
+    activePlatforms,
+    activeAccountIds,
+    hasActiveFilters,
+
+=== END CMD 14 ===
+
+=== CMD 15 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\pages\QueuePage.tsx" | Select-Object -First 60
+
+/**
+ * Queue Management Page
+ *
+ * Comprehensive queue management interface that beats Buffer, Hootsuite, Sprout Social, Later
+ *
+ * Features:
+ * - Drag-and-drop reordering
+ * - Platform filtering
+ * - Bulk operations
+ * - Smart shuffle algorithms
+ * - Queue statistics
+ * - Post preview cards
+ * - Empty state handling
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+
+=== END CMD 15 ===
+
+=== CMD 16 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\routes\v1\queue.routes.ts" | Select-Object -First 80
+
+/**
+ * Queue Routes
+ *
+ * API routes for comprehensive queue management
+ */
+
+import { Router } from 'express';
+import { queueController } from '../../controllers/QueueController';
+import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
+import { validateRequest } from '../../middleware/validate';
+import {
+  getQueueSchema,
+  reorderQueueSchema,
+  movePostSchema,
+  shuffleQueueSchema,
+  bulkOperationSchema,
+} from '../../schemas/queue.schemas';
+
+const router = Router();
+
+// All routes require authentication and workspace context
+router.use(requireAuth);
+router.use(requireWorkspace);
+
+/**
+ * @openapi
+ * /api/v1/queue:
+ *   get:
+ *     summary: Get queue with all scheduled posts
+ *     description: Retrieve all scheduled posts in chronological order with queue statistics
+ *     tags:
+ *       - Queue
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: platform
+ *         schema:
+ *           type: string
+ *           enum: [twitter, facebook, instagram, linkedin, youtube, threads, tiktok]
+ *         description: Filter by platform
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *           default: 100
+ *         description: Number of posts to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *         description: Number of posts to skip
+ *     responses:
+ *       200:
+ *         description: Queue retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     posts:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/QueuedPost'
+ *                     stats:
+ *                       $ref: '#/components/schemas/QueueStats'
+ *                     total:
+ *                       type: integer
+ */
+router.get('/', validateRequest(getQueueSchema), queueController.getQueue);
+
+=== END CMD 16 ===
+
+=== CMD 17 OUTPUT ===
+Get-Content "D:\My projects\jcsocialmediamanagementtool\apps\backend\src\models\index.ts"
+
+// Export all models
+export * from './User';
+export * from './Workspace';
+export * from './WorkspaceMember';
+export * from './SocialAccount';
+export * from './Post';
+export * from './PostAnalytics';
+export * from './TikTokPost';
+export * from './Plan';
+export * from './Subscription';
+export * from './Invoice';
+export * from './Payment';
+export * from './ApiKey';
+export * from './HashtagGroup';
+export * from './HashtagHistory';
+export * from './SavedCaption';
+
+// Phase-5: Automation Engine models
+export * from './Workflow';
+export * from './WorkflowRun';
+export * from './RSSFeed';
+export * from './RSSFeedItem';
+export * from './EvergreenRule';
+
+// Blackout Dates
+export * from './BlackoutDate';
+
+=== END CMD 17 ===
+
+=== CMD 18 OUTPUT ===
+cd "D:\My projects\jcsocialmediamanagementtool"; npx jest --listTests 2>&1 | Select-String -Pattern "schedule|calendar|queue|blackout|recycle|evergreen|rss|timezone|optimal" -CaseSensitive:$false
+
+D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\calendar\__tests__\CalendarFilter.test.tsx
+D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\components\calendar\__tests__\CalendarAutoFill.test.tsx
+D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\posts\bulk-schedule.test.ts
+D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\rss\rss-feeds.test.ts
+D:\My projects\jcsocialmediamanagementtool\apps\backend\src\__tests__\rss\rss-articles.test.ts
+D:\My projects\jcsocialmediamanagementtool\apps\backend\dist\__tests__\rss\rss-feeds.test.js
+D:\My projects\jcsocialmediamanagementtool\apps\backend\dist\__tests__\rss\rss-feeds.test.d.ts
+D:\My projects\jcsocialmediamanagementtool\apps\backend\dist\__tests__\rss\rss-articles.test.js
+D:\My projects\jcsocialmediamanagementtool\apps\backend\dist\__tests__\rss\rss-articles.test.d.ts
+D:\My projects\jcsocialmediamanagementtool\apps\backend\dist\__tests__\posts\bulk-schedule.test.js
+D:\My projects\jcsocialmediamanagementtool\apps\backend\dist\__tests__\posts\bulk-schedule.test.d.ts
+D:\My projects\jcsocialmediamanagementtool\apps\frontend\src\test\rss\RSSPage.test.tsx
+
+=== END CMD 18 ===
+
+=== AUDIT COMPLETE ===
+All raw terminal outputs captured above.

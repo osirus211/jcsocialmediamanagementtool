@@ -1,7 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface ILoginHistory extends Document {
-  userId: mongoose.Types.ObjectId
+  userId?: mongoose.Types.ObjectId | null
+  email?: string
   ipAddress: string
   userAgent: string
   country?: string

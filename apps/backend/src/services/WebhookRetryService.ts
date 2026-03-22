@@ -81,11 +81,18 @@ export class WebhookRetryService {
       // Generate HMAC signature
       const signature = this.generateSignature(secret, webhookPayload);
 
+      // Generate delivery metadata
+      const crypto = require('crypto');
+      const deliveryTimestamp = Date.now().toString();
+      const deliveryId = crypto.randomUUID();
+
       // Attempt delivery
       const response = await axios.post(url, webhookPayload, {
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Signature': signature,
+          'X-Webhook-Timestamp': deliveryTimestamp,
+          'X-Webhook-Delivery-Id': deliveryId,
           'User-Agent': 'SocialMediaManager-Webhook/1.0',
         },
         timeout: this.TIMEOUT_MS,
@@ -97,6 +104,7 @@ export class WebhookRetryService {
       delivery.statusCode = response.status;
       delivery.responseBody = JSON.stringify(response.data).substring(0, 1000); // Limit size
       delivery.deliveredAt = new Date();
+      delivery.deliveryTimestamp = parseInt(deliveryTimestamp, 10);
       delivery.nextRetryAt = undefined;
 
       await delivery.save();

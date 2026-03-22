@@ -22,9 +22,13 @@ import { Post, IPost, PostStatus, PublishMode } from '../models/Post';
 import { Media, IMedia } from '../models/Media';
 import { SocialAccount } from '../models/SocialAccount';
 import { PostingQueue } from '../queue/PostingQueue';
-import { BadRequestError, NotFoundError, ForbiddenError } from '../utils/errors';
+import { BadRequestError, NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
 import { logger } from '../utils/logger';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
+import { PLATFORM_CHAR_LIMITS } from '../constants/platformLimits';
+import { scrubPii } from '../utils/piiScrubber';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 
 export interface CreateDraftInput {
   workspaceId: string;
@@ -73,6 +77,28 @@ export class ComposerService {
   }
 
   /**
+   * Validate content against platform limits
+   */
+  private static validateContent(content: string, platform: string): string {
+    // Strip HTML
+    let clean = content.replace(/<[^>]*>/g, '').trim();
+    
+    // Scrub PII
+    clean = scrubPii(clean);
+    
+    // Platform char limit
+    const limit = PLATFORM_CHAR_LIMITS[platform.toLowerCase()];
+    if (limit && clean.length > limit) {
+      throw new BadRequestError(
+        `Content exceeds ${platform} character limit`,
+        { platform, limit, actual: clean.length, code: 'CONTENT_TOO_LONG' }
+      );
+    }
+    
+    return clean;
+  }
+
+  /**
    * Create a draft post
    * Always creates with DRAFT status
    */
@@ -106,12 +132,16 @@ export class ComposerService {
         }
       }
 
+      // Sanitize content - scrub PII and strip HTML
+      let sanitizedContent = scrubPii(input.content.trim().slice(0, 10000));
+      sanitizedContent = sanitizedContent.replace(/<[^>]*>/g, '');
+
       // Create post as DRAFT
       const post = new Post({
         workspaceId: input.workspaceId,
         socialAccountId: accountIds[0], // Primary account (for backward compatibility)
         socialAccountIds: accountIds.map(id => new mongoose.Types.ObjectId(id)),
-        content: input.content,
+        content: sanitizedContent,
         mediaIds: input.mediaIds?.map(id => new mongoose.Types.ObjectId(id)) || [],
         platformContent: input.platformContent || [],
         status: PostStatus.DRAFT,
@@ -121,6 +151,16 @@ export class ComposerService {
       });
 
       await post.save();
+
+      // Audit log (non-blocking)
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+        userId: new mongoose.Types.ObjectId(input.createdBy),
+        action: ActivityAction.DRAFT_CREATED,
+        resourceType: 'Post',
+        resourceId: post._id,
+        details: { accountCount: accountIds.length },
+      }).catch(() => {});
 
       logger.info('Draft post created', {
         postId: post._id,
@@ -316,6 +356,26 @@ export class ComposerService {
       throw new BadRequestError('No valid social accounts found');
     }
 
+    // Duplicate detection
+    const contentHash = crypto.createHash('sha256').update(post.content.trim()).digest('hex');
+    const duplicate = await Post.findOne({
+      workspaceId: post.workspaceId,
+      contentHash,
+      scheduledAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      status: { $nin: [PostStatus.FAILED, PostStatus.CANCELLED] },
+      _id: { $ne: post._id },
+    });
+
+    if (duplicate) {
+      throw new ConflictError(
+        'Duplicate post detected within 24 hours',
+        { existingPostId: duplicate._id, scheduledAt: duplicate.scheduledAt, code: 'DUPLICATE_POST' }
+      );
+    }
+
+    // Store content hash
+    post.set('contentHash', contentHash);
+
     // Create one job per account/platform
     for (const account of accounts) {
       await this.postingQueue.addPost({
@@ -332,6 +392,16 @@ export class ComposerService {
         socialAccountId: account._id,
       });
     }
+
+    // Audit log (non-blocking)
+    WorkspaceActivityLog.create({
+      workspaceId: post.workspaceId,
+      userId: post.createdBy,
+      action: ActivityAction.DRAFT_PUBLISHED,
+      resourceType: 'Post',
+      resourceId: post._id,
+      details: { publishMode: 'now' },
+    }).catch(() => {});
   }
 
   /**

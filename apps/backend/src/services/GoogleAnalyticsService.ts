@@ -62,12 +62,16 @@ export class GoogleAnalyticsService {
    * Encrypt OAuth tokens for secure storage
    */
   private static encryptToken(token: string): string {
+    const secretKey = process.env.ENCRYPTION_KEY;
+    if (!secretKey) {
+      throw new Error('ENCRYPTION_KEY environment variable is required');
+    }
+    
     const algorithm = 'aes-256-gcm';
-    const secretKey = process.env.ENCRYPTION_KEY || 'default-key-change-in-production';
     const key = crypto.scryptSync(secretKey, 'salt', 32);
     const iv = crypto.randomBytes(16);
     
-    const cipher = crypto.createCipher(algorithm, key);
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
     cipher.setAAD(Buffer.from('google-analytics', 'utf8'));
     
     let encrypted = cipher.update(token, 'utf8', 'hex');
@@ -82,15 +86,19 @@ export class GoogleAnalyticsService {
    * Decrypt OAuth tokens
    */
   private static decryptToken(encryptedToken: string): string {
+    const secretKey = process.env.ENCRYPTION_KEY;
+    if (!secretKey) {
+      throw new Error('ENCRYPTION_KEY environment variable is required');
+    }
+    
     const algorithm = 'aes-256-gcm';
-    const secretKey = process.env.ENCRYPTION_KEY || 'default-key-change-in-production';
     const key = crypto.scryptSync(secretKey, 'salt', 32);
     
     const [ivHex, authTagHex, encrypted] = encryptedToken.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
     
-    const decipher = crypto.createDecipher(algorithm, key);
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
     decipher.setAAD(Buffer.from('google-analytics', 'utf8'));
     decipher.setAuthTag(authTag);
     

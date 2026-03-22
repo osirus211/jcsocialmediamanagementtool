@@ -8,6 +8,7 @@
 import { ListeningRule, ListeningRuleType } from '../models/ListeningRule';
 import { Mention, IMention } from '../models/Mention';
 import { logger } from '../utils/logger';
+import { scrubPii } from '../utils/piiScrubber';
 
 export interface MentionData {
   author: {
@@ -263,8 +264,13 @@ export class ListeningCollectorService {
       listeningRuleId: rule._id,
       platform: rule.platform,
       keyword: rule.value,
-      author: data.author,
-      text: data.text,
+      author: {
+        username: data.author.username,
+        displayName: data.author.displayName ? scrubPii(data.author.displayName) : undefined,
+        profileUrl: data.author.profileUrl,
+        followerCount: data.author.followerCount,
+      },
+      text: scrubPii(data.text.trim().slice(0, 5000)),
       sourcePostId: data.sourcePostId,
       sourceUrl: data.sourceUrl,
       engagementMetrics: data.engagementMetrics,
@@ -322,13 +328,14 @@ export class ListeningCollectorService {
         const count = Math.floor(Math.random() * 10);
         
         for (let i = 0; i < count; i++) {
+          const rawText = `Mock mention containing ${params.value}`;
           mockMentions.push({
             author: {
               username: `user${i}`,
               displayName: `User ${i}`,
               followerCount: Math.floor(Math.random() * 10000),
             },
-            text: `Mock mention containing ${params.value}`,
+            text: rawText,
             sourcePostId: `${platform}-${Date.now()}-${i}`,
             sourceUrl: `https://${platform}.com/post/${i}`,
             engagementMetrics: {

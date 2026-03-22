@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import { EvergreenRule, IEvergreenRule, ContentModification, RecyclingSchedule, RecyclingHistoryEntry } from '../models/EvergreenRule';
 import { Post } from '../models/Post';
 import { logger } from '../utils/logger';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 
 export interface CreateRuleInput {
   workspaceId: string;
@@ -67,6 +68,15 @@ export class EvergreenService {
    */
   static async createRule(input: CreateRuleInput): Promise<IEvergreenRule> {
     try {
+      const existingCount = await EvergreenRule.countDocuments({
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+        deletedAt: { $exists: false },
+      });
+
+      if (existingCount >= 50) {
+        throw new Error('Maximum of 50 evergreen rules allowed per workspace');
+      }
+
       // Validate post exists and is published
       await this.validatePost(input.postId, input.workspaceId);
 
@@ -95,6 +105,13 @@ export class EvergreenService {
       });
 
       await rule.save();
+
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(input.workspaceId),
+        userId: new mongoose.Types.ObjectId(input.createdBy),
+        action: ActivityAction.EVERGREEN_RULE_CREATED,
+        details: { ruleId: rule._id.toString() }
+      }).catch(() => {});
 
       logger.info('Evergreen rule created', {
         ruleId: rule._id.toString(),
@@ -161,6 +178,13 @@ export class EvergreenService {
       });
 
       if (result.deletedCount > 0) {
+        WorkspaceActivityLog.create({
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          userId: new mongoose.Types.ObjectId('000000000000000000000000'),
+          action: ActivityAction.EVERGREEN_RULE_DELETED,
+          details: { ruleId }
+        }).catch(() => {});
+
         logger.info('Evergreen rule deleted', {
           ruleId,
           workspaceId,

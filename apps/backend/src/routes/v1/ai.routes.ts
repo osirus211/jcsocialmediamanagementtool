@@ -135,5 +135,10 @@ router.get('/image-history', AIController.getImageHistory);
  */
 router.post('/moderate-content', AIController.moderateContent);
 
+/**
+ * @route   POST /api/v1/ai/translate
+ */
+router.post('/translate', checkAILimit, AIController.translateContent);
+
 export default router;
 

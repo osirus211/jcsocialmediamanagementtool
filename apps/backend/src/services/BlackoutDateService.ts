@@ -2,6 +2,7 @@ import { BlackoutDate, IBlackoutDate } from '../models/BlackoutDate';
 import { ScheduledPost } from '../models/ScheduledPost';
 import mongoose from 'mongoose';
 import { logger } from '../utils/logger';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 
 export interface CreateBlackoutDateData {
   workspaceId: string;
@@ -63,6 +64,13 @@ class BlackoutDateService {
       });
 
       await blackoutDate.save();
+
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(data.workspaceId),
+        userId: new mongoose.Types.ObjectId(data.createdBy),
+        action: ActivityAction.BLACKOUT_DATE_CREATED,
+        details: { blackoutDateId: blackoutDate._id.toString() }
+      }).catch(() => {});
       
       logger.info('Blackout date created', {
         blackoutDateId: blackoutDate._id,
@@ -206,6 +214,13 @@ class BlackoutDateService {
       });
 
       if (result.deletedCount > 0) {
+        WorkspaceActivityLog.create({
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          userId: new mongoose.Types.ObjectId('000000000000000000000000'),
+          action: ActivityAction.BLACKOUT_DATE_DELETED,
+          details: { blackoutDateId: id }
+        }).catch(() => {});
+
         logger.info('Blackout date deleted', {
           blackoutDateId: id,
           workspaceId,

@@ -13,6 +13,48 @@ import { SocialPlatform } from '../../../models/ScheduledPost';
 
 const router = Router();
 
+// SSRF Protection
+function validateHookUrl(hookUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(hookUrl);
+  } catch {
+    throw new Error('Invalid hook URL format');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Hook URL must use HTTP or HTTPS');
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block localhost and loopback
+  const blockedPatterns = ['localhost', '127.', '0.0.0.0', '::1', '169.254.', '::ffff:'];
+  for (const pattern of blockedPatterns) {
+    if (hostname.includes(pattern)) {
+      throw new Error('Hook URL points to a blocked address');
+    }
+  }
+
+  // Block private IP ranges
+  const privateCidrs = [
+    /^192\.168\./,
+    /^10\./,
+    /^172\.(1[6-9]|2[0-9]|3[01])\./,
+  ];
+  for (const cidr of privateCidrs) {
+    if (cidr.test(hostname)) {
+      throw new Error('Hook URL points to a blocked address');
+    }
+  }
+
+  // Block cloud metadata endpoints
+  const blockedHosts = ['169.254.169.254', 'metadata.google.internal', '168.63.129.16'];
+  if (blockedHosts.includes(hostname)) {
+    throw new Error('Hook URL points to a blocked address');
+  }
+}
+
 // Validation schemas
 const SubscribeHookSchema = z.object({
   hookUrl: z.string().url('Invalid hook URL'),
@@ -120,6 +162,9 @@ router.post('/hooks/subscribe', requireScope('webhooks:write'), async (req, res,
   try {
     const workspaceId = req.apiKey!.workspaceId;
     const data = SubscribeHookSchema.parse(req.body);
+    
+    // SSRF protection
+    validateHookUrl(data.hookUrl);
     
     const webhook = await AutomationService.registerAutomationWebhook(
       workspaceId,

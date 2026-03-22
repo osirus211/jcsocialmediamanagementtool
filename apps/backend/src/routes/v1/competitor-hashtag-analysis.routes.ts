@@ -1,13 +1,41 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { CompetitorHashtagAnalysisService } from '../../services/CompetitorHashtagAnalysisService';
 import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
 import { body, query, validationResult } from 'express-validator';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
 
+// Apply auth and workspace middleware to all routes
+router.use(requireAuth);
+router.use(requireWorkspace);
+
+// Rate limiting for competitor hashtag analysis endpoints
+const competitorHashtagLimit = new SlidingWindowRateLimiter({
+  maxRequests: 30,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:competitorHashtag',
+});
+
+const competitorHashtagRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await competitorHashtagLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many competitor hashtag analysis requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(competitorHashtagRateLimit);
+
 // POST /api/v1/competitor-hashtag-analysis/analyze - Analyze a competitor's hashtag strategy
 router.post('/analyze',
-  requireAuth,
   body('competitorHandle')
     .trim()
     .isLength({ min: 1, max: 50 })
@@ -57,7 +85,6 @@ router.post('/analyze',
 
 // POST /api/v1/competitor-hashtag-analysis/compare - Compare your hashtags with competitor's
 router.post('/compare',
-  requireAuth,
   body('yourHashtags')
     .isArray({ min: 1, max: 50 })
     .withMessage('Your hashtags must be an array with 1-50 items'),
@@ -113,7 +140,6 @@ router.post('/compare',
 
 // POST /api/v1/competitor-hashtag-analysis/recommendations - Get hashtag recommendations based on competitor
 router.post('/recommendations',
-  requireAuth,
   body('competitorHandle')
     .trim()
     .isLength({ min: 1, max: 50 })
@@ -170,7 +196,6 @@ router.post('/recommendations',
 
 // GET /api/v1/competitor-hashtag-analysis/categories - Get competitor's hashtags by category
 router.get('/categories',
-  requireAuth,
   query('competitorHandle')
     .trim()
     .isLength({ min: 1, max: 50 })
@@ -218,7 +243,6 @@ router.get('/categories',
 
 // POST /api/v1/competitor-hashtag-analysis/batch - Analyze multiple competitors
 router.post('/batch',
-  requireAuth,
   body('competitorHandles')
     .isArray({ min: 1, max: 10 })
     .withMessage('Competitor handles must be an array with 1-10 items'),
@@ -270,7 +294,6 @@ router.post('/batch',
 
 // POST /api/v1/competitor-hashtag-analysis/insights - Get aggregated insights from competitors
 router.post('/insights',
-  requireAuth,
   body('competitorHandles')
     .isArray({ min: 2, max: 10 })
     .withMessage('Competitor handles must be an array with 2-10 items'),

@@ -6,8 +6,13 @@
  */
 
 import axios from 'axios';
+import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { logger } from '../utils/logger';
 import { Webhook } from '../models/Webhook';
+import { SSRF_BLOCKED_PATTERNS, SSRF_BLOCKED_CIDRS } from '../constants/platformLimits';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
+import { BadRequestError } from '../utils/errors';
 
 export enum WebhookEventType {
   POST_PUBLISHED = 'post.published',
@@ -166,15 +171,159 @@ export class WebhookService {
   }
 
   /**
-   * Validate webhook URL
+   * Validate webhook URL with SSRF protection
    */
-  validateWebhookUrl(url: string): boolean {
+  private static validateWebhookUrl(url: string): void {
+    let parsed: URL;
     try {
-      const parsed = new URL(url);
-      return parsed.protocol === 'https:';
+      parsed = new URL(url);
     } catch {
-      return false;
+      throw new BadRequestError('Invalid webhook URL', 'INVALID_WEBHOOK_URL');
     }
+
+    // Only allow HTTPS in production
+    if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+      throw new BadRequestError(
+        'Webhook URL must use HTTPS',
+        'WEBHOOK_HTTPS_REQUIRED'
+      );
+    }
+
+    // Block non-HTTP(S) protocols
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new BadRequestError(
+        'Webhook URL must use HTTP or HTTPS protocol',
+        'INVALID_WEBHOOK_PROTOCOL'
+      );
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block SSRF patterns
+    for (const pattern of SSRF_BLOCKED_PATTERNS) {
+      if (hostname.includes(pattern)) {
+        throw new BadRequestError(
+          'Webhook URL points to a blocked address',
+          'WEBHOOK_SSRF_BLOCKED'
+        );
+      }
+    }
+
+    // Block private CIDR ranges
+    for (const cidr of SSRF_BLOCKED_CIDRS) {
+      if (cidr.test(hostname)) {
+        throw new BadRequestError(
+          'Webhook URL points to a blocked address',
+          'WEBHOOK_SSRF_BLOCKED'
+        );
+      }
+    }
+
+    // Block AWS/GCP/Azure metadata endpoints explicitly
+    const blockedHosts = [
+      '169.254.169.254',
+      'metadata.google.internal',
+      '168.63.129.16',
+    ];
+    if (blockedHosts.includes(hostname)) {
+      throw new BadRequestError(
+        'Webhook URL points to a blocked address',
+        'WEBHOOK_SSRF_BLOCKED'
+      );
+    }
+  }
+
+  /**
+   * Create webhook with SSRF validation and audit logging
+   */
+  async createWebhook(params: {
+    workspaceId: string;
+    url: string;
+    secret: string;
+    events: string[];
+    userId?: string;
+  }): Promise<any> {
+    const { workspaceId, url, secret, events, userId } = params;
+
+    // Validate URL for SSRF
+    WebhookService.validateWebhookUrl(url);
+
+    // Create webhook
+    const webhook = await Webhook.create({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      url,
+      secret,
+      events,
+      enabled: true,
+    });
+
+    // Log webhook creation
+    WorkspaceActivityLog.create({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      userId: userId ? new mongoose.Types.ObjectId(userId) : undefined,
+      action: ActivityAction.WEBHOOK_CREATED,
+      resourceType: 'webhook',
+      resourceId: webhook._id,
+      details: { 
+        url: url.replace(/\/\/.*@/, '//***@'), // strip credentials
+        events,
+      },
+    }).catch(() => {});
+
+    return webhook;
+  }
+
+  /**
+   * Update webhook with SSRF validation
+   */
+  async updateWebhook(params: {
+    webhookId: string;
+    workspaceId: string;
+    url?: string;
+    events?: string[];
+    enabled?: boolean;
+  }): Promise<any> {
+    const { webhookId, workspaceId, url, events, enabled } = params;
+
+    // Validate URL if provided
+    if (url) {
+      WebhookService.validateWebhookUrl(url);
+    }
+
+    const webhook = await Webhook.findOneAndUpdate(
+      { _id: webhookId, workspaceId },
+      { ...(url && { url }), ...(events && { events }), ...(enabled !== undefined && { enabled }) },
+      { new: true }
+    );
+
+    return webhook;
+  }
+
+  /**
+   * Test webhook with SSRF validation
+   */
+  async testWebhook(params: {
+    webhookId: string;
+    workspaceId: string;
+  }): Promise<any> {
+    const { webhookId, workspaceId } = params;
+
+    const webhook = await Webhook.findOne({ _id: webhookId, workspaceId });
+    if (!webhook) {
+      throw new BadRequestError('Webhook not found', 'WEBHOOK_NOT_FOUND');
+    }
+
+    // Validate URL before testing
+    WebhookService.validateWebhookUrl(webhook.url);
+
+    // Send test event
+    await this.emit({
+      event: 'webhook.test',
+      workspaceId,
+      data: { test: true, timestamp: new Date().toISOString() },
+    });
+
+    return { success: true };
   }
 
   /**

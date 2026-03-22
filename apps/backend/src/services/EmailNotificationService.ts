@@ -620,6 +620,52 @@ export class EmailNotificationService {
       throw error;
     }
   }
+
+  /**
+   * Send new login alert email for device/IP change detection
+   */
+  async sendNewLoginAlert(params: {
+    userId: string;
+    email: string;
+    firstName: string;
+    ipAddress: string;
+    userAgent: string;
+    loginAt: Date;
+  }): Promise<void> {
+    try {
+      const subject = 'New login to your account';
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #ef4444;">New Login Detected</h2>
+          <p>Hi ${params.firstName},</p>
+          <p>A new login was detected on your account.</p>
+          <ul style="list-style: none; padding: 0;">
+            <li style="margin: 10px 0;"><strong>Time:</strong> ${params.loginAt.toUTCString()}</li>
+            <li style="margin: 10px 0;"><strong>IP Address:</strong> ${params.ipAddress}</li>
+            <li style="margin: 10px 0;"><strong>Device:</strong> ${params.userAgent.slice(0, 100)}</li>
+          </ul>
+          <p>If this was you, no action is needed.</p>
+          <p>If this was NOT you, <a href="${process.env.FRONTEND_URL}/settings/security" style="color: #ef4444; font-weight: bold;">secure your account immediately</a>.</p>
+          <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
+            This is an automated security alert. For your protection, we notify you of all new logins.
+          </p>
+        </div>
+      `;
+      const text = `Hi ${params.firstName}, A new login was detected on your account. Time: ${params.loginAt.toUTCString()}, IP: ${params.ipAddress}, Device: ${params.userAgent.slice(0, 100)}. If this was not you, secure your account immediately at ${process.env.FRONTEND_URL}/settings/security`;
+
+      await this.emailProvider.sendEmail({
+        to: params.email,
+        subject,
+        html,
+        text,
+      });
+
+      logger.info('New login alert email sent', { userId: params.userId, to: params.email });
+    } catch (error: any) {
+      logger.error('Failed to send new login alert', { userId: params.userId, error: error.message });
+      // Non-blocking — never throw
+    }
+  }
 }
 
 export const emailNotificationService = new EmailNotificationService();

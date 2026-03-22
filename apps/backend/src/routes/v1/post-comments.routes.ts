@@ -2,10 +2,45 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { PostCommentService } from '../../services/PostCommentService';
 import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
 import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
+import { Request, Response, NextFunction } from 'express';
+import { WorkspaceActivityLog, ActivityAction } from '../../models/WorkspaceActivityLog';
+import mongoose from 'mongoose';
 
 const router = Router();
+
+// Apply auth and workspace middleware to all routes
+router.use(requireAuth);
+router.use(requireWorkspace);
+
+// Rate limiter for post comments (100 per minute per workspace)
+const commentLimit = new SlidingWindowRateLimiter({
+  maxRequests: 100,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:postComments',
+});
+
+const commentRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await commentLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many comment requests.',
+      });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(commentRateLimit);
 
 // Validation schemas
 const addCommentSchema = z.object({
@@ -25,7 +60,7 @@ const editCommentSchema = z.object({
  * GET /posts/:postId/comments
  * Get all comments for a post
  */
-router.get('/:postId/comments', requireAuth, async (req, res): Promise<void> => {
+router.get('/:postId/comments', async (req, res): Promise<void> => {
   try {
     const { postId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
@@ -66,7 +101,6 @@ router.get('/:postId/comments', requireAuth, async (req, res): Promise<void> => 
  */
 router.post(
   '/:postId/comments',
-  requireAuth,
   validateRequest(addCommentSchema),
   async (req, res): Promise<void> => {
     try {
@@ -91,6 +125,14 @@ router.post(
         content,
         parentId
       );
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(authorId),
+        action: ActivityAction.COMMENT_CREATED,
+        metadata: { postId, commentId: comment._id.toString() },
+      }).catch(() => {});
 
       res.status(201).json({
         success: true,
@@ -117,7 +159,6 @@ router.post(
  */
 router.patch(
   '/:postId/comments/:commentId',
-  requireAuth,
   validateRequest(editCommentSchema),
   async (req, res): Promise<void> => {
     try {
@@ -168,7 +209,7 @@ router.patch(
  * DELETE /posts/:postId/comments/:commentId
  * Delete a comment
  */
-router.delete('/:postId/comments/:commentId', requireAuth, async (req, res): Promise<void> => {
+router.delete('/:postId/comments/:commentId', async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
@@ -216,7 +257,7 @@ router.delete('/:postId/comments/:commentId', requireAuth, async (req, res): Pro
  * POST /posts/:postId/comments/:commentId/resolve
  * Resolve a comment
  */
-router.post('/:postId/comments/:commentId/resolve', requireAuth, async (req, res): Promise<void> => {
+router.post('/:postId/comments/:commentId/resolve', async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
@@ -264,7 +305,7 @@ router.post('/:postId/comments/:commentId/resolve', requireAuth, async (req, res
  * DELETE /posts/:postId/comments/:commentId/resolve
  * Unresolve a comment
  */
-router.delete('/:postId/comments/:commentId/resolve', requireAuth, async (req, res): Promise<void> => {
+router.delete('/:postId/comments/:commentId/resolve', async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const workspaceId = req.workspace?.workspaceId?.toString();
@@ -312,7 +353,7 @@ router.delete('/:postId/comments/:commentId/resolve', requireAuth, async (req, r
  * POST /posts/:postId/comments/:commentId/reactions
  * Add reaction to a comment
  */
-router.post('/:postId/comments/:commentId/reactions', requireAuth, async (req, res): Promise<void> => {
+router.post('/:postId/comments/:commentId/reactions', async (req, res): Promise<void> => {
   try {
     const { commentId } = req.params;
     const { emoji } = req.body;
@@ -369,7 +410,7 @@ router.post('/:postId/comments/:commentId/reactions', requireAuth, async (req, r
  * DELETE /posts/:postId/comments/:commentId/reactions/:emoji
  * Remove reaction from a comment
  */
-router.delete('/:postId/comments/:commentId/reactions/:emoji', requireAuth, async (req, res): Promise<void> => {
+router.delete('/:postId/comments/:commentId/reactions/:emoji', async (req, res): Promise<void> => {
   try {
     const { commentId, emoji } = req.params;
     const userId = req.user?.userId;

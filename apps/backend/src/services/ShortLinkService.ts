@@ -13,6 +13,7 @@ import { logger } from '../utils/logger';
 import { NotFoundError, BadRequestError } from '../utils/errors';
 import { config } from '../config';
 import { BitlyService } from './BitlyService';
+import { SSRF_BLOCKED_PATTERNS, SSRF_BLOCKED_CIDRS } from '../constants/platformLimits';
 
 export interface CreateShortLinkOptions {
   postId?: string;
@@ -99,6 +100,29 @@ export class ShortLinkService {
       try {
         const urlObj = new URL(originalUrl);
         
+        // SSRF protection
+        const hostname = urlObj.hostname.toLowerCase();
+        const protocol = urlObj.protocol;
+
+        // Block dangerous protocols
+        if (['file:', 'javascript:', 'data:'].includes(protocol)) {
+          throw new BadRequestError('Invalid URL protocol');
+        }
+
+        // Block SSRF patterns
+        for (const pattern of SSRF_BLOCKED_PATTERNS) {
+          if (hostname.includes(pattern)) {
+            throw new BadRequestError('URL not allowed');
+          }
+        }
+
+        // Block private IP ranges
+        for (const cidr of SSRF_BLOCKED_CIDRS) {
+          if (cidr.test(hostname)) {
+            throw new BadRequestError('Private IP addresses not allowed');
+          }
+        }
+        
         // Add UTM parameters if provided
         if (options?.utmParams) {
           const params = new URLSearchParams(urlObj.search);
@@ -112,7 +136,8 @@ export class ShortLinkService {
           urlObj.search = params.toString();
           processedUrl = urlObj.toString();
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof BadRequestError) throw error;
         throw new BadRequestError('Invalid URL format');
       }
 

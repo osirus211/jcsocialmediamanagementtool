@@ -1,16 +1,12 @@
-/**
- * Client Portal Routes
- * 
- * Handles client approval portals and branding management
- */
-
 import { Router } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 import rateLimit from 'express-rate-limit';
+import { Request, Response, NextFunction } from 'express';
 import { ClientPortalService } from '../../services/ClientPortalService';
 import { ClientReviewStatus, ClientPortalStatus, PostApprovalStatus } from '../../models/ClientReview';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 import { sendSuccess, sendValidationError, sendError } from '../../utils/apiResponse';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
@@ -18,7 +14,31 @@ import mongoose from 'mongoose';
 const router = Router();
 const clientPortalService = new ClientPortalService();
 
-// Rate limiting for public endpoints
+// Redis-backed rate limiter for public portal endpoints
+const portalPublicLimit = new SlidingWindowRateLimiter({
+  maxRequests: 20,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:clientPortal',
+});
+
+const portalRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.ip || 'unknown';
+    const { allowed } = await portalPublicLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests. Please try again later.',
+      });
+      return;
+    }
+    next();
+  } catch {
+    next(); // fail open — never block on Redis failure
+  }
+};
+
+// Legacy in-memory rate limiter (deprecated)
 const publicRateLimit = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5, // 5 requests per minute per IP
@@ -516,7 +536,7 @@ router.get('/:id/activity', requireAuth, requireWorkspace, async (req, res, next
  *     summary: Get client portal (public)
  *     tags: [Public Portal]
  */
-router.get('/public/portal/:slug', publicRateLimit, async (req, res, next) => {
+router.get('/public/portal/:slug', portalRateLimit, async (req, res, next) => {
   try {
     const { slug } = req.params;
     const result = await clientPortalService.getPortalBySlug(slug);
@@ -538,7 +558,7 @@ router.get('/public/portal/:slug', publicRateLimit, async (req, res, next) => {
  *     summary: Verify portal password (public)
  *     tags: [Public Portal]
  */
-router.post('/public/portal/:slug/verify-password', publicRateLimit, validatePassword, async (req, res, next) => {
+router.post('/public/portal/:slug/verify-password', portalRateLimit, validatePassword, async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -567,7 +587,7 @@ router.post('/public/portal/:slug/verify-password', publicRateLimit, validatePas
  *     summary: Approve post (public)
  *     tags: [Public Portal]
  */
-router.post('/public/portal/:slug/posts/:postId/approve', publicRateLimit, async (req, res, next) => {
+router.post('/public/portal/:slug/posts/:postId/approve', portalRateLimit, async (req, res, next) => {
   try {
     const { slug, postId } = req.params;
     const { feedback } = req.body;
@@ -601,7 +621,7 @@ router.post('/public/portal/:slug/posts/:postId/approve', publicRateLimit, async
  *     summary: Reject post (public)
  *     tags: [Public Portal]
  */
-router.post('/public/portal/:slug/posts/:postId/reject', publicRateLimit, validatePostAction, async (req, res, next) => {
+router.post('/public/portal/:slug/posts/:postId/reject', portalRateLimit, validatePostAction, async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -640,7 +660,7 @@ router.post('/public/portal/:slug/posts/:postId/reject', publicRateLimit, valida
  *     summary: Comment on post (public)
  *     tags: [Public Portal]
  */
-router.post('/public/portal/:slug/posts/:postId/comment', publicRateLimit, validateComment, async (req, res, next) => {
+router.post('/public/portal/:slug/posts/:postId/comment', portalRateLimit, validateComment, async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -829,7 +849,7 @@ router.patch('/branding', requireAuth, requireWorkspace, validateBranding, async
  *     summary: Get client review (public, legacy)
  *     tags: [Client Portal Legacy]
  */
-router.get('/review/:token', async (req, res, next) => {
+router.get('/review/:token', portalRateLimit, async (req, res, next) => {
   try {
     const { token } = req.params;
     const result = await clientPortalService.getReview(token);
@@ -848,7 +868,7 @@ router.get('/review/:token', async (req, res, next) => {
  *     summary: Submit client feedback (public, legacy)
  *     tags: [Client Portal Legacy]
  */
-router.post('/review/:token/feedback', validateFeedback, async (req, res, next) => {
+router.post('/review/:token/feedback', portalRateLimit, validateFeedback, async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -878,7 +898,7 @@ router.post('/review/:token/feedback', validateFeedback, async (req, res, next) 
  *     summary: Record review view (public, legacy)
  *     tags: [Client Portal Legacy]
  */
-router.post('/review/:token/view', async (req, res, next) => {
+router.post('/review/:token/view', portalRateLimit, async (req, res, next) => {
   try {
     const { token } = req.params;
     

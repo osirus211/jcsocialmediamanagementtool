@@ -7,6 +7,7 @@
 import Stripe from 'stripe';
 import { config } from '../config';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import { Subscription as SubscriptionModel, SubscriptionStatus, BillingCycle, ISubscription } from '../models/Subscription';
 import { Plan } from '../models/Plan';
 import { Workspace } from '../models/Workspace';
@@ -17,6 +18,7 @@ import {
   recordPaymentSucceeded,
   recordPaymentFailed,
 } from '../config/billingMetrics';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 
 // Only initialize Stripe if we have a real secret key
 const isStripeConfigured = config.stripe.secretKey && 
@@ -52,6 +54,8 @@ export class StripeService {
         metadata: {
           workspaceId: workspaceId.toString(),
         },
+      }, {
+        idempotencyKey: `customer-create-${workspaceId.toString()}-${Date.now()}`,
       });
 
       logger.info(`Stripe customer created: ${customer.id}`);
@@ -129,6 +133,8 @@ export class StripeService {
           workspaceId: workspaceId.toString(),
           planId: planId.toString(),
         },
+      }, {
+        idempotencyKey: `sub-create-${workspaceId.toString()}-${planId.toString()}-${Date.now()}`,
       });
 
       // Calculate dates
@@ -197,6 +203,17 @@ export class StripeService {
       recordSubscriptionCreated(plan.name, billingCycle);
       logger.info(`Subscription created for workspace ${workspaceId}`);
 
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId.toString()),
+        action: ActivityAction.SUBSCRIPTION_CREATED,
+        metadata: {
+          planId: planId.toString(),
+          stripeSubscriptionId: stripeSubscription.id,
+          billingCycle,
+        },
+      }).catch(() => {});
+
       return subscription;
     } catch (error: any) {
       await session.abortTransaction();
@@ -240,6 +257,16 @@ export class StripeService {
 
       recordSubscriptionCanceled(subscription.planId.toString(), immediately);
       logger.info(`Subscription canceled for workspace ${workspaceId}`);
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId.toString()),
+        action: ActivityAction.SUBSCRIPTION_CANCELLED,
+        metadata: {
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+          immediately,
+        },
+      }).catch(() => {});
     } catch (error: any) {
       logger.error('Failed to cancel subscription:', error);
       throw new Error(`Failed to cancel subscription: ${error.message}`);

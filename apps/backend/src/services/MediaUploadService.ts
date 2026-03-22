@@ -22,6 +22,7 @@ import {
   recordValidationFailure,
   updateStorageUsage,
 } from '../config/mediaMetrics';
+import { PLATFORM_SIZE_LIMITS, PLATFORM_MEDIA_LIMITS } from '../constants/platformLimits';
 
 // Supported file types
 export const SUPPORTED_IMAGE_TYPES = [
@@ -102,6 +103,40 @@ export class MediaUploadService {
   }
 
   /**
+   * Validate upload file size and type
+   */
+  static validateUpload(fileSize: number, mimeType: string, platform?: string): void {
+    const isVideo = mimeType.startsWith('video/');
+    const platformKey = platform
+      ? (isVideo ? `${platform.toLowerCase()}_video` : platform.toLowerCase())
+      : 'default';
+    const limit = PLATFORM_SIZE_LIMITS[platformKey] ?? PLATFORM_SIZE_LIMITS['default'];
+
+    if (fileSize > limit) {
+      throw new BadRequestError(
+        `File size ${(fileSize / 1024 / 1024).toFixed(1)}MB exceeds ${platform ?? 'default'} limit of ${(limit / 1024 / 1024).toFixed(0)}MB`,
+        { fileSize, limit, platform, code: 'MEDIA_TOO_LARGE' }
+      );
+    }
+  }
+
+  /**
+   * Validate media count
+   */
+  static validateMediaCount(existingCount: number, platform?: string): void {
+    const limit = platform
+      ? (PLATFORM_MEDIA_LIMITS[platform.toLowerCase()] ?? PLATFORM_MEDIA_LIMITS['default'])
+      : PLATFORM_MEDIA_LIMITS['default'];
+
+    if (existingCount >= limit) {
+      throw new BadRequestError(
+        `Maximum ${limit} media files allowed for ${platform ?? 'this platform'}`,
+        { limit, platform, code: 'MEDIA_LIMIT_EXCEEDED' }
+      );
+    }
+  }
+
+  /**
    * Validate file type and size
    */
   private validateFile(mimeType: string, size: number): {
@@ -173,6 +208,9 @@ export class MediaUploadService {
       const startTime = Date.now();
 
       try {
+        // Validate upload using platform limits
+        MediaUploadService.validateUpload(input.size, input.mimeType);
+
         // Validate file
         const validation = this.validateFile(input.mimeType, input.size);
         if (!validation.valid) {

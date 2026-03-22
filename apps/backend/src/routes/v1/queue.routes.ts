@@ -4,7 +4,7 @@
  * API routes for comprehensive queue management
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { queueController } from '../../controllers/QueueController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
@@ -16,12 +16,45 @@ import {
   shuffleQueueSchema,
   bulkOperationSchema,
 } from '../../schemas/queue.schemas';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
 
 // All routes require authentication and workspace context
 router.use(requireAuth);
 router.use(requireWorkspace);
+
+// Rate limiting for queue APIs
+const queueReadLimit = new SlidingWindowRateLimiter({ maxRequests: 200, windowMs: 60 * 1000, keyPrefix: 'rateLimit:queueRead' });
+const queueMutateLimit = new SlidingWindowRateLimiter({ maxRequests: 60, windowMs: 60 * 1000, keyPrefix: 'rateLimit:queueMutate' });
+
+const queueReadRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await queueReadLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many queue requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+const queueMutateRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await queueMutateLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many queue mutation requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
 
 /**
  * @openapi
@@ -77,9 +110,7 @@ router.use(requireWorkspace);
  *                     total:
  *                       type: integer
  */
-router.get('/', validateRequest(getQueueSchema), queueController.getQueue);
-
-export default router;
+router.get('/', queueReadRateLimit, validateRequest(getQueueSchema), queueController.getQueue);
 /**
  * @openapi
  * /api/v1/queue/reorder:
@@ -122,7 +153,7 @@ export default router;
  *                   items:
  *                     $ref: '#/components/schemas/QueuedPost'
  */
-router.post('/reorder', validateRequest(reorderQueueSchema), queueController.reorderQueue);
+router.post('/reorder', queueMutateRateLimit, validateRequest(reorderQueueSchema), queueController.reorderQueue);
 
 /**
  * @openapi
@@ -145,7 +176,7 @@ router.post('/reorder', validateRequest(reorderQueueSchema), queueController.reo
  *               postId:
  *                 type: string
  */
-router.post('/move-up', validateRequest(movePostSchema), queueController.movePostUp);
+router.post('/move-up', queueMutateRateLimit, validateRequest(movePostSchema), queueController.movePostUp);
 
 /**
  * @openapi
@@ -168,7 +199,7 @@ router.post('/move-up', validateRequest(movePostSchema), queueController.movePos
  *               postId:
  *                 type: string
  */
-router.post('/move-down', validateRequest(movePostSchema), queueController.movePostDown);
+router.post('/move-down', queueMutateRateLimit, validateRequest(movePostSchema), queueController.movePostDown);
 
 /**
  * @openapi
@@ -191,7 +222,7 @@ router.post('/move-down', validateRequest(movePostSchema), queueController.moveP
  *               postId:
  *                 type: string
  */
-router.post('/move-to-top', validateRequest(movePostSchema), queueController.moveToTop);
+router.post('/move-to-top', queueMutateRateLimit, validateRequest(movePostSchema), queueController.moveToTop);
 
 /**
  * @openapi
@@ -214,7 +245,7 @@ router.post('/move-to-top', validateRequest(movePostSchema), queueController.mov
  *               postId:
  *                 type: string
  */
-router.post('/move-to-bottom', validateRequest(movePostSchema), queueController.moveToBottom);
+router.post('/move-to-bottom', queueMutateRateLimit, validateRequest(movePostSchema), queueController.moveToBottom);
 
 /**
  * @openapi
@@ -238,7 +269,7 @@ router.post('/move-to-bottom', validateRequest(movePostSchema), queueController.
  *               postId:
  *                 type: string
  */
-router.post('/remove', validateRequest(movePostSchema), queueController.removeFromQueue);
+router.post('/remove', queueMutateRateLimit, validateRequest(movePostSchema), queueController.removeFromQueue);
 
 /**
  * @openapi
@@ -270,7 +301,7 @@ router.post('/remove', validateRequest(movePostSchema), queueController.removeFr
  *                 default: optimal
  *                 description: Shuffle algorithm to use
  */
-router.post('/shuffle', validateRequest(shuffleQueueSchema), queueController.shuffleQueue);
+router.post('/shuffle', queueMutateRateLimit, validateRequest(shuffleQueueSchema), queueController.shuffleQueue);
 
 /**
  * @openapi
@@ -309,7 +340,7 @@ router.post('/shuffle', validateRequest(shuffleQueueSchema), queueController.shu
  *                     format: date-time
  *                     description: Required for reschedule operation
  */
-router.post('/bulk', validateRequest(bulkOperationSchema), queueController.bulkOperation);
+router.post('/bulk', queueMutateRateLimit, validateRequest(bulkOperationSchema), queueController.bulkOperation);
 
 /**
  * PAUSE QUEUE ROUTES - Superior to Buffer & Hootsuite
@@ -346,7 +377,7 @@ router.post('/bulk', validateRequest(bulkOperationSchema), queueController.bulkO
  *       200:
  *         description: Queue paused successfully
  */
-router.post('/pause', queueController.pauseQueue);
+router.post('/pause', queueMutateRateLimit, queueController.pauseQueue);
 
 /**
  * @openapi
@@ -371,7 +402,7 @@ router.post('/pause', queueController.pauseQueue);
  *       200:
  *         description: Queue resumed successfully
  */
-router.post('/resume', queueController.resumeQueue);
+router.post('/resume', queueMutateRateLimit, queueController.resumeQueue);
 
 /**
  * @openapi
@@ -407,7 +438,7 @@ router.post('/resume', queueController.resumeQueue);
  *       200:
  *         description: Queue paused with auto-resume scheduled
  */
-router.post('/pause-until', queueController.pauseUntil);
+router.post('/pause-until', queueMutateRateLimit, queueController.pauseUntil);
 
 /**
  * @openapi
@@ -432,4 +463,6 @@ router.post('/pause-until', queueController.pauseUntil);
  *                 data:
  *                   $ref: '#/components/schemas/QueuePauseStatus'
  */
-router.get('/status', queueController.getQueueStatus);
+router.get('/status', queueReadRateLimit, queueController.getQueueStatus);
+
+export default router;

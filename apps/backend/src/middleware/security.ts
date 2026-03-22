@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoSanitize from 'express-mongo-sanitize';
 import { v4 as uuidv4 } from 'uuid';
+import { getRedisClient } from '../config/redis';
 
 /**
  * Request ID middleware
@@ -38,6 +39,10 @@ export const xssProtection = (_req: Request, res: Response, next: NextFunction) 
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   next();
 };
 
@@ -48,13 +53,20 @@ export const xssProtection = (_req: Request, res: Response, next: NextFunction) 
 export const contentSecurityPolicy = (_req: Request, res: Response, next: NextFunction) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self'; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https:; " +
-    "font-src 'self' data:; " +
-    "connect-src 'self'; " +
-    "frame-ancestors 'none';"
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' wss: https:",
+      "media-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests",
+    ].join('; ')
   );
   next();
 };
@@ -125,41 +137,36 @@ export const validateContentType = (req: Request, res: Response, next: NextFunct
  * IP Rate Limiting per User
  * Track requests per IP per user to detect suspicious activity
  */
-const ipUserRequests = new Map<string, Map<string, number>>();
-
-export const ipUserRateLimit = (req: Request, res: Response, next: NextFunction) => {
+export const ipUserRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user) return next();
-  
-  const ip = req.ip || 'unknown';
-  const userId = req.user.userId;
-  const key = `${ip}:${userId}`;
-  
-  if (!ipUserRequests.has(ip)) {
-    ipUserRequests.set(ip, new Map());
-  }
-  
-  const userMap = ipUserRequests.get(ip)!;
-  const count = userMap.get(userId) || 0;
-  
-  // Allow 1000 requests per 15 minutes per IP-user combination
-  if (count > 1000) {
-    return res.status(429).json({
-      error: 'Too Many Requests',
-      message: 'Rate limit exceeded for this IP and user combination',
-    });
-  }
-  
-  userMap.set(userId, count + 1);
-  
-  // Reset after 15 minutes
-  setTimeout(() => {
-    const currentCount = userMap.get(userId) || 0;
-    if (currentCount > 0) {
-      userMap.set(userId, currentCount - 1);
+
+  try {
+    const redis = getRedisClient();
+    const ip = req.ip || 'unknown';
+    const userId = req.user.userId;
+    const key = `ipUserRate:${ip}:${userId}`;
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    const maxRequests = 1000;
+
+    await redis.zremrangebyscore(key, 0, now - windowMs);
+    const count = await redis.zcard(key);
+
+    if (count >= maxRequests) {
+      res.status(429).json({
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests from this IP and user combination',
+      });
+      return;
     }
-  }, 15 * 60 * 1000);
-  
-  next();
+
+    await redis.zadd(key, now, `${now}-${Math.random()}`);
+    await redis.expire(key, Math.ceil(windowMs / 1000));
+
+    next();
+  } catch {
+    next();
+  }
 };
 
 /**

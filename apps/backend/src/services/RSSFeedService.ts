@@ -572,15 +572,40 @@ export class RSSFeedService {
    * Validate feed URL format
    */
   static validateFeedUrl(feedUrl: string): void {
+    let parsed: URL;
     try {
-      const url = new URL(feedUrl);
-      
-      // Only allow HTTP and HTTPS protocols
-      if (!['http:', 'https:'].includes(url.protocol)) {
-        throw new Error('Feed URL must use HTTP or HTTPS protocol');
-      }
-    } catch (error: any) {
-      throw new Error(`Invalid feed URL: ${error.message}`);
+      parsed = new URL(feedUrl);
+    } catch {
+      throw new Error('Invalid feed URL format');
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Feed URL must use HTTP or HTTPS protocol');
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+    const blocked =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname === '169.254.169.254' ||
+      hostname.startsWith('169.254.') ||
+      hostname === '::1' ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local') ||
+      (() => {
+        const parts = hostname.split('.');
+        if (parts.length === 4) {
+          const second = parseInt(parts[1], 10);
+          return parts[0] === '172' && second >= 16 && second <= 31;
+        }
+        return false;
+      })();
+
+    if (blocked) {
+      throw new Error('Feed URL points to a blocked address');
     }
   }
 

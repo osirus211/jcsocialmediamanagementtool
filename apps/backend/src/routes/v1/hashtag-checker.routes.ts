@@ -1,9 +1,33 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { BannedHashtagChecker } from '../../services/BannedHashtagChecker';
 import { requireAuth } from '../../middleware/auth';
 import { body, query, validationResult } from 'express-validator';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
+
+// Rate limiting for hashtag checker endpoints
+const hashtagCheckerLimit = new SlidingWindowRateLimiter({
+  maxRequests: 30,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:hashtagChecker',
+});
+
+const hashtagCheckerRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await hashtagCheckerLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many hashtag checker requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(hashtagCheckerRateLimit);
 
 // POST /api/v1/hashtag-checker/check - Check hashtags for banned/problematic content
 router.post('/check',

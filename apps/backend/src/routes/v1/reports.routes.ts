@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { ScheduledReport, ReportFrequency, ReportFormat, ReportType } from '../../models/ScheduledReport';
 import { ReportGeneratorService } from '../../services/ReportGeneratorService';
@@ -7,8 +7,35 @@ import { requireWorkspace } from '../../middleware/tenant';
 import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 import mongoose from 'mongoose';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
+import { WorkspaceActivityLog, ActivityAction } from '../../models/WorkspaceActivityLog';
 
 const router = Router();
+
+// Rate limiting for report endpoints (PDF generation is expensive)
+const reportsLimit = new SlidingWindowRateLimiter({
+  maxRequests: 20,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:reports',
+});
+
+const reportsRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await reportsLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many report requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(requireAuth);
+router.use(requireWorkspace);
+router.use(reportsRateLimit);
 
 // Validation schemas
 const createReportSchema = z.object({
@@ -54,7 +81,7 @@ const downloadReportSchema = z.object({
  * GET /api/v1/reports
  * List scheduled reports for workspace
  */
-router.get('/', requireAuth, requireWorkspace, async (req, res): Promise<void> => {
+router.get('/', async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
 
@@ -86,7 +113,7 @@ router.get('/', requireAuth, requireWorkspace, async (req, res): Promise<void> =
  * POST /api/v1/reports
  * Create scheduled report
  */
-router.post('/', requireAuth, requireWorkspace, validateRequest(createReportSchema), async (req, res): Promise<void> => {
+router.post('/', validateRequest(createReportSchema), async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
     const { userId } = req.user!;
@@ -107,6 +134,14 @@ router.post('/', requireAuth, requireWorkspace, validateRequest(createReportSche
       workspaceId,
       name: reportData.name,
     });
+
+    // Audit log
+    WorkspaceActivityLog.create({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      userId: new mongoose.Types.ObjectId(userId),
+      action: ActivityAction.REPORT_CREATED,
+      details: { reportId: report._id.toString() },
+    }).catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -129,7 +164,7 @@ router.post('/', requireAuth, requireWorkspace, validateRequest(createReportSche
  * PATCH /api/v1/reports/:id
  * Update scheduled report
  */
-router.patch('/:id', requireAuth, requireWorkspace, validateRequest(updateReportSchema), async (req, res): Promise<void> => {
+router.patch('/:id', validateRequest(updateReportSchema), async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
     const { id } = req.params;
@@ -179,7 +214,7 @@ router.patch('/:id', requireAuth, requireWorkspace, validateRequest(updateReport
  * DELETE /api/v1/reports/:id
  * Delete scheduled report
  */
-router.delete('/:id', requireAuth, requireWorkspace, async (req, res): Promise<void> => {
+router.delete('/:id', async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
     const { id } = req.params;
@@ -201,6 +236,14 @@ router.delete('/:id', requireAuth, requireWorkspace, async (req, res): Promise<v
       reportId: id,
       workspaceId,
     });
+
+    // Audit log
+    WorkspaceActivityLog.create({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      userId: new mongoose.Types.ObjectId(req.user!.userId),
+      action: ActivityAction.REPORT_DELETED,
+      details: { reportId: id },
+    }).catch(() => {});
 
     res.json({
       success: true,
@@ -224,7 +267,7 @@ router.delete('/:id', requireAuth, requireWorkspace, async (req, res): Promise<v
  * POST /api/v1/reports/:id/send-now
  * Trigger immediate report generation and email
  */
-router.post('/:id/send-now', requireAuth, requireWorkspace, async (req, res): Promise<void> => {
+router.post('/:id/send-now', async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
     const { id } = req.params;
@@ -275,6 +318,14 @@ router.post('/:id/send-now', requireAuth, requireWorkspace, async (req, res): Pr
       workspaceId,
     });
 
+    // Audit log
+    WorkspaceActivityLog.create({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      userId: new mongoose.Types.ObjectId(req.user!.userId),
+      action: ActivityAction.REPORT_SENT,
+      details: { reportId: id },
+    }).catch(() => {});
+
     res.json({
       success: true,
       message: 'Report sent successfully',
@@ -297,7 +348,7 @@ router.post('/:id/send-now', requireAuth, requireWorkspace, async (req, res): Pr
  * GET /api/v1/reports/download
  * Download report file
  */
-router.get('/download', requireAuth, requireWorkspace, validateRequest(downloadReportSchema), async (req, res): Promise<void> => {
+router.get('/download', validateRequest(downloadReportSchema), async (req, res): Promise<void> => {
   try {
     const { workspaceId } = req.workspace!;
     const { reportType, format, startDate, endDate, platforms } = req.query;

@@ -80,6 +80,7 @@ export interface IUser extends Document {
   // Account lockout
   loginAttempts: number;
   lockUntil?: Date;
+  lastLoginIp?: string;
   
   // GDPR Consent tracking
   gdprConsentAt?: Date;
@@ -235,6 +236,7 @@ const UserSchema = new Schema<IUser, Model<IUser, IUserQueryHelpers>, {}, IUserQ
     passwordResetExpiresAt: { type: Date, default: null, select: false },
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
+    lastLoginIp: { type: String, default: null },
     
     // GDPR Consent fields
     gdprConsentAt: { type: Date },

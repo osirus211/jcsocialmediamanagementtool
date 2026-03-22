@@ -54,9 +54,10 @@ export class FacebookWebhookProvider extends BaseWebhookProvider {
       .update(rawBody)
       .digest('hex');
 
-    const isValid = signature === `sha256=${expectedSignature}`;
+    const sig = Buffer.from(signature.replace('sha256=', ''));
+    const expected = Buffer.from(expectedSignature);
     
-    if (!isValid) {
+    if (sig.length !== expected.length || !crypto.timingSafeEqual(sig, expected)) {
       throw new WebhookSignatureError('Invalid signature');
     }
 

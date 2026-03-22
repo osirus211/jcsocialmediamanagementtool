@@ -112,10 +112,21 @@ export class TaskService {
       dueDate: Date;
       labels: string[];
       estimatedMinutes: number;
-    }>
+    }>,
+    workspaceId?: string
   ): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -147,9 +158,19 @@ export class TaskService {
   /**
    * Delete a task
    */
-  static async deleteTask(taskId: string, userId: string): Promise<void> {
+  static async deleteTask(taskId: string, userId: string, workspaceId?: string): Promise<void> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -177,9 +198,19 @@ export class TaskService {
   /**
    * Assign users to a task
    */
-  static async assignTask(taskId: string, userIds: string[], assignedBy: string): Promise<ITask> {
+  static async assignTask(taskId: string, userIds: string[], assignedBy: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -212,9 +243,19 @@ export class TaskService {
   /**
    * Unassign a user from a task
    */
-  static async unassignTask(taskId: string, userId: string): Promise<ITask> {
+  static async unassignTask(taskId: string, userId: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -236,9 +277,19 @@ export class TaskService {
   /**
    * Update task status
    */
-  static async updateStatus(taskId: string, status: TaskStatus, userId: string): Promise<ITask> {
+  static async updateStatus(taskId: string, status: TaskStatus, userId: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -275,9 +326,19 @@ export class TaskService {
   /**
    * Update task priority
    */
-  static async updatePriority(taskId: string, priority: TaskPriority, userId: string): Promise<ITask> {
+  static async updatePriority(taskId: string, priority: TaskPriority, userId: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -303,9 +364,19 @@ export class TaskService {
   /**
    * Add a comment to a task
    */
-  static async addComment(taskId: string, userId: string, text: string): Promise<ITask> {
+  static async addComment(taskId: string, userId: string, text: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -337,9 +408,19 @@ export class TaskService {
   /**
    * Add a checklist item
    */
-  static async addChecklistItem(taskId: string, text: string): Promise<ITask> {
+  static async addChecklistItem(taskId: string, text: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -366,9 +447,19 @@ export class TaskService {
   /**
    * Toggle checklist item completion
    */
-  static async toggleChecklistItem(taskId: string, itemId: string, userId: string): Promise<ITask> {
+  static async toggleChecklistItem(taskId: string, itemId: string, userId: string, workspaceId?: string): Promise<ITask> {
     try {
-      const task = await Task.findById(taskId);
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query);
+      } else {
+        task = await Task.findById(taskId);
+      }
+      
       if (!task) {
         throw new Error('Task not found');
       }
@@ -551,14 +642,28 @@ export class TaskService {
   /**
    * Get a single task by ID
    */
-  static async getTaskById(taskId: string): Promise<PopulatedTask | null> {
+  static async getTaskById(taskId: string, workspaceId?: string): Promise<PopulatedTask | null> {
     try {
-      const task = await Task.findById(taskId)
-        .populate('assignedTo', 'firstName lastName avatar')
-        .populate('assignedBy', 'firstName lastName avatar')
-        .populate('watchers', 'firstName lastName avatar')
-        .populate('comments.userId', 'firstName lastName avatar')
-        .lean();
+      let task;
+      if (workspaceId && workspaceId.trim()) {
+        const query: any = { 
+          _id: new Types.ObjectId(taskId),
+          workspaceId: new Types.ObjectId(workspaceId)
+        };
+        task = await Task.findOne(query)
+          .populate('assignedTo', 'firstName lastName avatar')
+          .populate('assignedBy', 'firstName lastName avatar')
+          .populate('watchers', 'firstName lastName avatar')
+          .populate('comments.userId', 'firstName lastName avatar')
+          .lean();
+      } else {
+        task = await Task.findById(taskId)
+          .populate('assignedTo', 'firstName lastName avatar')
+          .populate('assignedBy', 'firstName lastName avatar')
+          .populate('watchers', 'firstName lastName avatar')
+          .populate('comments.userId', 'firstName lastName avatar')
+          .lean();
+      }
 
       if (!task) {
         return null;

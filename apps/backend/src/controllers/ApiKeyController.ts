@@ -8,6 +8,8 @@ import { Request, Response, NextFunction } from 'express';
 import { apiKeyService } from '../services/ApiKeyService';
 import { BadRequestError } from '../utils/errors';
 import { logger } from '../utils/logger';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
+import mongoose from 'mongoose';
 
 export class ApiKeyController {
   /**
@@ -67,6 +69,18 @@ export class ApiKeyController {
         workspaceId,
         createdBy,
       });
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(req.user!.userId),
+        action: ActivityAction.API_KEY_CREATED,
+        metadata: {
+          keyId: apiKey._id.toString(),
+          name: apiKey.name,
+          scopes: apiKey.scopes,
+        },
+      }).catch(() => {});
 
       // Return plaintext key ONCE
       res.status(201).json({
@@ -241,6 +255,14 @@ export class ApiKeyController {
         revokedBy,
       });
 
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(req.user!.userId),
+        action: ActivityAction.API_KEY_REVOKED,
+        metadata: { keyId: id },
+      }).catch(() => {});
+
       res.json({
         message: 'API key revoked successfully',
         keyId: id,
@@ -267,6 +289,14 @@ export class ApiKeyController {
         workspaceId,
         deletedBy: req.user!.userId,
       });
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(req.user!.userId),
+        action: ActivityAction.API_KEY_DELETED,
+        metadata: { keyId: id },
+      }).catch(() => {});
 
       res.json({
         message: 'API key deleted successfully',
@@ -305,6 +335,18 @@ export class ApiKeyController {
         workspaceId,
         gracePeriodDays: gracePeriod,
       });
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(req.user!.userId),
+        action: ActivityAction.API_KEY_ROTATED,
+        metadata: {
+          oldKeyId: id,
+          newKeyId: newKey._id.toString(),
+          gracePeriodDays: gracePeriod,
+        },
+      }).catch(() => {});
 
       // Return new plaintext key ONCE
       res.json({

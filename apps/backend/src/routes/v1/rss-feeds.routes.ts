@@ -4,11 +4,11 @@
  * API routes for managing RSS feed subscriptions
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { rssFeedController } from '../../controllers/RSSFeedController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { rateLimit } from 'express-rate-limit';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
 
@@ -17,15 +17,22 @@ router.use(requireAuth);
 router.use(requireWorkspace);
 
 // Rate limiting for RSS feed APIs
-const rssFeedRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const rssFeedLimit = new SlidingWindowRateLimiter({ maxRequests: 100, windowMs: 15 * 60 * 1000, keyPrefix: 'rateLimit:rssFeeds' });
+const rssFeedRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await rssFeedLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many RSS feed requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
 
-router.use(rssFeedRateLimiter);
+router.use(rssFeedRateLimit);
 
 /**
  * @openapi

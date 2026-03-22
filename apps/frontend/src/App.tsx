@@ -5,6 +5,7 @@ import { AppRouter } from './app/router';
 import { ErrorBoundary } from './components/errors/ErrorBoundary';
 import { PWAInstallBanner } from './components/pwa/PWAInstallBanner';
 import { OfflineBanner } from './components/pwa/OfflineBanner';
+import { CookieConsentBanner } from './components/legal/CookieConsentBanner';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <OfflineBanner />
           <AppRouter />
           <PWAInstallBanner />
+          <CookieConsentBanner />
         </AuthProvider>
         {/* Add ReactQueryDevtools when @tanstack/react-query-devtools is installed */}
         {/* <ReactQueryDevtools initialIsOpen={false} /> */}

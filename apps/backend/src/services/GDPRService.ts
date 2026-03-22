@@ -92,6 +92,20 @@ export class GDPRService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<{ data: GDPRExportData; requestId: string }> {
+    // Rate limit: max 1 export per 24 hours per user
+    const recentExport = await GDPRRequestLog.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      requestType: GDPRRequestType.DATA_EXPORT,
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    });
+    if (recentExport) {
+      const { TooManyRequestsError } = await import('../utils/errors');
+      throw new TooManyRequestsError(
+        'A data export was already requested in the last 24 hours. Please wait before requesting again.',
+        { code: 'EXPORT_RATE_LIMITED', nextAvailableAt: new Date(recentExport.createdAt.getTime() + 24 * 60 * 60 * 1000) }
+      );
+    }
+
     // Create GDPR request log
     const request = await this.createGDPRRequest(
       userId,

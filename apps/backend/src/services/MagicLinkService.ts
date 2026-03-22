@@ -162,27 +162,30 @@ export class MagicLinkService {
 
   /**
    * Consume magic link token (invalidate after use)
+   * Uses atomic findOneAndUpdate to prevent race conditions
    */
   static async consumeMagicLink(token: string): Promise<IUser> {
     try {
-      const verification = await MagicLinkService.verifyMagicLink(token);
+      // Hash the provided token
+      const hashedToken = MagicLinkService.hashToken(token);
 
-      if (!verification.valid || !verification.user) {
-        if (verification.expired) {
-          throw new UnauthorizedError('Magic link has expired');
-        }
+      // Atomic single-use: find user with matching token AND clear it in one op
+      const user = await User.findOneAndUpdate(
+        {
+          magicLinkToken: hashedToken,
+          magicLinkExpiresAt: { $gt: new Date() },
+          softDeletedAt: null,
+        },
+        {
+          $unset: { magicLinkToken: 1, magicLinkExpiresAt: 1 },
+          $set: { lastLoginAt: new Date() },
+        },
+        { new: false } // return the document BEFORE the update to verify it existed
+      ).select('+magicLinkToken +magicLinkExpiresAt +refreshTokens');
+
+      if (!user) {
         throw new UnauthorizedError('Invalid or expired magic link');
       }
-
-      const user = verification.user;
-
-      // Invalidate the token (one-time use)
-      user.magicLinkToken = undefined;
-      user.magicLinkExpiresAt = undefined;
-      
-      // Update last login
-      user.lastLoginAt = new Date();
-      await user.save();
 
       logger.info('Magic link consumed successfully', { 
         userId: user._id, 

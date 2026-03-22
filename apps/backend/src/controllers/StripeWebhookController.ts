@@ -6,6 +6,8 @@ import { Workspace } from '../models/Workspace';
 import { WebhookEvent } from '../models/WebhookEvent';
 import { usageService } from '../services/UsageService';
 import { logger } from '../utils/logger';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
+import mongoose from 'mongoose';
 
 /**
  * Stripe Webhook Controller
@@ -263,6 +265,16 @@ export class StripeWebhookController {
       subscriptionId,
       paymentFailedAt: billing.metadata.paymentFailedAt,
     });
+
+    // Audit log
+    WorkspaceActivityLog.create({
+      workspaceId: new mongoose.Types.ObjectId(billing.workspaceId.toString()),
+      action: ActivityAction.PAYMENT_FAILED,
+      metadata: {
+        stripeEventId: invoice.id,
+        subscriptionId,
+      },
+    }).catch(() => {});
   }
 
   /**
@@ -306,6 +318,17 @@ export class StripeWebhookController {
         subscriptionId,
       });
     }
+
+    // Audit log
+    WorkspaceActivityLog.create({
+      workspaceId: new mongoose.Types.ObjectId(billing.workspaceId.toString()),
+      action: ActivityAction.PAYMENT_SUCCESS,
+      metadata: {
+        stripeEventId: invoice.id,
+        amount: invoice.amount_paid,
+        subscriptionId,
+      },
+    }).catch(() => {});
   }
 
   /**

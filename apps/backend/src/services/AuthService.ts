@@ -202,6 +202,8 @@ export class AuthService {
       // Sanitize and validate input
       const email = input.email.toLowerCase().trim();
       const password = input.password;
+      const ipAddress = input.ipAddress;
+      const userAgent = input.userAgent;
 
       // Input validation
       if (!email || !password) {
@@ -371,6 +373,21 @@ export class AuthService {
       await user.save();
 
       logger.info('User logged in successfully', { userId: user._id, email: user.email });
+
+      // Send new device alert if IP changed
+      if (user.lastLoginIp && user.lastLoginIp !== ipAddress) {
+        const { emailNotificationService } = await import('./EmailNotificationService');
+        emailNotificationService.sendNewLoginAlert({
+          userId: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName || 'User',
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          loginAt: new Date(),
+        }).catch(() => {}); // non-blocking
+      }
+      // Update lastLoginIp
+      await User.findByIdAndUpdate(user._id, { $set: { lastLoginIp: ipAddress } });
 
       // Generate tokens
       const tokens = TokenService.generateTokenPair({

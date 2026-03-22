@@ -83,6 +83,10 @@ const ClientPortalPage = lazy(() => import('@/pages/client-portal/ClientPortalPa
 const ClientReviewPage = lazy(() => import('@/pages/client-portal/ClientReviewPage').then(module => ({ default: module.ClientReviewPage })));
 const ClientPortalView = lazy(() => import('@/pages/client-portal/ClientPortalView').then(module => ({ default: module.ClientPortalView })));
 
+// Legal
+const PrivacyPolicyPage = lazy(() => import('@/pages/legal/PrivacyPolicyPage').then(module => ({ default: module.PrivacyPolicyPage })));
+const TermsOfServicePage = lazy(() => import('@/pages/legal/TermsOfServicePage').then(module => ({ default: module.TermsOfServicePage })));
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -280,6 +284,15 @@ const router = createBrowserRouter([
   {
     path: '/accept-invite/:token',
     element: <SuspenseWrapper><AcceptInvitePage /></SuspenseWrapper>,
+  },
+  // Public legal pages (no authentication required)
+  {
+    path: '/privacy',
+    element: <SuspenseWrapper><PrivacyPolicyPage /></SuspenseWrapper>,
+  },
+  {
+    path: '/terms',
+    element: <SuspenseWrapper><TermsOfServicePage /></SuspenseWrapper>,
   },
   {
     path: '/auth',

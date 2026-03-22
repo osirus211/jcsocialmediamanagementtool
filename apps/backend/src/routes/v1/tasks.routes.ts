@@ -3,10 +3,15 @@ import { z } from 'zod';
 import { TaskService, TaskFilters } from '../../services/TaskService';
 import { TaskType, TaskStatus, TaskPriority } from '../../models/Task';
 import { requireAuth } from '../../middleware/auth';
+import { requireWorkspace } from '../../middleware/tenant';
 import { validateRequest } from '../../middleware/validate';
 import { logger } from '../../utils/logger';
 
 const router = Router();
+
+// Apply workspace isolation to all task routes
+router.use(requireAuth);
+router.use(requireWorkspace);
 
 // Validation schemas
 const createTaskSchema = z.object({
@@ -87,7 +92,6 @@ const getTasksSchema = z.object({
  */
 router.post(
   '/',
-  requireAuth,
   validateRequest(createTaskSchema),
   async (req, res): Promise<void> => {
     try {
@@ -134,7 +138,6 @@ router.post(
  */
 router.get(
   '/',
-  requireAuth,
   validateRequest(getTasksSchema),
   async (req, res): Promise<void> => {
     try {
@@ -217,7 +220,7 @@ router.get(
  * GET /tasks/my
  * Get my assigned tasks
  */
-router.get('/my', requireAuth, async (req, res): Promise<void> => {
+router.get('/my', async (req, res): Promise<void> => {
   try {
     const workspaceId = req.workspace?.workspaceId?.toString();
     const userId = req.user?.userId;
@@ -254,7 +257,7 @@ router.get('/my', requireAuth, async (req, res): Promise<void> => {
  * GET /tasks/overdue
  * Get overdue tasks
  */
-router.get('/overdue', requireAuth, async (req, res): Promise<void> => {
+router.get('/overdue', async (req, res): Promise<void> => {
   try {
     const workspaceId = req.workspace?.workspaceId?.toString();
 
@@ -290,7 +293,7 @@ router.get('/overdue', requireAuth, async (req, res): Promise<void> => {
  * GET /tasks/by-post/:postId
  * Get tasks by post ID
  */
-router.get('/by-post/:postId', requireAuth, async (req, res): Promise<void> => {
+router.get('/by-post/:postId', async (req, res): Promise<void> => {
   try {
     const { postId } = req.params;
     const tasks = await TaskService.getTasksByPost(postId);
@@ -317,10 +320,11 @@ router.get('/by-post/:postId', requireAuth, async (req, res): Promise<void> => {
  * GET /tasks/:id
  * Get a single task
  */
-router.get('/:id', requireAuth, async (req, res): Promise<void> => {
+router.get('/:id', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
-    const task = await TaskService.getTaskById(id);
+    const workspaceId = req.workspace?.workspaceId?.toString();
+    const task = await TaskService.getTaskById(id, workspaceId);
 
     if (!task) {
       res.status(404).json({
@@ -355,12 +359,12 @@ router.get('/:id', requireAuth, async (req, res): Promise<void> => {
  */
 router.patch(
   '/:id',
-  requireAuth,
   validateRequest(updateTaskSchema),
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const userId = req.user?.userId;
+      const workspaceId = req.workspace?.workspaceId?.toString();
 
       if (!userId) {
         res.status(401).json({
@@ -376,7 +380,7 @@ router.patch(
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
       };
 
-      const task = await TaskService.updateTask(id, userId, updates);
+      const task = await TaskService.updateTask(id, userId, updates, workspaceId);
 
       res.json({
         success: true,
@@ -410,10 +414,11 @@ router.patch(
  * DELETE /tasks/:id
  * Delete a task
  */
-router.delete('/:id', requireAuth, async (req, res): Promise<void> => {
+router.delete('/:id', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
+    const workspaceId = req.workspace?.workspaceId?.toString();
 
     if (!userId) {
       res.status(401).json({
@@ -424,7 +429,7 @@ router.delete('/:id', requireAuth, async (req, res): Promise<void> => {
       return;
     }
 
-    await TaskService.deleteTask(id, userId);
+    await TaskService.deleteTask(id, userId, workspaceId);
 
     res.json({
       success: true,
@@ -459,13 +464,13 @@ router.delete('/:id', requireAuth, async (req, res): Promise<void> => {
  */
 router.post(
   '/:id/assign',
-  requireAuth,
   validateRequest(assignTaskSchema),
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const { userIds } = req.body;
       const userId = req.user?.userId;
+      const workspaceId = req.workspace?.workspaceId?.toString();
 
       if (!userId) {
         res.status(401).json({
@@ -476,7 +481,7 @@ router.post(
         return;
       }
 
-      const task = await TaskService.assignTask(id, userIds, userId);
+      const task = await TaskService.assignTask(id, userIds, userId, workspaceId);
 
       res.json({
         success: true,
@@ -510,11 +515,12 @@ router.post(
  * POST /tasks/:id/unassign
  * Unassign a user from a task
  */
-router.post('/:id/unassign', requireAuth, async (req, res): Promise<void> => {
+router.post('/:id/unassign', async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const { userId: targetUserId } = req.body;
     const userId = req.user?.userId;
+    const workspaceId = req.workspace?.workspaceId?.toString();
 
     if (!userId) {
       res.status(401).json({
@@ -525,7 +531,7 @@ router.post('/:id/unassign', requireAuth, async (req, res): Promise<void> => {
       return;
     }
 
-    const task = await TaskService.unassignTask(id, targetUserId || userId);
+    const task = await TaskService.unassignTask(id, targetUserId || userId, workspaceId);
 
     res.json({
       success: true,
@@ -560,13 +566,13 @@ router.post('/:id/unassign', requireAuth, async (req, res): Promise<void> => {
  */
 router.patch(
   '/:id/status',
-  requireAuth,
   validateRequest(updateStatusSchema),
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const { status } = req.body;
       const userId = req.user?.userId;
+      const workspaceId = req.workspace?.workspaceId?.toString();
 
       if (!userId) {
         res.status(401).json({
@@ -577,7 +583,7 @@ router.patch(
         return;
       }
 
-      const task = await TaskService.updateStatus(id, status, userId);
+      const task = await TaskService.updateStatus(id, status, userId, workspaceId);
 
       res.json({
         success: true,
@@ -613,13 +619,13 @@ router.patch(
  */
 router.patch(
   '/:id/priority',
-  requireAuth,
   validateRequest(updatePrioritySchema),
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const { priority } = req.body;
       const userId = req.user?.userId;
+      const workspaceId = req.workspace?.workspaceId?.toString();
 
       if (!userId) {
         res.status(401).json({
@@ -630,7 +636,7 @@ router.patch(
         return;
       }
 
-      const task = await TaskService.updatePriority(id, priority, userId);
+      const task = await TaskService.updatePriority(id, priority, userId, workspaceId);
 
       res.json({
         success: true,
@@ -666,13 +672,13 @@ router.patch(
  */
 router.post(
   '/:id/comments',
-  requireAuth,
   validateRequest(addCommentSchema),
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const { text } = req.body;
       const userId = req.user?.userId;
+      const workspaceId = req.workspace?.workspaceId?.toString();
 
       if (!userId) {
         res.status(401).json({
@@ -683,7 +689,7 @@ router.post(
         return;
       }
 
-      const task = await TaskService.addComment(id, userId, text);
+      const task = await TaskService.addComment(id, userId, text, workspaceId);
 
       res.json({
         success: true,
@@ -719,14 +725,14 @@ router.post(
  */
 router.post(
   '/:id/checklist',
-  requireAuth,
   validateRequest(addChecklistItemSchema),
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const { text } = req.body;
+      const workspaceId = req.workspace?.workspaceId?.toString();
 
-      const task = await TaskService.addChecklistItem(id, text);
+      const task = await TaskService.addChecklistItem(id, text, workspaceId);
 
       res.json({
         success: true,
@@ -760,10 +766,11 @@ router.post(
  * PATCH /tasks/:id/checklist/:itemId
  * Toggle checklist item completion
  */
-router.patch('/:id/checklist/:itemId', requireAuth, async (req, res): Promise<void> => {
+router.patch('/:id/checklist/:itemId', async (req, res): Promise<void> => {
   try {
     const { id, itemId } = req.params;
     const userId = req.user?.userId;
+    const workspaceId = req.workspace?.workspaceId?.toString();
 
     if (!userId) {
       res.status(401).json({
@@ -774,7 +781,7 @@ router.patch('/:id/checklist/:itemId', requireAuth, async (req, res): Promise<vo
       return;
     }
 
-    const task = await TaskService.toggleChecklistItem(id, itemId, userId);
+    const task = await TaskService.toggleChecklistItem(id, itemId, userId, workspaceId);
 
     res.json({
       success: true,

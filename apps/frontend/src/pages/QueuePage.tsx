@@ -88,6 +88,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { queueService, QueuedPost, QueueStats, QueuePauseStatus } from '@/services/queue.service';
+import { useScheduleStore } from '@/store/schedule.store';
+import { useWorkspaceStore } from '@/store/workspace.store';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { SortableQueueItem } from '@/components/queue/SortableQueueItem';
@@ -113,10 +115,22 @@ const SHUFFLE_STRATEGIES = [
 ];
 
 export default function QueuePage() {
-  const [posts, setPosts] = useState<QueuedPost[]>([]);
-  const [stats, setStats] = useState<QueueStats | null>(null);
-  const [pauseStatus, setPauseStatus] = useState<QueuePauseStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { currentWorkspaceId } = useWorkspaceStore();
+  const {
+    queuedPosts,
+    queueStats,
+    isQueueLoading,
+    queueError,
+    isPaused,
+    pauseStatus,
+    fetchQueue,
+    reorderQueue,
+    shuffleQueue,
+    pauseQueue,
+    resumeQueue,
+    removeFromQueue,
+  } = useScheduleStore();
+
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -124,7 +138,6 @@ export default function QueuePage() {
   const [shuffleStrategy, setShuffleStrategy] = useState('optimal');
   const [preserveTimeSlots, setPreserveTimeSlots] = useState(true);
   const [isShuffling, setIsShuffling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -138,61 +151,46 @@ export default function QueuePage() {
   );
 
   const loadQueue = useCallback(async () => {
+    if (!currentWorkspaceId) return;
     try {
-      setLoading(true);
-      setError(null);
       const platform = selectedPlatform === 'all' ? undefined : selectedPlatform;
-      const data = await queueService.getQueue(platform);
-      setPosts(data.posts);
-      setStats(data.stats);
+      await fetchQueue(currentWorkspaceId, platform);
     } catch (error: any) {
       console.error('Failed to load queue:', error);
-      setError(error.message || 'Failed to load queue');
       toast.error('Failed to load queue');
-    } finally {
-      setLoading(false);
     }
-  }, [selectedPlatform]);
+  }, [currentWorkspaceId, selectedPlatform, fetchQueue]);
 
   useEffect(() => {
     loadQueue();
   }, [loadQueue]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!currentWorkspaceId) return;
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
       return;
     }
 
-    const oldIndex = posts.findIndex((post) => post.id === active.id);
-    const newIndex = posts.findIndex((post) => post.id === over.id);
+    const oldIndex = queuedPosts.findIndex((post) => post.id === active.id);
+    const newIndex = queuedPosts.findIndex((post) => post.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) {
       return;
     }
 
-    // Optimistically update UI
-    const newPosts = arrayMove(posts, oldIndex, newIndex);
-    setPosts(newPosts);
-
     try {
-      // Send API request
-      const updatedPosts = await queueService.reorderQueue({
-        postId: active.id as string,
-        newPosition: newIndex + 1,
-      });
-      setPosts(updatedPosts);
+      await reorderQueue(currentWorkspaceId, active.id as string, newIndex + 1);
       toast.success('Queue reordered successfully');
     } catch (error: any) {
-      // Revert on error
-      setPosts(posts);
       toast.error('Failed to reorder queue');
       console.error('Reorder error:', error);
     }
   };
 
   const handleMovePost = async (postId: string, action: 'up' | 'down' | 'top' | 'bottom') => {
+    if (!currentWorkspaceId) return;
     try {
       let updatedPosts: QueuedPost[];
       
@@ -211,7 +209,7 @@ export default function QueuePage() {
           break;
       }
       
-      setPosts(updatedPosts);
+      await loadQueue();
       toast.success(`Post moved ${action === 'top' || action === 'bottom' ? `to ${action}` : action}`);
     } catch (error: any) {
       toast.error(`Failed to move post ${action}`);
@@ -220,9 +218,9 @@ export default function QueuePage() {
   };
 
   const handleRemovePost = async (postId: string) => {
+    if (!currentWorkspaceId) return;
     try {
-      await queueService.removeFromQueue(postId);
-      setPosts(posts.filter(p => p.id !== postId));
+      await removeFromQueue(currentWorkspaceId, postId);
       toast.success('Post removed from queue');
     } catch (error: any) {
       toast.error('Failed to remove post from queue');
@@ -231,17 +229,17 @@ export default function QueuePage() {
   };
 
   const handleShuffle = async () => {
+    if (!currentWorkspaceId) return;
     try {
       setIsShuffling(true);
       const platform = selectedPlatform === 'all' ? undefined : selectedPlatform;
       
-      const updatedPosts = await queueService.shuffleQueue({
+      await shuffleQueue(currentWorkspaceId, {
         platform,
         preserveTimeSlots,
         distributionStrategy: shuffleStrategy as any,
       });
       
-      setPosts(updatedPosts);
       setShowShuffleDialog(false);
       toast.success('Queue shuffled successfully');
     } catch (error: any) {
@@ -292,16 +290,16 @@ export default function QueuePage() {
   };
 
   const selectAllPosts = () => {
-    if (selectedPosts.size === posts.length) {
+    if (selectedPosts.size === queuedPosts.length) {
       setSelectedPosts(new Set());
       setShowBulkActions(false);
     } else {
-      setSelectedPosts(new Set(posts.map(p => p.id)));
+      setSelectedPosts(new Set(queuedPosts.map(p => p.id)));
       setShowBulkActions(true);
     }
   };
 
-  if (loading) {
+  if (isQueueLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
@@ -322,18 +320,18 @@ export default function QueuePage() {
     );
   }
 
-  if (error) {
+  if (queueError) {
     return (
       <div className="container mx-auto p-6">
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{queueError}</AlertDescription>
         </Alert>
       </div>
     );
   }
 
-  if (posts.length === 0) {
+  if (queuedPosts.length === 0) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
@@ -370,7 +368,7 @@ export default function QueuePage() {
             onClick={() => setShowShuffleDialog(true)}
             variant="outline"
             size="sm"
-            disabled={posts.length < 2}
+            disabled={queuedPosts.length < 2}
           >
             <Shuffle className="h-4 w-4 mr-2" />
             Shuffle
@@ -385,10 +383,10 @@ export default function QueuePage() {
       {/* Stats and Pause Control */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          {stats && <QueueStatsCard stats={stats} />}
+          {queueStats && <QueueStatsCard stats={queueStats} />}
         </div>
         <div>
-          <QueuePauseControl onStatusChange={setPauseStatus} />
+          <QueuePauseControl onStatusChange={() => loadQueue()} />
         </div>
       </div>
 
@@ -421,7 +419,7 @@ export default function QueuePage() {
                   variant="ghost"
                   size="sm"
                 >
-                  {selectedPosts.size === posts.length ? 'Deselect All' : 'Select All'}
+                  {selectedPosts.size === queuedPosts.length ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
               <div className="flex items-center gap-2">
@@ -463,9 +461,9 @@ export default function QueuePage() {
         onDragEnd={handleDragEnd}
         modifiers={[restrictToVerticalAxis, restrictToParentElement]}
       >
-        <SortableContext items={posts.map(p => p.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={queuedPosts.map(p => p.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
-            {posts.map((post, index) => {
+            {queuedPosts.map((post, index) => {
               // Check if this post is paused (global or account-specific)
               const isPostPaused = pauseStatus?.isPaused || 
                 pauseStatus?.accountPauses.some(p => p.socialAccountId === post.socialAccountId);

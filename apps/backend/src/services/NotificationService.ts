@@ -1,113 +1,101 @@
-import { logger } from '../utils/logger';
+import { Notification, INotification, NotificationType, NotificationPriority } from '../models/Notification';
 import mongoose from 'mongoose';
+import { logger } from '../utils/logger';
 
 interface NotificationData {
   workspaceId: string;
-  type: 'disconnected' | 'reconnect_success' | 'reconnect_failed';
-  accountId: string;
-  platform: string;
-  accountName: string;
+  userId?: string;
+  type: NotificationType | 'disconnected' | 'reconnect_success' | 'reconnect_failed';
+  title?: string;
   message: string;
-}
-
-interface Notification extends NotificationData {
-  id: string;
-  timestamp: Date;
-  isRead: boolean;
+  accountId?: string;
+  platform?: string;
+  accountName?: string;
+  data?: Record<string, any>;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
 }
 
 /**
  * Notification Service
  * 
- * Manages in-app notifications for reconnect events
- * Note: This is a simplified in-memory implementation
- * In production, use MongoDB collection or Redis
+ * Manages in-app notifications using MongoDB persistence
  */
 export class NotificationService {
-  private notifications: Map<string, Notification[]> = new Map();
+  async createNotification(data: NotificationData): Promise<INotification> {
+    try {
+      const typeMap: Record<string, NotificationType> = {
+        disconnected: NotificationType.CONNECTION_EXPIRED,
+        reconnect_success: NotificationType.CONNECTION_RECOVERED,
+        reconnect_failed: NotificationType.CONNECTION_DEGRADED,
+      };
 
-  /**
-   * Create a new notification
-   */
-  async createNotification(data: NotificationData): Promise<Notification> {
-    const notification: Notification = {
-      ...data,
-      id: new mongoose.Types.ObjectId().toString(),
-      timestamp: new Date(),
-      isRead: false
-    };
+      const notifType = (Object.values(NotificationType).includes(data.type as NotificationType)
+        ? data.type
+        : typeMap[data.type]) as NotificationType;
 
-    // Get existing notifications for workspace
-    const workspaceNotifications = this.notifications.get(data.workspaceId) || [];
-    
-    // Add new notification at the beginning
-    workspaceNotifications.unshift(notification);
-    
-    // Keep only last 100 notifications per workspace
-    if (workspaceNotifications.length > 100) {
-      workspaceNotifications.splice(100);
+      const notification = await Notification.create({
+        workspaceId: new mongoose.Types.ObjectId(data.workspaceId),
+        userId: data.userId ? new mongoose.Types.ObjectId(data.userId) : new mongoose.Types.ObjectId(),
+        type: notifType || NotificationType.SYSTEM_ANNOUNCEMENT,
+        priority: data.priority || 'medium',
+        title: data.title || data.type,
+        message: data.message,
+        data: data.data || {},
+        read: false,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      });
+
+      logger.info('Notification created', {
+        notificationId: notification._id.toString(),
+        type: data.type,
+        workspaceId: data.workspaceId,
+      });
+
+      return notification;
+    } catch (error: any) {
+      logger.error('Failed to create notification', { error: error.message });
+      throw error;
     }
-    
-    this.notifications.set(data.workspaceId, workspaceNotifications);
-
-    logger.info('Notification created', {
-      notificationId: notification.id,
-      type: data.type,
-      workspaceId: data.workspaceId
-    });
-
-    return notification;
   }
 
-  /**
-   * Get reconnect notifications for workspace
-   */
   async getReconnectNotifications(
     workspaceId: string,
     limit: number = 20,
     offset: number = 0
-  ): Promise<Notification[]> {
-    const workspaceNotifications = this.notifications.get(workspaceId) || [];
-    
-    return workspaceNotifications
-      .slice(offset, offset + limit)
-      .map(notification => ({
-        ...notification,
-        // Format for frontend
-        timestamp: notification.timestamp.toISOString()
-      })) as any;
+  ): Promise<any[]> {
+    return Notification.find({
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      type: {
+        $in: [
+          NotificationType.CONNECTION_EXPIRED,
+          NotificationType.CONNECTION_RECOVERED,
+          NotificationType.CONNECTION_DEGRADED,
+        ],
+      },
+    })
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .lean();
   }
 
-  /**
-   * Mark notification as read
-   */
   async markAsRead(notificationId: string, workspaceId: string): Promise<void> {
-    const workspaceNotifications = this.notifications.get(workspaceId) || [];
-    
-    const notification = workspaceNotifications.find(n => n.id === notificationId);
-    if (notification) {
-      notification.isRead = true;
-      logger.debug('Notification marked as read', { notificationId, workspaceId });
-    }
+    await Notification.findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(notificationId),
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+      },
+      { $set: { read: true, readAt: new Date() } }
+    );
   }
 
-  /**
-   * Dismiss notification
-   */
   async dismissNotification(notificationId: string, workspaceId: string): Promise<void> {
-    const workspaceNotifications = this.notifications.get(workspaceId) || [];
-    
-    const index = workspaceNotifications.findIndex(n => n.id === notificationId);
-    if (index !== -1) {
-      workspaceNotifications.splice(index, 1);
-      this.notifications.set(workspaceId, workspaceNotifications);
-      logger.debug('Notification dismissed', { notificationId, workspaceId });
-    }
+    await Notification.findOneAndDelete({
+      _id: new mongoose.Types.ObjectId(notificationId),
+      workspaceId: new mongoose.Types.ObjectId(workspaceId),
+    });
   }
 
-  /**
-   * Create account disconnected notification
-   */
   async notifyAccountDisconnected(
     workspaceId: string,
     accountId: string,
@@ -121,13 +109,10 @@ export class NotificationService {
       accountId,
       platform,
       accountName,
-      message: `${accountName} was disconnected: ${reason}`
+      message: `${accountName} was disconnected: ${reason}`,
     });
   }
 
-  /**
-   * Create reconnect success notification
-   */
   async notifyReconnectSuccess(
     workspaceId: string,
     accountId: string,
@@ -140,13 +125,10 @@ export class NotificationService {
       accountId,
       platform,
       accountName,
-      message: `${accountName} was successfully reconnected`
+      message: `${accountName} was successfully reconnected`,
     });
   }
 
-  /**
-   * Create reconnect failed notification
-   */
   async notifyReconnectFailed(
     workspaceId: string,
     accountId: string,
@@ -160,7 +142,7 @@ export class NotificationService {
       accountId,
       platform,
       accountName,
-      message: `Failed to reconnect ${accountName}: ${error}`
+      message: `Failed to reconnect ${accountName}: ${error}`,
     });
   }
 }

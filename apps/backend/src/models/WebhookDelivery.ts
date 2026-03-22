@@ -20,6 +20,7 @@ export interface IWebhookDelivery extends Document {
   responseBody?: string;
   errorMessage?: string;
   deliveredAt?: Date;
+  deliveryTimestamp?: number;
   nextRetryAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -80,6 +81,9 @@ const WebhookDeliverySchema = new Schema<IWebhookDelivery>(
     },
     deliveredAt: {
       type: Date,
+    },
+    deliveryTimestamp: {
+      type: Number,
     },
     nextRetryAt: {
       type: Date,

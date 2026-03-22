@@ -4,11 +4,11 @@
  * API routes for managing evergreen content republishing rules
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { evergreenController } from '../../controllers/EvergreenController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
-import { rateLimit } from 'express-rate-limit';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
 
@@ -17,15 +17,22 @@ router.use(requireAuth);
 router.use(requireWorkspace);
 
 // Rate limiting for evergreen APIs
-const evergreenRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const evergreenLimit = new SlidingWindowRateLimiter({ maxRequests: 100, windowMs: 15 * 60 * 1000, keyPrefix: 'rateLimit:evergreen' });
+const evergreenRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await evergreenLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many evergreen requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
 
-router.use(evergreenRateLimiter);
+router.use(evergreenRateLimit);
 
 /**
  * @openapi

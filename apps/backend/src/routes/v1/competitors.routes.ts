@@ -3,16 +3,40 @@
  * Competitor tracking and analytics endpoints
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { CompetitorController } from '../../controllers/CompetitorController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
 
 // Apply auth and workspace middleware to all routes
 router.use(requireAuth);
 router.use(requireWorkspace);
+
+// Rate limiting for competitor endpoints
+const competitorsLimit = new SlidingWindowRateLimiter({
+  maxRequests: 50,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:competitors',
+});
+
+const competitorsRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await competitorsLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many competitor requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(competitorsRateLimit);
 
 /**
  * @route   POST /api/v1/competitors

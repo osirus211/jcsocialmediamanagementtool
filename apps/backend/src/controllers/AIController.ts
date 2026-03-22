@@ -955,6 +955,58 @@ export class AIController {
   }
 
   /**
+   * Translate content
+   * POST /ai/translate
+   */
+  static async translateContent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { content, targetLanguage, sourceLanguage, platform, preserveHashtags, preserveEmojis } = req.body;
+
+      if (!content || !targetLanguage) {
+        res.status(400).json({
+          success: false,
+          message: 'Missing required fields: content, targetLanguage',
+        });
+        return;
+      }
+
+      const { getAIModule } = await import('../ai/ai.module');
+      const aiModule = getAIModule();
+      const { TranslationService } = await import('../ai/services/translation.service');
+
+      const service = new TranslationService(aiModule.getProvider());
+      const result = await service.translate({
+        content,
+        targetLanguage,
+        sourceLanguage,
+        platform,
+        preserveHashtags: preserveHashtags ?? true,
+        preserveEmojis: preserveEmojis ?? true,
+      });
+
+      const workspaceId = req.workspace?.workspaceId.toString();
+      if (workspaceId) {
+        await usageService.incrementAI(workspaceId);
+      }
+
+      logger.info('Content translated', {
+        workspaceId: req.workspace?.workspaceId,
+        userId: req.user?.userId,
+        targetLanguage,
+        tokensUsed: result.tokensUsed,
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Translate content error:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Generate AI image using DALL-E 3
    * Superior feature - competitors don't have this!
    */

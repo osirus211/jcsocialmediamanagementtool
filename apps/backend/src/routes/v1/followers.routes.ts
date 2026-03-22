@@ -3,16 +3,40 @@
  * Follower growth and trend endpoints
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { FollowerAnalyticsController } from '../../controllers/FollowerAnalyticsController';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace } from '../../middleware/tenant';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
 
 const router = Router();
 
 // Apply auth and workspace middleware to all routes
 router.use(requireAuth);
 router.use(requireWorkspace);
+
+// Rate limiting for follower analytics endpoints
+const followersLimit = new SlidingWindowRateLimiter({
+  maxRequests: 60,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:followers',
+});
+
+const followersRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await followersLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many follower analytics requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(followersRateLimit);
 
 /**
  * @route   GET /api/v1/analytics/followers/workspace/growth

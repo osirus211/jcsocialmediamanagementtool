@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspace.store';
+import { useScheduleStore } from '@/store/schedule.store';
 import { useCalendarData } from '@/hooks/useCalendarData';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { CalendarHeader } from '@/components/calendar/CalendarHeader';
 import { MonthGrid } from '@/components/calendar/MonthGrid';
 import { WeekView } from '@/components/calendar/WeekView';
@@ -38,6 +40,12 @@ type ViewMode = 'month' | 'week' | 'list';
 export const CalendarPage = () => {
   const navigate = useNavigate();
   const { currentWorkspace, currentWorkspaceId, fetchMembers } = useWorkspaceStore();
+  const {
+    setCalendarView,
+    setCalendarMonth,
+    setActiveFilters,
+    reschedulePost: storeReschedulePost,
+  } = useScheduleStore();
   
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [searchQuery, setSearchQuery] = useState('');
@@ -171,17 +179,21 @@ export const CalendarPage = () => {
     setCurrentMonth((prev) => {
       const year = prev.getFullYear();
       const month = prev.getMonth();
-      return new Date(year, month - 1, 1);
+      const newMonth = new Date(year, month - 1, 1);
+      setCalendarMonth(newMonth);
+      return newMonth;
     });
-  }, []);
+  }, [setCalendarMonth]);
 
   const nextMonth = useCallback(() => {
     setCurrentMonth((prev) => {
       const year = prev.getFullYear();
       const month = prev.getMonth();
-      return new Date(year, month + 1, 1);
+      const newMonth = new Date(year, month + 1, 1);
+      setCalendarMonth(newMonth);
+      return newMonth;
     });
-  }, []);
+  }, [setCalendarMonth]);
 
   const previousWeek = useCallback(() => {
     setCurrentWeek((prev) => {
@@ -208,6 +220,27 @@ export const CalendarPage = () => {
     const diff = now.getDate() - day;
     setCurrentWeek(new Date(now.setDate(diff)));
   }, []);
+
+  /**
+   * Swipe gesture handlers for mobile navigation
+   */
+  const swipeHandlers = useSwipeGesture({
+    onSwipeLeft: () => {
+      if (viewMode === 'month') {
+        nextMonth();
+      } else if (viewMode === 'week') {
+        nextWeek();
+      }
+    },
+    onSwipeRight: () => {
+      if (viewMode === 'month') {
+        previousMonth();
+      } else if (viewMode === 'week') {
+        previousWeek();
+      }
+    },
+    minSwipeDistance: 50,
+  });
 
   /**
    * Keyboard navigation
@@ -244,14 +277,17 @@ export const CalendarPage = () => {
         case '1':
           e.preventDefault();
           setViewMode('month');
+          setCalendarView('month');
           break;
         case '2':
           e.preventDefault();
           setViewMode('week');
+          setCalendarView('week');
           break;
         case '3':
           e.preventDefault();
           setViewMode('list');
+          setCalendarView('list');
           break;
         case '/':
           e.preventDefault();
@@ -273,7 +309,7 @@ export const CalendarPage = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, searchQuery, previousMonth, nextMonth, previousWeek, nextWeek, goToToday]);
+  }, [viewMode, searchQuery, previousMonth, nextMonth, previousWeek, nextWeek, goToToday, setCalendarView]);
 
   /**
    * Post click handler - navigate to composer with post ID
@@ -286,15 +322,22 @@ export const CalendarPage = () => {
    * Reschedule handler
    */
   const handleReschedule = useCallback(async (postId: string, newDate: string): Promise<boolean> => {
+    if (!currentWorkspaceId) return false;
+    
     const success = await reschedulePost(postId, newDate);
     
     if (success) {
-      // Show success feedback (optional)
+      // Also update store
+      try {
+        await storeReschedulePost(currentWorkspaceId, postId, new Date(newDate));
+      } catch (error) {
+        logger.warn('Failed to update store after reschedule', error);
+      }
       logger.info('Post rescheduled successfully');
     }
     
     return success;
-  }, [reschedulePost]);
+  }, [currentWorkspaceId, reschedulePost, storeReschedulePost]);
 
   /**
    * Empty state check
@@ -312,7 +355,7 @@ export const CalendarPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" {...swipeHandlers}>
       <div className="max-w-7xl mx-auto w-full">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">
@@ -343,7 +386,10 @@ export const CalendarPage = () => {
         {/* Calendar Header with filters */}
         <CalendarHeader
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
+          onViewModeChange={(mode) => {
+            setViewMode(mode);
+            setCalendarView(mode);
+          }}
           selectedMemberIds={selectedMemberIds}
           onFilterByMembers={filterByMembers}
           postCount={posts.length}
@@ -354,7 +400,15 @@ export const CalendarPage = () => {
           platformCounts={platformCounts}
           hasActiveFilters={hasActiveFilters}
           onTogglePlatform={togglePlatform}
-          onToggleAccountId={toggleAccountId}
+          onToggleAccountId={(accountId) => {
+            toggleAccountId(accountId);
+            setActiveFilters({
+              platforms: activePlatforms,
+              accountIds: activeAccountIds.includes(accountId)
+                ? activeAccountIds.filter(id => id !== accountId)
+                : [...activeAccountIds, accountId],
+            });
+          }}
           onClearAllFilters={clearAllFilters}
         />
 

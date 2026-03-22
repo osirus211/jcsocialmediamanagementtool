@@ -61,6 +61,8 @@ export class BillingService {
           workspaceId: workspaceId.toString(),
           workspaceName: workspace?.name || 'Unknown',
         },
+      }, {
+        idempotencyKey: `customer-create-${workspaceId.toString()}-${Date.now()}`,
       });
 
       // Update subscription with customer ID
@@ -127,6 +129,8 @@ export class BillingService {
           planName,
           billingPeriod,
         },
+      }, {
+        idempotencyKey: `checkout-${workspaceId.toString()}-${Date.now()}`,
       });
 
       logger.info('Checkout session created', { 

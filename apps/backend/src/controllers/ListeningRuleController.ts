@@ -8,6 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ListeningRule, ListeningRuleType } from '../models/ListeningRule';
 import { SocialListeningQueue } from '../queue/SocialListeningQueue';
 import { logger } from '../utils/logger';
+import { WorkspaceActivityLog, ActivityAction } from '../models/WorkspaceActivityLog';
 
 export class ListeningRuleController {
   /**
@@ -43,6 +44,17 @@ export class ListeningRuleController {
         return;
       }
 
+      // Check rule limit (max 20 per workspace)
+      const ruleCount = await ListeningRule.countDocuments({ workspaceId });
+      if (ruleCount >= 20) {
+        res.status(409).json({
+          success: false,
+          code: 'RULE_LIMIT_EXCEEDED',
+          message: 'Maximum 20 listening rules per workspace',
+        });
+        return;
+      }
+
       // Create rule
       const rule = new ListeningRule({
         workspaceId,
@@ -54,6 +66,14 @@ export class ListeningRuleController {
       });
 
       await rule.save();
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId,
+        userId,
+        action: ActivityAction.LISTENING_RULE_CREATED,
+        metadata: { ruleId: rule._id.toString(), platform, type, value },
+      }).catch(() => {});
 
       // Schedule collection jobs for this platform if not already scheduled
       try {
@@ -157,6 +177,14 @@ export class ListeningRuleController {
         });
         return;
       }
+
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId,
+        userId: req.user!.userId,
+        action: ActivityAction.LISTENING_RULE_DELETED,
+        metadata: { ruleId: id, platform: result.platform, type: result.type },
+      }).catch(() => {});
 
       res.json({
         success: true,

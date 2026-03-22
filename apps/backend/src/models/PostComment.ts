@@ -20,6 +20,7 @@ export interface IPostComment extends Document {
   resolvedBy?: Types.ObjectId;
   resolvedAt?: Date;
   editedAt?: Date;
+  readAt?: Date;
   reactions: IReaction[];
   attachments: Array<{
     url: string;
@@ -98,6 +99,9 @@ const PostCommentSchema = new Schema<IPostComment>(
       type: Date,
     },
     editedAt: {
+      type: Date,
+    },
+    readAt: {
       type: Date,
     },
     reactions: [ReactionSchema],

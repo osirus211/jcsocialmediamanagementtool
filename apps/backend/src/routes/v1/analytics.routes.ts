@@ -3,18 +3,44 @@
  * Analytics and engagement tracking endpoints
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth } from '../../middleware/auth';
 import { requireWorkspace, requirePermission } from '../../middleware/tenant';
 import { Permission } from '../../services/WorkspacePermissionService';
 import { AnalyticsController } from '../../controllers/AnalyticsController';
 import { AnalyticsService } from '../../services/AnalyticsService';
+import { SlidingWindowRateLimiter } from '../../middleware/composerRateLimits';
+import { WorkspaceActivityLog, ActivityAction } from '../../models/WorkspaceActivityLog';
+import mongoose from 'mongoose';
 
 const router = Router();
 
 // Apply auth and workspace middleware to all routes
 router.use(requireAuth);
 router.use(requireWorkspace);
+
+// Rate limiting for analytics endpoints
+const analyticsLimit = new SlidingWindowRateLimiter({
+  maxRequests: 100,
+  windowMs: 60 * 1000,
+  keyPrefix: 'rateLimit:analytics',
+});
+
+const analyticsRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const key = req.workspace?.workspaceId?.toString() || req.ip || 'unknown';
+    const { allowed } = await analyticsLimit.checkLimit(key);
+    if (!allowed) {
+      res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many analytics requests.' });
+      return;
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+
+router.use(analyticsRateLimit);
 
 /**
  * @route   POST /api/v1/analytics/export
@@ -39,12 +65,29 @@ router.post('/export', requirePermission(Permission.VIEW_ANALYTICS), async (req,
         const pdfBuffer = await AnalyticsService.generatePDFReport(workspaceId, start, end);
         const fileName = `analytics-report-${Date.now()}.pdf`;
         
+        // Audit log
+        WorkspaceActivityLog.create({
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          userId: new mongoose.Types.ObjectId(req.user!.userId),
+          action: ActivityAction.ANALYTICS_EXPORTED,
+          details: { format, startDate, endDate },
+        }).catch(() => {});
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
         res.send(pdfBuffer);
       } catch (pdfError: any) {
         // If PDF generation fails, return metadata response for tests
         const fileName = `analytics-report-${Date.now()}.pdf`;
+        
+        // Audit log
+        WorkspaceActivityLog.create({
+          workspaceId: new mongoose.Types.ObjectId(workspaceId),
+          userId: new mongoose.Types.ObjectId(req.user!.userId),
+          action: ActivityAction.ANALYTICS_EXPORTED,
+          details: { format, startDate, endDate },
+        }).catch(() => {});
+        
         res.json({ 
           success: true, 
           data: { 
@@ -59,6 +102,15 @@ router.post('/export', requirePermission(Permission.VIEW_ANALYTICS), async (req,
       const summaryData = await AnalyticsService.getSummaryMetrics(workspaceId, start, end, start, end);
       const fileName = `analytics-report-${Date.now()}.${format}`;
       const csvContent = JSON.stringify(summaryData);
+      
+      // Audit log
+      WorkspaceActivityLog.create({
+        workspaceId: new mongoose.Types.ObjectId(workspaceId),
+        userId: new mongoose.Types.ObjectId(req.user!.userId),
+        action: ActivityAction.ANALYTICS_EXPORTED,
+        details: { format, startDate, endDate },
+      }).catch(() => {});
+      
       res.json({ success: true, data: { fileName, fileSize: csvContent.length, downloadUrl: `/exports/${fileName}` } });
     }
   } catch (error: any) {

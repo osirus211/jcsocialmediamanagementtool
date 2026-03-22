@@ -41,6 +41,9 @@ export interface IMention extends Document {
   // Collection metadata
   collectedAt: Date;
   
+  // Read status
+  readAt?: Date;
+  
   // Platform-specific data
   platformData?: Record<string, any>;
   
@@ -128,6 +131,11 @@ const MentionSchema = new Schema<IMention>(
       type: Date,
       required: true,
       index: true,
+    },
+    
+    // Read status
+    readAt: {
+      type: Date,
     },
     
     // Platform-specific data
